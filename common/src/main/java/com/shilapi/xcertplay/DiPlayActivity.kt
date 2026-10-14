@@ -2242,11 +2242,9 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             val clusterSize = clusterDisplay?.let { ClusterMapPresentation.sizeOf(it) }
             val diLink4 = false
             val clusterMapEnabled = AirPlayPersistence.loadClusterMapEnabled(this)
-            if (clusterMapEnabled) {
-                // v100 B561: 仪表屏选择 —— B561 不做指纹匹配,一律走「枚举副屏 + 用户选屏」。
-                // 原选屏控件(clusterDisplayControl)在移植时遗漏,此处补回。
-                clusterDisplayControl(card, diLink4)
-            }
+            // v100 B561: 选屏控件**无条件**显示 —— 它是「用哪块屏」的入口。
+            // 若也要求先开总开关才出现,用户就看不到屏列表(死锁)。
+            clusterDisplayControl(card, diLink4)
             reconnectingToggle(card, getString(R.string.carplay_map_on_instrument_cluster_experimental),
                 if (clusterDisplay != null || adbCluster) getString(R.string.shows_the_iphone_s_cluster_map_on_the_instrument_cluster_c)
                 else getString(R.string.shows_the_iphone_s_cluster_map_virtual_stream_description),
@@ -2289,10 +2287,12 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                         card.addView(button(getString(R.string.btn_auto_apply_permissions), false) { autoApplyPermissions() }, matchButton(8, 54))
                     }
                 }
-                if (clusterDisplay != null || adbCluster) {
-                    // v100 B561: 原 `if (false && !adbCluster)`
-                    // 分支(按车机仪表主题自动切地图/卡片 + 主题/对比度选择)整体删除
-                    // —— B561 无 DiLink 屏,主题由仪表显示屏自己决定。走 else 分支。
+                // v100 B561: 恒真 —— 这层原先是 `if (clusterDisplay != null || adbCluster)`,
+                // 害得「转向卡 / 路口卡 / 三卡预览」在还没选到屏时整块不显示;而选屏控件
+                // 也在这一层里,用户被卡在「看不到卡、也选不了屏」的死结。
+                // 卡片设置与「有没有屏」解耦:屏由 clusterDisplayControl 让用户显式选。
+                if (true) {
+                    // v100: DiLink 5.1 自动主题分支已随 BYD 集成删除(恒假占位保持结构)
                     if (false) {
                         // v100: DiLink 5.1 自动主题分支已随 BYD 集成删除(占位保持结构)
                     } else {

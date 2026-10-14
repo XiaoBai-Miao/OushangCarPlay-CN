@@ -9,10 +9,28 @@ import java.net.URL
 import java.net.URLConnection
 
 internal object UpdateClient {
-    internal const val GITEE_RELEASES_URL =
-        "https://gitee.com/api/v5/repos/oneeyear/DiPlay-CN/releases/latest"
+    /**
+     * ★ v100 B561: 更新源指向本人的 GitHub 仓库（原为上游 serein-morii/DiPlay-CN +
+     * Gitee oneeyear 镜像 —— 那些 release 里没有 B561 定制版，会把车机升级到
+     * 别人的构建）。
+     */
     internal const val GITHUB_RELEASES_URL =
-        "https://api.github.com/repos/serein-morii/DiPlay-CN/releases?per_page=5"
+        "https://api.github.com/repos/XiaoBai-Miao/OushangCarPlay-CN/releases?per_page=5"
+
+    /**
+     * 备用源：gh-proxy.org 前缀式镜像。
+     *
+     * 与 git 推送不同，**读**操作走代理是可行的（fetch 实测通过），所以这里
+     * 拿它当国内网络下的备份通道。
+     */
+    internal const val GITHUB_PROXY_RELEASES_URL =
+        "https://gh-proxy.org/$GITHUB_RELEASES_URL"
+
+    /**
+     * 保留旧常量名以免 [UpdateChannels] 与测试引用断裂 —— 值已指向本人仓库，
+     * 走 GitHub 官方 API（api.github.com），不用 Gitee。
+     */
+    internal const val GITEE_RELEASES_URL = GITHUB_RELEASES_URL
     private const val CONNECT_TIMEOUT_MILLIS = 10_000
     private const val READ_TIMEOUT_MILLIS = 30_000
     private const val MAXIMUM_TEXT_BYTES = 4 * 1024 * 1024
