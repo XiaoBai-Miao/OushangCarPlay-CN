@@ -2203,8 +2203,41 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             toggle(card, getString(R.string.settings_car_bluetooth_audio), getString(R.string.settings_car_bluetooth_audio_description),
                 AirPlayPersistence.loadCarBluetoothAudio(this)) {
                 AirPlayPersistence.saveCarBluetoothAudio(this, it)
+                // 同步切断档位,免得两个开关各说各话:音频走车机蓝牙 → 不切断(OFF);
+                // 音频走 CarPlay → 断 A2DP(AUDIO)。
+                AirPlayPersistence.saveBluetoothScope(
+                    this,
+                    if (it) AirPlayPersistence.BluetoothScope.OFF
+                    else AirPlayPersistence.BluetoothScope.AUDIO,
+                )
                 reconnectIfRunning()
             }
+            // ★ v104 B561: 车机侧蓝牙机械切断档位。`/info` 的 disableBluetooth 键拦不住
+            //   iPhone 建 BT profile(10-14 实测),所以要车机侧硬切。
+            val scopes = AirPlayPersistence.BluetoothScope.entries
+            choice(
+                card,
+                getString(R.string.bluetooth_cut_scope),
+                listOf(
+                    getString(R.string.bluetooth_cut_off),
+                    getString(R.string.bluetooth_cut_audio),
+                    getString(R.string.bluetooth_cut_full),
+                    getString(R.string.bluetooth_cut_all),
+                ),
+                scopes.indexOf(
+                    AirPlayPersistence.loadBluetoothScopeMigrated(
+                        this, AirPlayPersistence.BluetoothScope.AUDIO,
+                    ),
+                ).coerceAtLeast(0),
+                reconnects = false,
+            ) { index ->
+                AirPlayPersistence.saveBluetoothScope(this, scopes[index])
+                render()
+            }
+            card.addView(
+                label(getString(R.string.bluetooth_cut_scope_note), 14, MUTED)
+                    .apply { setPadding(0, dp(NOTE_LINE_GAP_DP), 0, 0) },
+            )
         }
         filteredSection(content, SettingsSection.CAR_BUTTON,
             getString(R.string.car_button_in_carplay), R.drawable.ic_dp_car) { card -> carButtonCard = card; carButtonControls(card) }

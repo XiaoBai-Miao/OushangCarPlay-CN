@@ -5090,6 +5090,12 @@ class CarPlayHostActivity : ComponentActivity() {
         object : AirPlaySessionListener {
             private val diagnosticLog = sessionLog
 
+            // ★ v104 B561: T1 —— 手机下发 disableBluetooth(handoff)时立即切断车机侧 BT。
+            //   这是抢在手机提交 BT 音频路由之前的最后时点。
+            override fun onBluetoothHandoffCommand(session: AirPlaySession) {
+                cutBluetoothNow("handoff")
+            }
+
             override fun onSessionActive(session: AirPlaySession) {
                 runOnUiThread {
                     if (controllerGeneration != restartGeneration) {
@@ -5103,6 +5109,10 @@ class CarPlayHostActivity : ComponentActivity() {
                     reconnectAttempts = 0
                     logThemeState(ThemeModeDiagnostics.Source.SESSION_ACTIVE, resources.configuration)
                     syncAirPlayDarkMode(ThemeModeDiagnostics.Source.SESSION_ACTIVE)
+                    // ★ v104 B561: T2 兜底 —— 会话激活后 +1.5s 断车机侧 BT。
+                    //   必须在 runOnUiThread 里调（armA2dpDisconnectTick 走 mainHandler），
+                    //   但 BluetoothA2dpDisconnect 是阻塞的,真正执行在后台线程。
+                    armA2dpDisconnectTick()
                     // A monitor result may arrive after the stream geometry was requested.
                     applyClusterTurnOverlay()
                     if (AirPlayPersistence.loadClusterSmallWindowMode(this@CarPlayHostActivity) == CLUSTER_SMALL_WINDOW_AUTO &&
@@ -5425,6 +5435,118 @@ class CarPlayHostActivity : ComponentActivity() {
         }
         logThemeState(source, newConfig)
     }
+
+    // ─────────────────────────────────────────────────────────────
+    // ★ v104 B561: 车机侧蓝牙机械切断（T1 即时 + T2 兜底）
+    //
+    // 为什么要车机侧硬切：`/info` 的 `disableBluetooth` 键只能让 iPhone 关闭蓝牙
+    // **会话控制**（SBC/AAC 协商层），**拦不住它建立 BT profile** ——
+    // 10-14 实测：handoff 在 37.42 完成，iPhone 39.45 照样连上 HFP(16)+A2DP(11)。
+    //
+    // 时机分工：
+    //   T1 [cutBluetoothNow]  手机下发 disableBluetooth 的瞬间（抢在路由提交前）
+    //   T2 [a2dpDisconnectTick] 会话激活 +1.5s（兜底「命令后才连」的场景）
+    // 两者共用 [cutBluetoothProfiles] 执行体。
+    // ─────────────────────────────────────────────────────────────
+
+    /** 当前要断的 profile 集合，按用户选的档位展开。 */
+    private fun bluetoothProfilesForScope(scope: AirPlayPersistence.BluetoothScope): List<BluetoothA2dpDisconnect.Profile> =
+        when (scope) {
+            AirPlayPersistence.BluetoothScope.OFF -> emptyList()
+            // ★ AUDIO 档断的是 **A2DP_SINK**(id=11)，不是 BluetoothProfile.A2DP(=2)。
+            //   2 是 A2DP Source 角色 —— 这台车机没有该链路，栈回 "no state machine"，
+            //   实车表现为「点了立即断开但手机音乐还在」。
+            AirPlayPersistence.BluetoothScope.AUDIO -> listOf(BluetoothA2dpDisconnect.Profile.A2DP_SINK)
+            // 连 HFP 一起断：手机来电/铃声也不再从车机出，双焦点最彻底。
+            // HFP 在这台车上是 profile=16（厂商 com.chinatsp...HfpProfile），不是 HEADSET(=1)。
+            AirPlayPersistence.BluetoothScope.FULL ->
+                listOf(
+                    BluetoothA2dpDisconnect.Profile.A2DP_SINK,
+                    BluetoothA2dpDisconnect.Profile.HFP,
+                )
+            // 「彻底断开」走另一条实现 —— 不按 profile 名单，
+            // 由系统对该设备断全部链路。见 [BluetoothA2dpDisconnect.disconnectAllLinks]。
+            AirPlayPersistence.BluetoothScope.ALL -> emptyList()
+        }
+
+    /** T1：手机下发 `disableBluetooth`（handoff）时按当前档位**立即**切断。 */
+    private fun cutBluetoothNow(reason: String) {
+        if (isDestroyed || shuttingDown.get()) return
+        val scope = AirPlayPersistence.loadBluetoothScopeMigrated(this, DEFAULT_BLUETOOTH_SCOPE)
+        if (scope == AirPlayPersistence.BluetoothScope.OFF) {
+            appendLog("Bluetooth[$reason]: scope=OFF; nothing to disconnect")
+            return
+        }
+        appendLog("Bluetooth[$reason]: cutting scope=$scope")
+        // 后台线程：BluetoothA2dpDisconnect 会阻塞等待 profile 代理，主线程调会 ANR。
+        Thread({ cutBluetoothProfiles(scope) }, "carplay-a2dp-disconnect").start()
+    }
+
+    /** 切断执行体（后台线程调用）：按档位断 profile 名单，或 ALL 档整链路断开。 */
+    private fun cutBluetoothProfiles(scope: AirPlayPersistence.BluetoothScope) {
+        if (scope == AirPlayPersistence.BluetoothScope.ALL) {
+            BluetoothA2dpDisconnect.disconnectAllLinks(this) { address, ok ->
+                runOnUiThread {
+                    appendLog("Bluetooth: full link drop ${address} ${if (ok) "requested" else "fallback"}")
+                }
+            }
+            return
+        }
+        val profiles = bluetoothProfilesForScope(scope)
+        if (profiles.isEmpty()) {
+            appendLog("Bluetooth: scope=$scope maps to no profile; nothing to do")
+            return
+        }
+        val connected = profiles.flatMap { profile ->
+            BluetoothA2dpDisconnect.connectedDevices(this, profile)
+                .map { device -> profile to device }
+        }
+        if (connected.isEmpty()) {
+            runOnUiThread {
+                appendLog("Bluetooth: no ${profiles.joinToString { it.label }} device connected")
+            }
+            return
+        }
+        // 先把要断的设备名单打出来 —— 即使后面 disconnect() 全被拒绝，
+        // 这一行也能证明"我们看见了什么"，比事后猜要可靠。
+        runOnUiThread {
+            appendLog(
+                "Bluetooth: ${connected.size} link(s) to drop — " +
+                    connected.joinToString { "${it.first.label}→${it.second.second ?: it.second.first}" },
+            )
+        }
+        BluetoothA2dpDisconnect.disconnect(this, profiles) { address, profileName, ok ->
+            runOnUiThread {
+                appendLog("Bluetooth: $profileName disconnect ${address} ${if (ok) "requested" else "refused"}")
+            }
+        }
+    }
+
+    /** T2 兜底：会话激活后延时 [A2DP_DISCONNECT_DELAY_MILLIS] 断，覆盖「命令后才连」的场景。 */
+    private val a2dpDisconnectTick = Runnable {
+        if (isDestroyed || shuttingDown.get()) return@Runnable
+        val scope = AirPlayPersistence.loadBluetoothScopeMigrated(this, DEFAULT_BLUETOOTH_SCOPE)
+        if (scope == AirPlayPersistence.BluetoothScope.OFF) {
+            appendLog("Bluetooth: scope=OFF; nothing to disconnect")
+            return@Runnable
+        }
+        Thread({ cutBluetoothProfiles(scope) }, "carplay-a2dp-disconnect").start()
+    }
+
+    private fun armA2dpDisconnectTick() {
+        val scope = AirPlayPersistence.loadBluetoothScopeMigrated(this, DEFAULT_BLUETOOTH_SCOPE)
+        if (scope == AirPlayPersistence.BluetoothScope.OFF) return
+        if (isDestroyed || shuttingDown.get()) return
+        val generation = restartGeneration
+        mainHandler.removeCallbacks(a2dpDisconnectTick)
+        mainHandler.postDelayed(a2dpDisconnectTick, A2DP_DISCONNECT_DELAY_MILLIS)
+        appendLog("A2DP: armed auto-disconnect in ${A2DP_DISCONNECT_DELAY_MILLIS}ms (generation=$generation)")
+    }
+
+    /** ★ v104 B561: 新装默认 AUDIO（断 A2DP）—— 与 `/info` 的 disableBluetooth 同向。 */
+    private val DEFAULT_BLUETOOTH_SCOPE = AirPlayPersistence.BluetoothScope.AUDIO
+
+    private val A2DP_DISCONNECT_DELAY_MILLIS = 1_500L
 
     private fun logThemeState(source: ThemeModeDiagnostics.Source, configuration: Configuration) {
         themeDiagnostics.observe(
