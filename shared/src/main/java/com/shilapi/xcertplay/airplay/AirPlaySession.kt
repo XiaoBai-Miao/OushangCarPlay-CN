@@ -33,6 +33,17 @@ interface AirPlaySessionListener {
     fun onDeviceInfo(session: AirPlaySession, info: AirPlayDeviceInfo) {}
     fun onHostUiRequested(session: AirPlaySession) {}
     fun onCommand(session: AirPlaySession, type: String, params: Map<String, Any?>) {}
+
+    /**
+     * ★ v104 B561: 手机下发 `disableBluetooth`（wireless handoff）时回调。
+     *
+     * 这是抢在手机提交 BT 音频路由之前的最后时点 —— 10-14 实测 handoff
+     * 在 37.42 完成，iPhone 39.45 才连 HFP/A2DP，所以必须**立刻**断，
+     * 等 +1.5s 的 tick 太晚。
+     *
+     * 默认空实现：不是所有监听方都要车机侧切断。
+     */
+    fun onBluetoothHandoffCommand(session: AirPlaySession) {}
     /** Video in car: a playback message on a remote control session (X-Apple-StreamID). */
     fun onRemoteControlMessage(session: AirPlaySession, streamId: Long, message: Map<String, Any?>) {}
     /** Video in car: requestUI "videoplayback:", the iPhone asks the car to show its video player. */

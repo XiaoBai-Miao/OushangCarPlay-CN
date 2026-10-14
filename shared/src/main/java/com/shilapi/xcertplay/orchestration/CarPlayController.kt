@@ -397,6 +397,9 @@ class CarPlayController(
                 )
                 armWirelessHandoffWatchdog(wirelessGeneration.get())
                 maybeCompleteWirelessHandoff()
+                // ★ v104 B561: 通知 UI 侧立刻切断车机侧 BT（`/info` 的
+                //   disableBluetooth 键拦不住 iPhone 建 profile,必须机械切断）。
+                uiListener?.onBluetoothHandoffCommand(session)
             }
             uiListener?.onCommand(session, type, params)
         }

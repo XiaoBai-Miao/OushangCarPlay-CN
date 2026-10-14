@@ -169,6 +169,7 @@ object AirPlayPersistence {
     private const val KEY_LAUNCHER_RETURNS_TO_CARPLAY = "launcher_returns_to_carplay"
     private const val KEY_SWIPE_OPENS_FULL_SETTINGS = "swipe_opens_full_settings"
     private const val KEY_UPDATE_CHANNEL = "update_channel"
+    private const val KEY_BLUETOOTH_SCOPE = "bluetooth_scope"
     private const val KEY_CARPLAY_CALLS = "carplay_calls"
     private const val KEY_CARPLAY_CALL_CONTROLS = "carplay_call_controls"
 
@@ -1728,5 +1729,64 @@ object AirPlayPersistence {
     fun saveCarPlayCallControls(context: Context, enabled: Boolean) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putBoolean(KEY_CARPLAY_CALL_CONTROLS, enabled).apply()
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // v104 B561: 蓝牙切断档位（从 OushangCarPlay v92 移植）
+    //
+    // `/info` 的 `disableBluetooth` 键只能让 iPhone 关闭蓝牙**会话控制**
+    // （SBC/AAC 协商层），**拦不住它建立 BT profile** —— 10-14 实测：
+    // handoff 37.42 完成，iPhone 39.45 照样连上 HFP(16)+A2DP(11)。
+    // 所以车机侧仍需这套机械切断兜底。
+    // ─────────────────────────────────────────────────────────────
+
+    /**
+     * 切断档位。**存枚举名而非下标** —— 下标顺序一变用户的设置就静默错位。
+     *
+     * - [OFF] 完全不介入
+     * - [AUDIO] 只断 A2DP_SINK(id=11)：车机不再当音箱收手机音乐
+     * - [FULL] 加断 HFP(id=16)：手机来电/铃声也不再从车机出，双焦点最彻底
+     * - [ALL] 走「彻底断开」，由系统对该设备断全部链路
+     */
+    enum class BluetoothScope { OFF, AUDIO, FULL, ALL }
+
+    fun loadBluetoothScope(context: Context): BluetoothScope {
+        val raw = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getString(KEY_BLUETOOTH_SCOPE, null) ?: return BluetoothScope.OFF
+        return runCatching { BluetoothScope.valueOf(raw) }.getOrDefault(BluetoothScope.OFF)
+    }
+
+    fun saveBluetoothScope(context: Context, scope: BluetoothScope) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putString(KEY_BLUETOOTH_SCOPE, scope.name).apply()
+    }
+
+    /**
+     * 读取切断档位，并把旧的布尔开关迁移过来。
+     *
+     * 迁移规则：**新枚举优先**，只有它**从未被写过**时才回退看旧布尔；
+     * 否则用户在新 UI 关掉档位后，下次启动会被旧布尔「复活」。
+     *
+     * @param legacyDefault 旧布尔也没写时的取值 —— v104 起默认 AUDIO
+     *        （新装即断 A2DP，与 `/info` 的 disableBluetooth 同向）。
+     */
+    fun loadBluetoothScopeMigrated(context: Context, legacyDefault: BluetoothScope): BluetoothScope {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val saved = prefs.getString(KEY_BLUETOOTH_SCOPE, null)
+        if (saved != null) {
+            return runCatching { BluetoothScope.valueOf(saved) }.getOrDefault(legacyDefault)
+        }
+        val legacy = if (prefs.contains(KEY_CAR_BLUETOOTH_AUDIO)) {
+            // 旧开关语义是「音频走车机蓝牙」= **不**断蓝牙 → OFF；否则 AUDIO。
+            if (prefs.getBoolean(KEY_CAR_BLUETOOTH_AUDIO, false)) {
+                BluetoothScope.OFF
+            } else {
+                BluetoothScope.AUDIO
+            }
+        } else {
+            legacyDefault
+        }
+        saveBluetoothScope(context, legacy)
+        return legacy
     }
 }
