@@ -2248,6 +2248,13 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             // v100 B561: 仪表媒体卡设置放在「音频」分区 —— 媒体卡本质是播放器
             // 的一部分,跟着音频走比塞在仪表屏设置里更符合预期。
             clusterMediaCardControls(card)
+            // ★ v105 B561: 导航声道是否申请音频焦点。默认关(= 不抢焦点,叠加播放)。
+            toggle(card, getString(R.string.navigation_audio_focus),
+                getString(R.string.navigation_audio_focus_description),
+                com.shilapi.xcertplay.media.NavigationAudioFocus.requestsFocus(this)) {
+                com.shilapi.xcertplay.media.NavigationAudioFocus
+                    .saveRequestsFocus(this, it)
+            }
             val bufferPresets = com.shilapi.xcertplay.media.MediaAudioBuffer.presets
             choice(card, getString(R.string.music_buffer), listOf(getString(R.string.s_300_ms_default), getString(R.string.s_500_ms), getString(R.string.s_1000_ms_most_stable)),
                 bufferPresets.indexOf(AirPlayPersistence.loadMediaBufferMillis(this)).coerceAtLeast(0)) {
