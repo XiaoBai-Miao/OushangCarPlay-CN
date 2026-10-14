@@ -267,6 +267,9 @@ internal object CarPlayMediaKeys {
 
     private fun start(context: Context) {
         val expectedController = controller ?: return
+        // ★ v106 B561: 媒体开始播放时做一次**只读**车机音量分组诊断。
+        // 由「音频增强诊断」开关控制（默认关）；不调任何写 API，不改原逻辑。
+        com.shilapi.xcertplay.media.NavVolumeFollower.dumpGroups(context)
         val focusDisabled = AirPlayPersistence.loadDisableMediaKeyAudioFocus(context)
         val granted = if (focusDisabled) {
             // Some OEMs route physical volume buttons to the focus owner. Keep an active
@@ -287,6 +290,8 @@ internal object CarPlayMediaKeys {
                     .build(),
                 { change -> onFocusChanged(expectedController, owner, change) },
                 mainHandler,
+                // ★ v106 B561: 开关默认关 ⇒ 不设 flag，行为与 v105 一致
+                com.shilapi.xcertplay.media.AudioEnhancements.enforcedAudibility(context),
             )
             focusRequest = request
             (audio?.let(request::request) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED).also {

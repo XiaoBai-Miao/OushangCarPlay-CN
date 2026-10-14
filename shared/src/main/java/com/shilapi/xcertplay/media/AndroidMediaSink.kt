@@ -38,7 +38,11 @@ internal fun audioTrackAttributesForFocus(track: AudioTrack, configured: AudioAt
 
 /** Owns one focus request for all eligible tracks in a CarPlay sink. */
 internal class AudioFocusCoordinator(
-    context: Context?,
+    /**
+     * ★ v106: 改为 val 以便在方法体内读取开关（原先只用于初始 manager）。
+     * 原本是普通构造参数，用完即弃。
+     */
+    private val context: Context?,
     private val enabled: Boolean,
     private val muteMediaOnTransientLoss: Boolean = true,
     private val report: (String) -> Unit = {},
@@ -133,7 +137,13 @@ internal class AudioFocusCoordinator(
             AudioChannel.NAVIGATION -> return
         }
         currentListener = listenerFor(focusGeneration)
-        val next = AudioFocusRequestCompat(gain, primary.attributes, currentListener, Handler(Looper.getMainLooper()))
+        val next = AudioFocusRequestCompat(
+            gain, primary.attributes, currentListener, Handler(Looper.getMainLooper()),
+            // ★ v106 B561: 开关默认关 ⇒ 不设 flag，行为与 v105 一致
+            // ★ AudioFocusCoordinator 有自己的 context 构造参数（见类头），
+            // 用它而不是外层 AndroidMediaSink.appContext —— 后者在此不可见。
+            enforcedAudibility = AudioEnhancements.enforcedAudibility(context),
+        )
         request = next
         requestedChannel = primary.channel
         val result = manager?.let(next::request)

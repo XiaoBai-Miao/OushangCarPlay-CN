@@ -2255,6 +2255,15 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                 com.shilapi.xcertplay.media.NavigationAudioFocus
                     .saveRequestsFocus(this, it)
             }
+            // ===== v106 B561: 音频增强（每项独立、默认全关，互不影响）=====
+            com.shilapi.xcertplay.media.AudioEnhancements.let { ae ->
+                toggle(card, getString(R.string.audio_enforced_audibility),
+                    getString(R.string.audio_enforced_audibility_description),
+                    ae.enforcedAudibility(this)) { ae.saveEnforcedAudibility(this, it) }
+                toggle(card, getString(R.string.audio_group_volume_diagnostic),
+                    getString(R.string.audio_group_volume_diagnostic_description),
+                    ae.groupVolumeVerbose(this)) { ae.saveGroupVolumeVerbose(this, it) }
+            }
             val bufferPresets = com.shilapi.xcertplay.media.MediaAudioBuffer.presets
             choice(card, getString(R.string.music_buffer), listOf(getString(R.string.s_300_ms_default), getString(R.string.s_500_ms), getString(R.string.s_1000_ms_most_stable)),
                 bufferPresets.indexOf(AirPlayPersistence.loadMediaBufferMillis(this)).coerceAtLeast(0)) {
