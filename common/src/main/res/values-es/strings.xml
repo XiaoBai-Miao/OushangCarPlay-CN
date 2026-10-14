@@ -908,4 +908,8 @@
         <string name="bluetooth_cut_audio">Drop A2DP (music)</string>
         <string name="bluetooth_cut_full">Drop A2DP + HFP (calls too)</string>
         <string name="bluetooth_cut_all">Drop every link</string>
+
+    <!-- v105 B561: 导航声道焦点 -->
+        <string name="navigation_audio_focus">Navigation prompts request audio focus</string>
+        <string name="navigation_audio_focus_description">Off (default): navigation prompts overlay other audio without interrupting it — this is what lets the car’s own map and an aftermarket map app speak at the same time. On: navigation takes audio focus, so the head unit can duck or pause other audio while it talks. Turn it on if navigation prompts are too quiet or get drowned out.</string>
 </resources>

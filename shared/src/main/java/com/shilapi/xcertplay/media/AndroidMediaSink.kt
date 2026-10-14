@@ -680,6 +680,9 @@ class AndroidMediaSink(
             speakerphoneCall = false,
             echoReference = echoReference,
             voiceFilter = callVoiceFilter && format.audioType == TELEPHONY_AUDIO_TYPE,
+            // ★ v105 B561: AudioRenderer 是内部类,拿不到外层的 appContext ——
+            //   导航声道要不要申请焦点得读设置,所以显式传进来。
+            settingsContext = appContext,
         ).also { audioRenderers[id] = it }
     }
 
@@ -1694,6 +1697,8 @@ private class AudioRenderer(
     /** Receives the played call audio so the call microphone can cancel its echo. */
     private val echoReference: EchoReference? = null,
     voiceFilter: Boolean = false,
+    /** ★ v105 B561: 只为读 [NavigationAudioFocus] 的开关；为 null 时按「不申请焦点」处理。 */
+    private val settingsContext: Context? = null,
 ) : Closeable {
     private data class AudioPacket(val rtp: ByteArray, val sample: Int)
 
@@ -2007,13 +2012,18 @@ private class AudioRenderer(
             .build()
 
     /**
-     * Shares a sink-level focus request across all active non-navigation renderers.
-     * Navigation guidance intentionally takes no focus: it overlays media without ducking it.
+     * Shares a sink-level focus request across all active renderers.
+     *
+     * 导航声道默认**不申请**焦点 —— 它叠加在媒体上而不打断
+     * （"overlays media without ducking it"），这是三路导航声音能共存的机制。
+     *
+     * ★ v105 B561: 是否申请改为开关（[NavigationAudioFocus]）——
+     * 有些车机要求「导航播报时压低其他音频」，或导航语音被别的 App 抢走时需要夺回。
      */
     private fun requestAudioFocus() {
         val channel = mappedChannel ?: return
         val attributes = trackAttributes ?: return
-        if (channel == AudioChannel.NAVIGATION) {
+        if (channel == AudioChannel.NAVIGATION && !NavigationAudioFocus.requestsFocus(settingsContext)) {
             Log.i(TAG, "audio focus skipped channel=NAVIGATION; overlays without ducking")
             return
         }

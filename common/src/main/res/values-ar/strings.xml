@@ -957,4 +957,8 @@
         <string name="bluetooth_cut_audio">Drop A2DP (music)</string>
         <string name="bluetooth_cut_full">Drop A2DP + HFP (calls too)</string>
         <string name="bluetooth_cut_all">Drop every link</string>
+
+    <!-- v105 B561: 导航声道焦点 -->
+        <string name="navigation_audio_focus">Navigation prompts request audio focus</string>
+    <string name="navigation_audio_focus_description">إيقاف (افتراضي): إرشادات التنقل تتراكب على الصوت الآخر دون مقاطعته — وهذا ما يسمح لخريطة السيارة وتطبيق خرائط خارجي بالتحدث في الوقت نفسه. تشغيل: يأخذ التنقل تركيز الصوت، فيستطيع النظام خفض الصوت الآخر أو إيقافه مؤقتًا أثناء النطق. فعّله إذا كانت إرشادات التنقل خافتة أو يغطّيها صوت آخر.</string>
 </resources>
