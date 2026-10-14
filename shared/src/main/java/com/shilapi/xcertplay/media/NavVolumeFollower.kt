@@ -67,9 +67,20 @@ object NavVolumeFollower {
         }
 
         val car = try {
-            // createCar(Context, ICarServiceConnectionListener) —— 第二参数 null，无需回调
-            val listenerClass = Class.forName("android.car.ICarServiceConnectionListener")
-            val create = carClass.getMethod("createCar", Context::class.java, listenerClass)
+            // ★ 真实签名来自 CarService.apk 的 `smali/android/car/Car.smali`（权威）：
+            //   createCar(Context, android.content.ServiceConnection) → Car       (line 608)
+            //   createCar(Context, ServiceConnection, Handler)        → Car       (line 623)
+            //   getCarManager(String) → Object                                    (line 1959)
+            //   isConnected() / connect()
+            //
+            // ★ 踩坑记录：v106 我猜第二参数是 `android.car.ICarServiceConnectionListener`
+            //   是**错的**（实车报 "Car.createCar/connect failed: android.car.
+            //   ICarServiceConnectionListener"）。它就是标准的 **ServiceConnection**。
+            val create = carClass.getMethod(
+                "createCar",
+                Context::class.java,
+                android.content.ServiceConnection::class.java,
+            )
             (create.invoke(null, app, null) as Any).also {
                 carClass.getMethod("connect").invoke(it)
             }
