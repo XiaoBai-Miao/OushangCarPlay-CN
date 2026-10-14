@@ -910,12 +910,12 @@
         <string name="bluetooth_cut_all">Drop every link</string>
 
     <!-- v105 B561: 导航声道焦点 -->
-        <string name="navigation_audio_focus">Navigation prompts request audio focus</string>
-        <string name="navigation_audio_focus_description">Off (default): navigation prompts overlay other audio without interrupting it — this is what lets the car’s own map and an aftermarket map app speak at the same time. On: navigation takes audio focus, so the head unit can duck or pause other audio while it talks. Turn it on if navigation prompts are too quiet or get drowned out.</string>
+        <string name="navigation_audio_focus">Los avisos de navegación solicitan el foco de audio</string>
+        <string name="navigation_audio_focus_description">Desactivado (predeterminado): los avisos de navegación se superponen al otro audio sin interrumpirlo — eso permite que el mapa del coche y una app de terceros hablen a la vez. Activado: la navegación toma el foco de audio, por lo que el equipo puede atenuar o pausar el otro audio mientras habla. Actívalo si los avisos suenan demasiado bajos o quedan tapados.</string>
 
     <!-- v106 B561: 音频增强开关 -->
-        <string name="audio_enforced_audibility">Force audible audio</string>
-        <string name="audio_enforced_audibility_description">Off (default): nothing changes. On: marks our audio request as “must stay audible” so the head unit cannot silence or duck it. The original car apps set this flag; enabling it may keep CarPlay audio from being muted when other audio policies kick in. If audio sounds stuck at full volume, turn it off.</string>
-        <string name="audio_group_volume_diagnostic">Volume group diagnostics</string>
-        <string name="audio_group_volume_diagnostic_description">Off (default): no output. On: when audio starts playing, log the head unit’s own volume groups and current levels (read-only, changes nothing). Useful for confirming how the car maps CarPlay audio to its navigation and music volume sliders. Read the log with: adb logcat -s NavVolumeFollower</string>
+        <string name="audio_enforced_audibility">Forzar que el audio sea audible</string>
+        <string name="audio_enforced_audibility_description">Desactivado (predeterminado): no cambia nada. Activado: marca nuestra solicitud de audio como «debe seguir siendo audible» para que el equipo no la silencie ni la atenúe. Las aplicaciones de fábrica usan esta marca; al activarla, el audio de CarPlay puede dejar de silenciarse cuando entren en juego otras políticas de audio. Si el sonido queda fijo al máximo, desactívalo.</string>
+        <string name="audio_group_volume_diagnostic">Diagnóstico de grupos de volumen</string>
+        <string name="audio_group_volume_diagnostic_description">Desactivado (predeterminado): sin salida. Activado: al iniciar el audio, registra los grupos de volumen del equipo y sus niveles actuales (solo lectura, no cambia nada). Sirve para comprobar cómo el coche asigna el audio de CarPlay a sus deslizadores de navegación y música. Lee el registro con: adb logcat -s NavVolumeFollower</string>
 </resources>

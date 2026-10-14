@@ -1016,7 +1016,7 @@
 
     <!-- v106 B561: 音频增强开关 -->
         <string name="audio_enforced_audibility">Force audible audio</string>
-        <string name="audio_enforced_audibility_description">Off (default): nothing changes. On: marks our audio request as “must stay audible” so the head unit cannot silence or duck it. The original car apps set this flag; enabling it may keep CarPlay audio from being muted when other audio policies kick in. If audio sounds stuck at full volume, turn it off.</string>
+        <string name="audio_enforced_audibility_description">Off (default): nothing changes. On: marks our audio request as “must stay audible” so the head unit cannot silence or duck it. The car’s own apps set this flag; enabling it may stop CarPlay audio being muted when other audio policies kick in. Turn it off if audio gets stuck at full volume.</string>
         <string name="audio_group_volume_diagnostic">Volume group diagnostics</string>
         <string name="audio_group_volume_diagnostic_description">Off (default): no output. On: when audio starts playing, log the head unit’s own volume groups and current levels (read-only, changes nothing). Useful for confirming how the car maps CarPlay audio to its navigation and music volume sliders. Read the log with: adb logcat -s NavVolumeFollower</string>
 </resources>
