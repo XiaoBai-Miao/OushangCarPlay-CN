@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <application
+        android:allowBackup="false"
+        android:fullBackupContent="@xml/backup_rules"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:icon="@drawable/ic_carplay"
+        android:label="@string/app_name"
+        android:localeConfig="@xml/locales_config"
+        android:roundIcon="@drawable/ic_carplay"
+        android:supportsRtl="true"
+        android:resizeableActivity="true"
+        android:theme="@style/Theme.Xcertplay">
+
+        <meta-data
+            android:name="android.allow_multiple_resumed_activities"
+            android:value="true" />
+
+        <receiver
+            android:name="com.shilapi.xcertplay.BootReceiver"
+            android:enabled="true"
+            tools:replace="android:enabled" />
+
+        <receiver
+            android:name="com.shilapi.xcertplay.PhoneBluetoothReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.bluetooth.device.action.ACL_CONNECTED" />
+            </intent-filter>
+        </receiver>
+
+        <service android:name="com.shilapi.xcertplay.shared.MyCarAppService" tools:node="remove" />
+        <meta-data android:name="androidx.car.app.minCarApiLevel" tools:node="remove" />
+
+        <!-- The launcher entry moves to the aliases below so the app-list name can be switched. -->
+        <activity
+            android:name="com.shilapi.xcertplay.DiPlayActivity"
+            android:exported="true"
+            android:launchMode="singleTop">
+            <intent-filter tools:node="remove">
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity-alias
+            android:name="com.shilapi.xcertplay.LauncherAliasCn"
+            android:label="@string/app_name"
+            android:enabled="true"
+            android:exported="true"
+            android:targetActivity="com.shilapi.xcertplay.DiPlayActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="com.shilapi.xcertplay.LauncherAliasDiplayCn"
+            android:label="@string/alias_label_diplaycn"
+            android:enabled="false"
+            android:exported="true"
+            android:targetActivity="com.shilapi.xcertplay.DiPlayActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="com.shilapi.xcertplay.LauncherAliasCarplay"
+            android:icon="@drawable/ic_alias_carpaly"
+            android:label="@string/alias_label_carpaly"
+            android:enabled="false"
+            android:exported="true"
+            android:targetActivity="com.shilapi.xcertplay.DiPlayActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="com.shilapi.xcertplay.LauncherAliasNavi"
+            android:icon="@drawable/ic_alias_navi"
+            android:label="@string/alias_label_navi"
+            android:enabled="false"
+            android:exported="true"
+            android:targetActivity="com.shilapi.xcertplay.DiPlayActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="com.shilapi.xcertplay.LauncherAliasMap"
+            android:icon="@drawable/ic_alias_map"
+            android:label="@string/alias_label_map"
+            android:enabled="false"
+            android:exported="true"
+            android:targetActivity="com.shilapi.xcertplay.DiPlayActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="com.shilapi.xcertplay.LauncherAliasLink"
+            android:icon="@drawable/ic_alias_link"
+            android:label="@string/alias_label_link"
+            android:enabled="false"
+            android:exported="true"
+            android:targetActivity="com.shilapi.xcertplay.DiPlayActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="com.shilapi.xcertplay.LauncherAliasMedia"
+            android:icon="@drawable/ic_alias_media"
+            android:label="@string/alias_label_media"
+            android:enabled="false"
+            android:exported="true"
+            android:targetActivity="com.shilapi.xcertplay.DiPlayActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+    </application>
+
+</manifest>

@@ -1,0 +1,8 @@
+# build outputs
+build/
+.gradle/
+local.properties
+*.apk
+*.p12
+*.pem
+*.jks
