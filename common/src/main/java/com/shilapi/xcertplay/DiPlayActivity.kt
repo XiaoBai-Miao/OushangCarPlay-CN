@@ -2242,6 +2242,11 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             val clusterSize = clusterDisplay?.let { ClusterMapPresentation.sizeOf(it) }
             val diLink4 = false
             val clusterMapEnabled = AirPlayPersistence.loadClusterMapEnabled(this)
+            if (clusterMapEnabled) {
+                // v100 B561: 仪表屏选择 —— B561 不做指纹匹配,一律走「枚举副屏 + 用户选屏」。
+                // 原选屏控件(clusterDisplayControl)在移植时遗漏,此处补回。
+                clusterDisplayControl(card, diLink4)
+            }
             reconnectingToggle(card, getString(R.string.carplay_map_on_instrument_cluster_experimental),
                 if (clusterDisplay != null || adbCluster) getString(R.string.shows_the_iphone_s_cluster_map_on_the_instrument_cluster_c)
                 else getString(R.string.shows_the_iphone_s_cluster_map_virtual_stream_description),
@@ -4112,6 +4117,84 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     /** 定位权限是否已授予（通用 Android 权限，与 BYD 无关）。 */
     private fun hasPreciseLocation(): Boolean =
         checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+
+    /**
+     * 长安欧尚 B561:仪表屏选择控件。
+     *
+     * 列出除主屏外的所有可用屏幕,供用户指定 CarPlay 导航/媒体信息的出图目标。
+     *
+     * ## 为什么 B561 必须有它,而 0.2.14 原版没有
+     *
+     * 0.2.14 靠 `DiLink4ClusterDisplay.matches(name, w, h)` 判定仪表屏,那是
+     * **比亚迪专属指纹**(`name == "DiLink4"` 且 1920×720)。B561 的仪表是 HDMI
+     * 外接副屏,屏名与尺寸都不匹配 —— `diLink4` 恒 false,`findDisplay()` 也没有
+     * 候选,于是界面上只剩「DiLink4 仪表视频(ADB,实验性)」,**没有选屏入口**。
+     *
+     * 0.2.13 的做法是 `ClusterStreamProfile.matches()` 直接 `= false`:
+     * 刻意不做指纹匹配,凡是 B561 一律走"枚举副屏 + 用户选屏"。本方法把那套逻辑
+     * 搬回新版,并在 [diLink4] 为真时让位给官方控件(两套不并存)。
+     *
+     * @param diLink4 官方 DiLink4 路径已接管时为真 —— 此时不重复显示选屏控件。
+     */
+    private fun clusterDisplayControl(parent: LinearLayout, diLink4: Boolean) {
+        // DiLink 路径下屏是确定的(指纹匹配出来的),让用户手选只会与官方逻辑打架。
+        if (diLink4) return
+
+        val candidates = com.shilapi.xcertplay.cluster.ClusterDisplayCatalog.candidates(this)
+
+        toggle(
+            parent, "自动选择仪表屏",
+            "开启后自动使用检测到的第一块副屏;关闭后可手动指定。",
+            com.shilapi.xcertplay.cluster.ClusterDisplayCatalog.autoFollow(this),
+        ) { enabled ->
+            com.shilapi.xcertplay.cluster.ClusterDisplayCatalog.setAutoFollow(this, enabled)
+            render()
+        }
+
+        if (candidates.isEmpty()) {
+            parent.addView(
+                label(
+                    "未检测到副屏。请确认仪表屏已点亮并接入 HDMI 后,重新进入此页面。",
+                    14, MUTED,
+                ).apply { setPadding(0, dp(12), 0, dp(4)) },
+            )
+            return
+        }
+
+        val selected = com.shilapi.xcertplay.cluster.ClusterDisplayCatalog.selectedId(this)
+        val resolved = com.shilapi.xcertplay.cluster.ClusterDisplayCatalog.resolve(this)
+        val currentLabel = resolved?.displayId?.let { id ->
+            candidates.firstOrNull { it.displayId == id }?.describe()
+        } ?: "未选择"
+
+        val control = button("目标仪表屏: $currentLabel", false) {}
+        control.setOnClickListener {
+            val labels = candidates.map { it.describe() }.toTypedArray()
+            val current = candidates.indexOfFirst { it.displayId == selected }.takeIf { it >= 0 } ?: 0
+            AlertDialog.Builder(this)
+                .setTitle("选择仪表屏")
+                .setSingleChoiceItems(labels, current) { dialog, which ->
+                    val picked = candidates[which]
+                    // ★ 显式选屏必须同时关掉 autoFollow ——
+                    //   resolve() 只在 !autoFollow() 时才读 selectedId,
+                    //   忘了关就是"选了没反应"。
+                    com.shilapi.xcertplay.cluster.ClusterDisplayCatalog
+                        .setAutoFollow(this, false)
+                    com.shilapi.xcertplay.cluster.ClusterDisplayCatalog
+                        .setSelectedId(this, picked.displayId)
+                    dialog.dismiss()
+                    render()
+                }
+                .setNegativeButton(getString(R.string.cancel), null)
+                .show()
+        }
+        parent.addView(control, matchButton(10, 60))
+
+        parent.addView(
+            label("共检测到 ${candidates.size} 块副屏。切换后需重新连接 iPhone 生效。", 14, MUTED)
+                .apply { setPadding(0, dp(8), 0, dp(4)) },
+        )
+    }
 
     private fun clusterSafeAreaControls(card: LinearLayout) {
         val rect = AirPlayPersistence.loadClusterSafeAreaRect(this)
