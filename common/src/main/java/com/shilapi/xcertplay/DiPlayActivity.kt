@@ -595,6 +595,11 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
 
     private fun render(appearanceOnly: Boolean, preferredFocusTag: Any? = null) {
         enforceInterfaceSize()
+        // ★ v103: 旧的仪表卡预览 View 随整棵视图树一起被丢弃 ——
+        //   必须先把字段置 null，否则 ensureClusterPreview 会把**已经挂在旧树上**
+        //   的 View 再挂到新树上，Android 抛「The specified child already has a parent」。
+        //   （v102 移植时漏了这行，模拟器上点选屏 → render() 即崩。）
+        clusterPreview = null
         refreshAppearance()
         applyWindowAppearance()
         // A pending assignment belongs to the widgets being replaced, never to another page.
