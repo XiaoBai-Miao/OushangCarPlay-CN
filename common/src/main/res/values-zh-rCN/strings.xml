@@ -962,12 +962,12 @@
     <string name="cluster_card_vertical">上下位置</string>
 
     <!-- v104 B561: 车机侧蓝牙切断档位 -->
-        <string name="bluetooth_cut_scope">Disconnect the car’s Bluetooth during CarPlay</string>
-        <string name="bluetooth_cut_scope_note">The /info disableBluetooth key only stops Bluetooth audio negotiation — the iPhone still opens A2DP/HFP. This cuts the car side: OFF does nothing, Audio drops A2DP_SINK (music stops coming from the car), Full also drops HFP (calls and ringtones stop too), All drops every link.</string>
-        <string name="bluetooth_cut_off">Don’t disconnect</string>
-        <string name="bluetooth_cut_audio">Drop A2DP (music)</string>
-        <string name="bluetooth_cut_full">Drop A2DP + HFP (calls too)</string>
-        <string name="bluetooth_cut_all">Drop every link</string>
+        <string name="bluetooth_cut_scope">CarPlay 期间断开车机蓝牙</string>
+        <string name="bluetooth_cut_scope_note">/info 里的 disableBluetooth 只是停止蓝牙音频协商 —— iPhone 仍会开 A2DP/HFP。本项切断的是车机侧：关闭=不做任何事；音频=断开 A2DP_SINK（车机不再出音乐）；完整=再断开 HFP（通话和铃声也停）；全部=断开所有链路。</string>
+        <string name="bluetooth_cut_off">不断开</string>
+        <string name="bluetooth_cut_audio">断开 A2DP（音乐）</string>
+        <string name="bluetooth_cut_full">断开 A2DP + HFP（含通话）</string>
+        <string name="bluetooth_cut_all">断开所有链路</string>
 
     <!-- v105 B561: 导航声道焦点 -->
         <string name="navigation_audio_focus">导航播报申请音频焦点</string>
