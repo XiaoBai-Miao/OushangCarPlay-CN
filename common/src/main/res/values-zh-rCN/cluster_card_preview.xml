@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="card_preview_title">转向卡位置预览</string>
-    <string name="card_preview_note">按整块仪表面板比例示意位置；实际小屏边界因车型而异。</string>
+    <string name="card_preview_title">卡片位置预览</string>
+    <string name="card_preview_note">蓝色描边为当前选中卡片，其余卡片按实际位置一并显示；拖动下方滑块即时生效。</string>
     <string name="card_preview_full">全屏</string>
     <string name="card_preview_small">小屏</string>
+    <string name="cluster_preview_card_turn">转向卡</string>
+    <string name="cluster_preview_no_card">当前没有可调整位置的卡片 —— 打开「自定义转向卡」「媒体卡」或「路口放大图」后即可在此调整。</string>
+    <string name="cluster_preview_reset">重置位置</string>
 </resources>

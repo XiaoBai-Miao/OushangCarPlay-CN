@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="card_preview_title">轉向卡位置預覽</string>
-    <string name="card_preview_note">依整個儀表面板比例顯示位置；實際小視窗邊界因車型而異。</string>
+    <string name="card_preview_title">卡片位置預覽</string>
+    <string name="card_preview_note">藍色描邊為目前選中的卡片，其餘卡片依實際位置一併顯示；拖動下方滑桿即時生效。</string>
     <string name="card_preview_full">全螢幕</string>
     <string name="card_preview_small">小視窗</string>
+    <string name="cluster_preview_card_turn">轉向卡</string>
+    <string name="cluster_preview_no_card">目前沒有可調整位置的卡片 —— 開啟「自訂轉向卡」「媒體卡」或「路口放大圖」後即可在此調整。</string>
+    <string name="cluster_preview_reset">重置位置</string>
 </resources>

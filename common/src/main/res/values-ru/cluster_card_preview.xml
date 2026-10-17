@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="card_preview_title">Предпросмотр положения карточки поворота</string>
-    <string name="card_preview_note">Положение показано относительно всей панели. Граница малого окна зависит от автомобиля.</string>
+    <string name="card_preview_title">Предпросмотр положения карточки</string>
+    <string name="card_preview_note">Карточка с синей рамкой — выбранная; остальные показаны в своих реальных позициях. Ползунки применяются сразу.</string>
     <string name="card_preview_full">Полный экран</string>
     <string name="card_preview_small">Малое окно</string>
+    <string name="cluster_preview_card_turn">Карточка поворота</string>
+    <string name="cluster_preview_no_card">Пока нет карточек для размещения — включите свою карточку поворота, карточку медиа или карточку перекрёстка, чтобы настроить их здесь.</string>
+    <string name="cluster_preview_reset">Сбросить положение</string>
 </resources>

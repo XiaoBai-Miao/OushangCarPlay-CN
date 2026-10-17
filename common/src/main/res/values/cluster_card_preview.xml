@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="card_preview_title">Turn-card placement preview</string>
-    <string name="card_preview_note">Proportional position on the full cluster panel. The actual small-window edge varies by car.</string>
+    <string name="card_preview_title">Card placement preview</string>
+    <string name="card_preview_note">The outlined card is the selected one; the other cards show their real positions. Slider changes apply instantly.</string>
     <string name="card_preview_full">Full screen</string>
     <string name="card_preview_small">Small window</string>
+    <string name="cluster_preview_card_turn">Turn card</string>
+    <string name="cluster_preview_no_card">No cards to position yet — enable the custom turn card, media card or junction card to adjust them here.</string>
+    <string name="cluster_preview_reset">Reset position</string>
 </resources>

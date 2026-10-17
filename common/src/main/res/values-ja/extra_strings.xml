@@ -22,10 +22,13 @@
     <string name="carplay_night_hint">保存してCarPlayに戻ると反映されます。</string>
     <string name="carplay_night_ambient_hint">下の明るさのしきい値と切り替え時間を使用します。光センサーがない場合はAndroidの設定に従います。</string>
     <string name="carplay_night_time_note">CarPlayの外観が「自動」の場合、iPhoneの時刻も考慮されます。「常に昼」を選んでも夜は暗い表示になることがあります。</string>
-    <string name="card_preview_title">案内カードの配置プレビュー</string>
-    <string name="card_preview_note">メーター全体に対する相対位置です。小画面の実際の端の位置は車種によって異なります。</string>
+    <string name="card_preview_title">カード位置プレビュー</string>
+    <string name="card_preview_note">青い枠が選択中のカードです。他のカードも実際の位置で表示されます。スライダーは即時反映されます。</string>
     <string name="card_preview_full">全画面</string>
     <string name="card_preview_small">小画面</string>
+    <string name="cluster_preview_card_turn">案内カード</string>
+    <string name="cluster_preview_no_card">位置を調整できるカードがありません。カスタム案内カード、メディアカード、交差点カードを有効にすると、ここで調整できます。</string>
+    <string name="cluster_preview_reset">位置をリセット</string>
     <string name="contrib_audio_home_channel_preview_unavailable">この端末ではAndroid音声ストリーム%1$dを試聴できません。</string>
     <string name="contrib_audio_home_choice_summary">%1$s · %2$s</string>
     <string name="contrib_audio_home_media_channel_label">メディア音声のストリーム</string>

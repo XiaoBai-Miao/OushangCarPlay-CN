@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="card_preview_title">معاينة موضع بطاقة الانعطاف</string>
-    <string name="card_preview_note">موضع نسبي على لوحة العدادات كاملة. تختلف حدود النافذة الصغيرة حسب السيارة.</string>
+    <string name="card_preview_title">معاينة موضع البطاقة</string>
+    <string name="card_preview_note">البطاقة ذات الإطار الأزرق هي المحددة؛ أما البطاقات الأخرى فتُعرض في مواضعها الفعلية. تُطبّق المنزلقات فورًا.</string>
     <string name="card_preview_full">شاشة كاملة</string>
     <string name="card_preview_small">نافذة صغيرة</string>
+    <string name="cluster_preview_card_turn">بطاقة الانعطاف</string>
+    <string name="cluster_preview_no_card">لا توجد بطاقات لتحديد موضعها بعد — شغّل بطاقة الانعطاف المخصصة أو بطاقة الوسائط أو بطاقة التقاطع لضبطها هنا.</string>
+    <string name="cluster_preview_reset">إعادة تعيين الموضع</string>
 </resources>

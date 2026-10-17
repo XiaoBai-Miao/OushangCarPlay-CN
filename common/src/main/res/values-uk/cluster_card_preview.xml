@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="card_preview_title">Попередній перегляд картки повороту</string>
-    <string name="card_preview_note">Положення показано відносно всієї панелі. Межа малого вікна залежить від авто.</string>
+    <string name="card_preview_title">Попередній перегляд картки</string>
+    <string name="card_preview_note">Картка з синьою рамкою — вибрана; інші показані у своїх реальних позиціях. Повзунки застосовуються одразу.</string>
     <string name="card_preview_full">Повний екран</string>
     <string name="card_preview_small">Мале вікно</string>
+    <string name="cluster_preview_card_turn">Картка повороту</string>
+    <string name="cluster_preview_no_card">Поки немає карток для розташування — увімкніть власну картку повороту, картку медіа або картку перехрестя, щоб налаштувати їх тут.</string>
+    <string name="cluster_preview_reset">Скинути положення</string>
 </resources>

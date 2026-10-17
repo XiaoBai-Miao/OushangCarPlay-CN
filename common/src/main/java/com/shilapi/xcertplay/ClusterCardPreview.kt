@@ -5,9 +5,9 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Rect
+import android.graphics.RectF
 import android.graphics.Typeface
 import android.view.View
-import android.widget.LinearLayout
 import com.shilapi.xcertplay.airplay.ClusterTurnCardOverlay
 
 /**
@@ -59,6 +59,14 @@ internal class ClusterCardPreview(context: Context) : View(context) {
     /** B561: 路口放大图。默认不画（与实车一致：没车道数据就不显示）。 */
     private var showJunctionCard = false
 
+    /**
+     * v108: 当前选中的卡片 —— 预览框下方的位置滑块调的就是它。
+     *
+     * 三张卡（转向 / 媒体 / 路口）共用这一个预览框，选中项决定：
+     * ① 哪张卡画高亮描边；② 下方滑块读写哪一套持久化键。
+     */
+    private var selectedCard = "turn"
+
     private val panelPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
@@ -72,6 +80,11 @@ internal class ClusterCardPreview(context: Context) : View(context) {
     private val cardPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val cardTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+    }
+
+    /** v108: 选中卡的描边。颜色随昼夜在 [update] 里切换。 */
+    private val selectionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.rgb(51, 139, 255)
     }
 
     private val turnCard = ClusterTurnCardView(context)
@@ -116,6 +129,8 @@ internal class ClusterCardPreview(context: Context) : View(context) {
         place(junctionCard, "junction")
         panelPaint.color = if (night) Color.rgb(18, 20, 26) else Color.rgb(226, 232, 240)
         hintPaint.color = if (night) Color.argb(110, 255, 255, 255) else Color.argb(150, 0, 0, 0)
+        // 夜间面板底色接近卡片底色，亮蓝在两种底色上都清晰；白天用更饱和的蓝。
+        selectionPaint.color = if (night) Color.rgb(96, 165, 250) else Color.rgb(37, 99, 235)
         invalidate()
     }
 
@@ -133,6 +148,18 @@ internal class ClusterCardPreview(context: Context) : View(context) {
      */
     fun setJunctionVisible(visible: Boolean) {
         showJunctionCard = visible
+        invalidate()
+    }
+
+    /**
+     * v108: 选中一张卡（"turn" / "media" / "junction"）。
+     *
+     * 高亮只画描边不改卡片本身 —— 未选中的卡照常显示，
+     * 用户能看到三张卡的相对位置（这正是这个预览框相对
+     * 每卡一个预览框的核心价值），同时明确知道滑块在调哪张。
+     */
+    fun setSelectedCard(key: String) {
+        selectedCard = key
         invalidate()
     }
 
@@ -165,44 +192,6 @@ internal class ClusterCardPreview(context: Context) : View(context) {
     }
 
     /**
-     * ★ v69: 把预览挂进设置页的卡片里。
-     *
-     * 抽这个是因为 v69 之后**两个分区都要挂它**（媒体卡设置搬去了「音频」），
-     * 而挂载方式是 `matchButton(4, 0)` —— DiPlayActivity 里的私有布局助手，
-     * Preview 拿不到。写成扩展函数放在 Preview 文件里，
-     * 两个分区就都能 `ensureClusterPreview(card)?.addTo(card)`。
-     *
-     * 宽度 `match(4, 0)`：占满卡片内容宽，高度给 0 让 [onMeasure] 按 8:3 自算。
-     *
-     * ## v73: 默认不再渲染
-     *
-     * 用户要求「设置里去掉卡片预览」。挡在这里而不是删调用点，是因为预览有
-     * **两个**挂载处（仪表分区建实例、音频分区 `ensureClusterPreview(card)?.addTo(card)` 挂载），
-     * 逐个删要改两处且容易漏 —— 漏一处就留下一个孤立的 View。
-     * 在唯一的挂载入口 early-return，两个分区一起干净。
-     *
-     * **滑块全部保留**：位置 / 大小 / 形状仍可调，只是不再画示意图。
-     * 预览的价值是"所见即所得"，但它在 1920×910 上要吃掉一整张卡的高度，
-     * 而这张卡下面就是实际调滑块的地方 —— 挤在一起反而不如直接调。
-     */
-    fun addTo(card: LinearLayout) {
-        if (!SHOW_CARD_PREVIEW) return
-        card.addView(this, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT, 0,
-        ))
-    }
-
-    companion object {
-        /**
-         * v73: 是否在设置页渲染仪表卡片缩略图。
-         *
-         * 默认 **false**（用户要求去掉）。改回 true 即恢复 v69 的所见即所得预览；
-         * 几何与形状的持久化、刷新逻辑都原封不动，所以恢复不需要额外改动。
-         */
-        const val SHOW_CARD_PREVIEW = false
-    }
-
-    /**
      * 缩略图里按屏幕比例显示仪表。
      *
      * 高度铺满可用空间、宽度按 8:3 推；宽度不够时反过来以宽度为准 ——
@@ -231,9 +220,9 @@ internal class ClusterCardPreview(context: Context) : View(context) {
         // 缩放由画布的 scale 承担，所以传原始像素尺寸即可。
         canvas.save()
         canvas.scale(scale, scale)
-        drawCard(canvas, turnCard, cardWidth, cardHeight, showTurnCard)
-        drawCard(canvas, mediaCard, cardWidth, cardHeight, showMediaCard)
-        drawCard(canvas, junctionCard, cardWidth, cardHeight, showJunctionCard)
+        drawCard(canvas, turnCard, cardWidth, cardHeight, showTurnCard, "turn")
+        drawCard(canvas, mediaCard, cardWidth, cardHeight, showMediaCard, "media")
+        drawCard(canvas, junctionCard, cardWidth, cardHeight, showJunctionCard, "junction")
         canvas.restore()
 
         canvas.drawText(
@@ -247,6 +236,7 @@ internal class ClusterCardPreview(context: Context) : View(context) {
         cardWidth: Int,
         cardHeight: Int,
         visible: Boolean,
+        key: String,
     ) {
         if (!visible) return
         // 没有数据的卡片不画 —— 与实车"宁缺勿画"一致：
@@ -259,6 +249,17 @@ internal class ClusterCardPreview(context: Context) : View(context) {
         )
         card.layout(0, 0, cardWidth, cardHeight)
         card.draw(canvas)
+        // v108: 选中卡的描边画在卡片之上（卡片自身背景不透明，垫在下面会被盖住）。
+        // 圆角与卡片圆角一致，看起来就是卡片自己的边框被点亮。
+        if (key == selectedCard) {
+            val rect = Rect(
+                card.left + dp(3), card.top + dp(3),
+                card.right - dp(3), card.bottom - dp(3),
+            )
+            selectionPaint.style = Paint.Style.STROKE
+            selectionPaint.strokeWidth = 3f * density
+            canvas.drawRoundRect(RectF(rect), 10f * density, 10f * density, selectionPaint)
+        }
     }
 
     private fun dp(value: Int): Int = (value * density).toInt()

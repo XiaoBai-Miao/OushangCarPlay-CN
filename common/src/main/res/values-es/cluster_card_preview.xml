@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="card_preview_title">Vista previa de la tarjeta de giro</string>
-    <string name="card_preview_note">Posición proporcional en el cuadro completo. El borde real de la ventana pequeña depende del coche.</string>
+    <string name="card_preview_title">Vista previa de la tarjeta</string>
+    <string name="card_preview_note">La tarjeta con contorno azul es la seleccionada; las demás muestran su posición real. Los controles se aplican al instante.</string>
     <string name="card_preview_full">Pantalla completa</string>
     <string name="card_preview_small">Ventana pequeña</string>
+    <string name="cluster_preview_card_turn">Tarjeta de giro</string>
+    <string name="cluster_preview_no_card">Aún no hay tarjetas que posicionar: activa la tarjeta de giro personalizada, la tarjeta de medio o la tarjeta de cruce para ajustarlas aquí.</string>
+    <string name="cluster_preview_reset">Restablecer posición</string>
 </resources>

@@ -1323,18 +1323,10 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                 AirPlayPersistence.loadClusterMediaArtwork(this)) {
                 AirPlayPersistence.saveClusterMediaArtwork(this, it)
             }
-            addCardGeometrySliders(
-                card,
-                prefix = "media", onChanged = ::refreshClusterPreview,
-                loadX = { AirPlayPersistence.loadClusterMediaXPercent(this) },
-                loadY = { AirPlayPersistence.loadClusterMediaYPercent(this) },
-                loadSize = { AirPlayPersistence.loadClusterMediaSizePercent(this) },
-                loadOpacity = { AirPlayPersistence.loadClusterMediaOpacityPercent(this) },
-                saveX = { AirPlayPersistence.saveClusterMediaXPercent(this, it) },
-                saveY = { AirPlayPersistence.saveClusterMediaYPercent(this, it) },
-                saveSize = { AirPlayPersistence.saveClusterMediaSizePercent(this, it) },
-                saveOpacity = { AirPlayPersistence.saveClusterMediaOpacityPercent(this, it) },
-            )
+            // v108: 位置/大小/透明度滑块已整合到仪表分区的「统一卡片预览」块
+            // （三张卡共用一个预览框 + 一行 chip 选卡）。这里只留内容属性：
+            // 字号、滚动、排放方向、宽高 —— 它们与"卡里放什么"相关，
+            // 跟位置不是一类，混在一起反而是六七个滑块一长条。
             // B561: 字号滑块 —— 与上面「大小」分开，因为它只改字不动卡。
             // 用户反馈仪表屏上歌名偏小，但把整张卡放大会挡住地图。
             card.addView(
@@ -1419,6 +1411,16 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     private var clusterPreview: ClusterCardPreview? = null
 
     /**
+     * v108: 统一预览框当前选中的卡片（"turn" / "media" / "junction"）。
+     *
+     * 与 [clusterPreview] 不同 —— 这个字段**不随 render() 重置**：
+     * render() 重建整棵视图树，但用户选中哪张卡是跨重建的意图，
+     * 重置会让用户每次切换任何设置都被打回转向卡。
+     * 若选中的卡恰好不可用（被关掉/内容切换），构建时回退到第一个可用卡。
+     */
+    private var clusterPreviewCard = "turn"
+
+    /**
      * ★ v69: 拿到（必要时创建并挂上）仪表卡预览。
      *
      *媒体卡的设置在「音频」分区、预览在「仪表」分区，两个分区各自 render()
@@ -1481,11 +1483,108 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         )
     }
 
-    private fun addCardGeometrySliders(
+    /**
+     * v108: 统一的仪表卡片预览块 —— 一行卡片选择 + 一个预览框 + 位置滑块。
+     *
+     * 原先主面板三张卡有**两个**预览框（转向卡一个 ClusterCardPlacementPreview、
+     * 三卡共用一个 ClusterCardPreview），位置滑块还散在三个分区（转向卡在仪表区、
+     * 媒体卡在音频区、路口卡在仪表区）——调媒体卡位置要跑去音频分区、
+     * 看效果要回仪表分区。现在合成一块：
+     *
+     * ```
+     *   [转向卡] [媒体卡] [路口卡]     ← 一行 chip，只列当前可用的卡
+     *   ┌────────────────────┐
+     *   │   预览框（选中卡高亮）  │
+     *   └────────────────────┘
+     *   大小 / 透明度 / 水平 / 垂直   ← 只调选中卡那一套
+     *   [重置位置]
+     * ```
+     *
+     * 小窗卡片的预览**不**并进来：它的几何是「小窗内的百分比」，
+     * 与主面板的 1920×720 面板坐标不是一套体系，画进同一个框会误导。
+     */
+    private fun clusterCardPreviewBlock(card: LinearLayout) {
+        val turnAvailable = CarPlayClusterDisplay.usesCustomTurnCard(
+            AirPlayPersistence.loadClusterContent(this))
+        val mediaAvailable = AirPlayPersistence.loadClusterMediaCardEnabled(this)
+        val junctionAvailable = AirPlayPersistence.loadClusterJunctionCardEnabled(this)
+        val available = buildList {
+            if (turnAvailable) add("turn")
+            if (mediaAvailable) add("media")
+            if (junctionAvailable) add("junction")
+        }
+        card.addView(label(getString(R.string.card_preview_title), 16, TEXT, true))
+        if (available.isEmpty()) {
+            // 官方转向卡模式下媒体卡/路口卡都关着 —— 没有可摆的卡，说清楚原因。
+            card.addView(label(getString(R.string.cluster_preview_no_card), 14, MUTED))
+            return
+        }
+        // 选中的卡可能刚被关掉（或内容切回了官方转向卡）—— 回退到第一个可用卡。
+        if (clusterPreviewCard !in available) clusterPreviewCard = available.first()
+
+        // 一行 chip：等分排布，点选即切换预览高亮与下方滑块。
+        val chipRow = row().apply { setPadding(0, dp(4), 0, dp(10)) }
+        for (key in available) {
+            chipRow.addView(clusterCardChip(key, clusterPreviewCard == key))
+        }
+        card.addView(chipRow)
+
+        ensureClusterPreview(card)?.let { preview ->
+            card.addView(preview, LinearLayout.LayoutParams(-1, dp(240)))
+            preview.setVisibleCards(turnAvailable, mediaAvailable)
+            preview.setJunctionVisible(junctionAvailable)
+            preview.setSelectedCard(clusterPreviewCard)
+        }
+        card.addView(label(getString(R.string.card_preview_note), 14, MUTED).apply {
+            setPadding(0, dp(8), 0, 0)
+        })
+
+        // 位置滑块：选中卡读自己那套持久化键；保存后立刻刷新预览（拖滑块即见）。
+        when (clusterPreviewCard) {
+            "media" -> clusterCardSliders(
+                card,
+                loadX = { AirPlayPersistence.loadClusterMediaXPercent(this) },
+                loadY = { AirPlayPersistence.loadClusterMediaYPercent(this) },
+                loadSize = { AirPlayPersistence.loadClusterMediaSizePercent(this) },
+                loadOpacity = { AirPlayPersistence.loadClusterMediaOpacityPercent(this) },
+                saveX = { AirPlayPersistence.saveClusterMediaXPercent(this, it) },
+                saveY = { AirPlayPersistence.saveClusterMediaYPercent(this, it) },
+                saveSize = { AirPlayPersistence.saveClusterMediaSizePercent(this, it) },
+                saveOpacity = { AirPlayPersistence.saveClusterMediaOpacityPercent(this, it) },
+            )
+            "junction" -> clusterCardSliders(
+                card,
+                loadX = { AirPlayPersistence.loadClusterJunctionXPercent(this) },
+                loadY = { AirPlayPersistence.loadClusterJunctionYPercent(this) },
+                loadSize = { AirPlayPersistence.loadClusterJunctionSizePercent(this) },
+                loadOpacity = { AirPlayPersistence.loadClusterJunctionOpacityPercent(this) },
+                saveX = { AirPlayPersistence.saveClusterJunctionXPercent(this, it) },
+                saveY = { AirPlayPersistence.saveClusterJunctionYPercent(this, it) },
+                saveSize = { AirPlayPersistence.saveClusterJunctionSizePercent(this, it) },
+                saveOpacity = { AirPlayPersistence.saveClusterJunctionOpacityPercent(this, it) },
+            )
+            else -> clusterCardSliders(
+                card,
+                loadX = { AirPlayPersistence.loadClusterTurnCardOverlayXPercent(this) },
+                loadY = { AirPlayPersistence.loadClusterTurnCardOverlayYPercent(this) },
+                loadSize = { AirPlayPersistence.loadClusterTurnCardOverlaySizePercent(this) },
+                loadOpacity = { AirPlayPersistence.loadClusterTurnCardOpacityPercent(this) },
+                saveX = { AirPlayPersistence.saveClusterTurnCardOverlayXPercent(this, it) },
+                saveY = { AirPlayPersistence.saveClusterTurnCardOverlayYPercent(this, it) },
+                saveSize = { AirPlayPersistence.saveClusterTurnCardOverlaySizePercent(this, it) },
+                saveOpacity = { AirPlayPersistence.saveClusterTurnCardOpacityPercent(this, it) },
+            )
+        }
+    }
+
+    /**
+     * v108: 选中卡片的位置滑块组（大小 / 透明度 / 水平 / 垂直 + 重置）。
+     *
+     * 标签不带卡片名前缀 —— 选中态已经说明了在调哪张卡，再加
+     * 「媒体卡 · 大小」在窄栏里是重复信息。
+     */
+    private fun clusterCardSliders(
         card: LinearLayout,
-        prefix: String,
-        /** 每次滑块变化后回调，让预览跟着动（媒体/通话卡的几何与转向卡独立）。 */
-        onChanged: () -> Unit = {},
         loadX: () -> Int,
         loadY: () -> Int,
         loadSize: () -> Int,
@@ -1495,27 +1594,74 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         saveSize: (Int) -> Unit,
         saveOpacity: (Int) -> Unit,
     ) {
-        val label = when (prefix) {
-            "media" -> getString(R.string.cluster_media_card)
-            "junction" -> getString(R.string.cluster_junction_card)
-            else -> getString(R.string.cluster_call_card)
+        card.addView(overlaySliderRow(
+            getString(R.string.cluster_card_size),
+            ClusterTurnCardOverlay.sizePercents, loadSize(),
+        ) { getString(R.string.turn_card_overlay_size_option, it) }
+            .also { it.onSave = { v -> saveSize(v); refreshClusterPreview() } })
+        card.addView(overlaySliderRow(
+            getString(R.string.cluster_card_opacity),
+            ClusterTurnCardOverlay.opacityPercents, loadOpacity(),
+        ) { getString(R.string.turn_card_overlay_opacity_option, it) }
+            .also { it.onSave = { v -> saveOpacity(v); refreshClusterPreview() } })
+        card.addView(overlaySliderRow(
+            getString(R.string.cluster_card_horizontal),
+            ClusterTurnCardOverlay.xPercents, loadX(),
+        ) { overlayOffsetLabel(it, getString(R.string.marker_left), getString(R.string.marker_right), 50) }
+            .also { it.onSave = { v -> saveX(v); refreshClusterPreview() } })
+        card.addView(overlaySliderRow(
+            getString(R.string.cluster_card_vertical),
+            ClusterTurnCardOverlay.yPercents, loadY(),
+        ) { overlayOffsetLabel(it, getString(R.string.marker_up), getString(R.string.marker_down), 40) }
+            .also { it.onSave = { v -> saveY(v); refreshClusterPreview() } })
+        // 只重置位置，不动大小/透明度 —— 与旧「重置转向卡位置」按钮同语义：
+        // 用户往往是"卡挡住了地图"而不是"卡太大"。
+        card.addView(button(getString(R.string.cluster_preview_reset), false) {
+            saveX(ClusterTurnCardOverlay.DEFAULT_X_PERCENT)
+            saveY(ClusterTurnCardOverlay.DEFAULT_Y_PERCENT)
+            render()
+        }, matchButton(10, 56))
+    }
+
+    /**
+     * v108: 预览块顶部一行的卡片选择 chip。
+     *
+     * 不用 [choice]（按钮 + 弹窗单选）—— 那是两步操作，而这里要的是
+     * "一眼看到三张卡、点一下切换"。紧凑高度 + 等分权重，
+     * 选中项填充强调色，和设置页其他按钮同一套形状常量。
+     */
+    private fun clusterCardChip(key: String, selected: Boolean): android.widget.Button {
+        val title = getString(when (key) {
+            "media" -> R.string.cluster_media_card
+            "junction" -> R.string.cluster_junction_card
+            else -> R.string.cluster_preview_card_turn
+        })
+        return android.widget.Button(this).apply {
+            text = title
+            isAllCaps = false
+            textSize = 15f
+            setTextColor(if (selected) ON_ACCENT else TEXT)
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            background = android.graphics.drawable.RippleDrawable(
+                ColorStateList.valueOf(RIPPLE),
+                buttonShape(if (selected) ACCENT else BUTTON, if (selected) ACCENT else BORDER),
+                null,
+            )
+            setPadding(dp(8), 0, dp(8), 0)
+            minHeight = dp(40)
+            stateListAnimator = null
+            layoutParams = LinearLayout.LayoutParams(0, dp(40)).apply {
+                weight = 1f
+                leftMargin = dp(6)
+                rightMargin = dp(6)
+            }
+            setOnClickListener {
+                if (clusterPreviewCard != key) {
+                    clusterPreviewCard = key
+                    render()
+                }
+            }
         }
-        card.addView(overlaySliderRow("$label · ${getString(R.string.cluster_card_size)}",
-            ClusterTurnCardOverlay.sizePercents, loadSize()) {
-            getString(R.string.turn_card_overlay_size_option, it)
-        }.also { it.onSave = { v -> saveSize(v); onChanged() } })
-        card.addView(overlaySliderRow("$label · ${getString(R.string.cluster_card_opacity)}",
-            ClusterTurnCardOverlay.opacityPercents, loadOpacity()) {
-            getString(R.string.turn_card_overlay_opacity_option, it)
-        }.also { it.onSave = { v -> saveOpacity(v); onChanged() } })
-        card.addView(overlaySliderRow("$label · ${getString(R.string.cluster_card_horizontal)}",
-            ClusterTurnCardOverlay.xPercents, loadX()) {
-            overlayOffsetLabel(it, getString(R.string.marker_left), getString(R.string.marker_right), 50)
-        }.also { it.onSave = { v -> saveX(v); onChanged() } })
-        card.addView(overlaySliderRow("$label · ${getString(R.string.cluster_card_vertical)}",
-            ClusterTurnCardOverlay.yPercents, loadY()) {
-            overlayOffsetLabel(it, getString(R.string.marker_up), getString(R.string.marker_down), 40)
-        }.also { it.onSave = { v -> saveY(v); onChanged() } })
     }
 
     private fun nightModeLabels() = CarPlayNightMode.entries.map { mode ->
@@ -2360,7 +2506,9 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                         val contents = CarPlayClusterDisplay.Content.entries
                         val content = AirPlayPersistence.loadClusterContent(this)
                         val customCard = CarPlayClusterDisplay.usesCustomTurnCard(content)
-                        var cardPlacementPreview: ClusterCardPlacementPreview? = null
+                        // v108: 转向卡的 ClusterCardPlacementPreview(FULL) 已整合进
+                        // 「统一卡片预览」块；smallWindowPlacementPreview(SMALL) 保留 ——
+                        // 小窗卡几何是窗内百分比，与主面板坐标不是一套体系。
                         var smallWindowPlacementPreview: ClusterCardPlacementPreview? = null
                         val officialCardOnly = content == CarPlayClusterDisplay.Content.TURN_CARD
                         choice(card, getString(R.string.dashboard_shows), listOf(
@@ -2393,23 +2541,9 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                             }
                         }
                         if (customCard) {
-                            card.addView(label(getString(R.string.card_preview_title), 16, TEXT, true))
-                            cardPlacementPreview = ClusterCardPlacementPreview(this, ClusterCardPlacementPreview.Mode.FULL).also {
-                                card.addView(it, LinearLayout.LayoutParams(-1, dp(240)))
-                            }
-                            card.addView(label(getString(R.string.card_preview_note), 14, MUTED))
-                            card.addView(overlaySliderRow(
-                                getString(R.string.turn_card_overlay_size),
-                                ClusterTurnCardOverlay.sizePercents,
-                                AirPlayPersistence.loadClusterTurnCardOverlaySizePercent(this),
-                            ) { it -> getString(R.string.turn_card_overlay_size_option, it) }
-                                .also { it.onSave = { v -> AirPlayPersistence.saveClusterTurnCardOverlaySizePercent(this, v); cardPlacementPreview?.invalidate() } })
-                            card.addView(overlaySliderRow(
-                                getString(R.string.turn_card_overlay_opacity),
-                                ClusterTurnCardOverlay.opacityPercents,
-                                AirPlayPersistence.loadClusterTurnCardOpacityPercent(this),
-                            ) { it -> getString(R.string.turn_card_overlay_opacity_option, it) }
-                                .also { it.onSave = { v -> AirPlayPersistence.saveClusterTurnCardOpacityPercent(this, v) } })
+                            // v108: 预览框与位置/大小/透明度滑块已整合到下方
+                            // 「统一卡片预览」块（三卡共用一个预览 + 一行 chip）。
+                            // 这里只留转向卡特有的内容属性：主题与到达信息。
                             choice(card, getString(R.string.turn_card_theme), listOf(
                                 getString(R.string.turn_card_theme_auto),
                                 getString(R.string.turn_card_theme_day),
@@ -2417,23 +2551,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                             ), AirPlayPersistence.loadClusterTurnCardTheme(this), reconnects = false) {
                                 AirPlayPersistence.saveClusterTurnCardTheme(this, it)
                             }
-                            card.addView(overlaySliderRow(
-                                getString(R.string.turn_card_overlay_horizontal),
-                                ClusterTurnCardOverlay.xPercents,
-                                AirPlayPersistence.loadClusterTurnCardOverlayXPercent(this),
-                            ) { it -> overlayOffsetLabel(it, getString(R.string.marker_left), getString(R.string.marker_right), 50) }
-                                .also { it.onSave = { v -> AirPlayPersistence.saveClusterTurnCardOverlayXPercent(this, v); cardPlacementPreview?.invalidate() } })
-                            card.addView(overlaySliderRow(
-                                getString(R.string.turn_card_overlay_vertical),
-                                ClusterTurnCardOverlay.yPercents,
-                                AirPlayPersistence.loadClusterTurnCardOverlayYPercent(this),
-                            ) { it -> overlayOffsetLabel(it, getString(R.string.marker_up), getString(R.string.marker_down), 40) }
-                                .also { it.onSave = { v -> AirPlayPersistence.saveClusterTurnCardOverlayYPercent(this, v); cardPlacementPreview?.invalidate() } })
-                            card.addView(button(getString(R.string.reset_turn_card_overlay), false) {
-                                AirPlayPersistence.saveClusterTurnCardOverlayXPercent(this, ClusterTurnCardOverlay.DEFAULT_X_PERCENT)
-                                AirPlayPersistence.saveClusterTurnCardOverlayYPercent(this, ClusterTurnCardOverlay.DEFAULT_Y_PERCENT)
-                                render()
-                            }, matchButton(10, 56))
+                            // v108: 水平/垂直/大小/透明度/重置位置已移入统一卡片预览块。
                             card.addView(label(getString(R.string.turn_card_overlay_note), 14, MUTED))
                             toggle(card, getString(R.string.turn_card_show_arrival),
                                 getString(R.string.turn_card_show_arrival_description),
@@ -2449,32 +2567,12 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                             AirPlayPersistence.saveClusterJunctionCardEnabled(this, it)
                             render()
                         }
-                        if (AirPlayPersistence.loadClusterJunctionCardEnabled(this)) {
-                            addCardGeometrySliders(
-                                card,
-                                prefix = "junction", onChanged = ::refreshClusterPreview,
-                                loadX = { AirPlayPersistence.loadClusterJunctionXPercent(this) },
-                                loadY = { AirPlayPersistence.loadClusterJunctionYPercent(this) },
-                                loadSize = { AirPlayPersistence.loadClusterJunctionSizePercent(this) },
-                                loadOpacity = { AirPlayPersistence.loadClusterJunctionOpacityPercent(this) },
-                                saveX = { AirPlayPersistence.saveClusterJunctionXPercent(this, it) },
-                                saveY = { AirPlayPersistence.saveClusterJunctionYPercent(this, it) },
-                                saveSize = { AirPlayPersistence.saveClusterJunctionSizePercent(this, it) },
-                                saveOpacity = { AirPlayPersistence.saveClusterJunctionOpacityPercent(this, it) },
-                            )
-                        }
-                        // v100 B561: 三卡位置预览(媒体卡在「音频」分区,预览统一在此)
-                        card.addView(label(getString(R.string.card_preview_title), 16, TEXT, true))
-                        ensureClusterPreview(card)?.let { preview ->
-                            card.addView(preview, LinearLayout.LayoutParams(-1, dp(240)))
-                            preview.setVisibleCards(
-                                AirPlayPersistence.loadClusterContent(this)
-                                    .let { CarPlayClusterDisplay.usesCustomTurnCard(it) },
-                                AirPlayPersistence.loadClusterMediaCardEnabled(this),
-                            )
-                            preview.setJunctionVisible(AirPlayPersistence.loadClusterJunctionCardEnabled(this))
-                        }
-                        card.addView(label(getString(R.string.card_preview_note), 14, MUTED))
+                        // v108: 路口卡的位置/大小/透明度滑块已整合到下方「统一卡片预览」块。
+                        // v108 B561: 统一卡片预览 —— 一行 chip 选卡 + 一个预览框
+                        // + 选中卡的位置滑块。取代原先「转向卡自带一个预览框 +
+                        // 这里三卡预览框」的两个预览框结构；媒体卡/路口卡的
+                        // 位置滑块也从各自分区收进来。
+                        clusterCardPreviewBlock(card)
                         val turnCard = officialCardOnly
                         if (!diLink4) {
                             card.addView(overlaySliderRow(
