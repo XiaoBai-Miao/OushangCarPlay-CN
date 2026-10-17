@@ -578,6 +578,7 @@
     <string name="settings_gesture_fingers_hint">選擇車機尚未使用的手指數。比亞迪的三指向下滑動會開啟空調面板，建議改用 2 指。</string>
     <string name="auto_car_hotspot_title">自動開啟熱點</string>
     <string name="auto_car_hotspot_description">DiPlay 啟動時開啟車機熱點。開啟開關會自動透過 ADB 申請所需權限，請允許車機上的授權提示。配合“車輛啟動後開啟”可隨開機啟動。保留熱點名稱和密碼，不會自動關閉熱點。</string>
+    <string name="auto_car_hotspot_permission_hint">自動打開熱點需要「修改系統設定」權限。請在下方允許，否則連線時將自動請求。</string>
     <string name="hotspot_control_missing">缺少熱點控制權限。請透過 ADB 授權，或在車機設定中手動開啟熱點。</string>
     <string name="hotspot_permission_granted">授權成功。</string>
     <string name="hotspot_permission_failed">未獲得所請求的權限。請檢查車機設定後再試一次。</string>

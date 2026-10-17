@@ -525,6 +525,10 @@ class CarPlayHostActivity : ComponentActivity() {
                 refreshAppAppearance()
                 paintWaitingScreen()
                 applyClusterTurnOverlay()
+                // 状态栏跟着昼夜反色：白天白底深色图标，夜间黑底浅色图标。
+                // 不跟随系统 uiMode —— 车机常年报 UI_MODE_NIGHT_UNDEFINED，
+                // 跟系统等于永远不切。见 SystemBars。
+                SystemBars.apply(this, night)
                 appendLog("CarPlay switched to ${if (night) "night" else "day"} mode")
                 logThemeState(nightModeDiagnosticSource, resources.configuration)
                 syncAirPlayDarkMode(nightModeDiagnosticSource)
@@ -1043,6 +1047,13 @@ class CarPlayHostActivity : ComponentActivity() {
                 nightSchedule)
         }
         nightModeController.resume(systemNight)
+        // ★ 状态栏要在**恢复时**就上色，不能只等 onNightChanged 回调。
+        //
+        // 踩过的坑（v55）：只把 SystemBars.apply 挂在昼夜切换回调里，结果"白天启动"
+        // 这条路径压根不触发切换（resume 直接把状态设成白天了），状态栏就一直是
+        // 系统默认的深色 —— 表现是"app 设置页正常、CarPlay 界面白天仍深色"。
+        // 回调只覆盖"切换"，不覆盖"初始"。
+        SystemBars.apply(this, darkMode)
         AppAppearanceRuntime.publishHost(this, darkMode)
         refreshAppAppearance()
         if (!menuOpen) {
@@ -1334,18 +1345,34 @@ class CarPlayHostActivity : ComponentActivity() {
                 val smallWindow = smallWindowActive()
                 requestedSmallWindowForStream = smallWindow
                 val requestedScale = AirPlayPersistence.loadClusterMapScalePercent(this)
-                fun streamAt(scale: Int) = CarPlayClusterDisplay.config(
-                    size.x,
-                    size.y,
-                    scale,
-                    0,
-                    0,
-                    AirPlayPersistence.loadClusterContent(this),
-                    markerXPercent = if (smallWindow) AirPlayPersistence.loadClusterSmallWindowMarkerXPercent(this)
-                    else AirPlayPersistence.loadClusterMarkerXPercent(this),
-                    markerYPercent = if (smallWindow) AirPlayPersistence.loadClusterSmallWindowMarkerYPercent(this)
-                    else AirPlayPersistence.loadClusterMarkerYPercent(this),
-                )
+                // v107 B561: 用户在「安全区映射」编辑器里拖出的框(1920×720 坐标)直接替换
+                // 标记位算出的 safeArea inset —— 与 v64 DiLink4ClusterDisplay.streamConfig
+                // 的 safeAreaRect 参数同语义；没保存过自定义框就沿用标记版。
+                val clusterSafeAreaRect = AirPlayPersistence.loadClusterSafeAreaRect(this)
+                fun streamAt(scale: Int): com.shilapi.xcertplay.airplay.AirPlayDisplayConfig {
+                    val config = CarPlayClusterDisplay.config(
+                        size.x,
+                        size.y,
+                        scale,
+                        0,
+                        0,
+                        AirPlayPersistence.loadClusterContent(this),
+                        markerXPercent = if (smallWindow) AirPlayPersistence.loadClusterSmallWindowMarkerXPercent(this)
+                        else AirPlayPersistence.loadClusterMarkerXPercent(this),
+                        markerYPercent = if (smallWindow) AirPlayPersistence.loadClusterSmallWindowMarkerYPercent(this)
+                        else AirPlayPersistence.loadClusterMarkerYPercent(this),
+                    )
+                    if (clusterSafeAreaRect == null) return config
+                    return config.copy(
+                        safeArea = AirPlaySafeArea.toInsets(
+                            mapping = clusterSafeAreaRect,
+                            activityWidthPixels = ClusterLayout.STREAM_WIDTH,
+                            activityHeightPixels = ClusterLayout.STREAM_HEIGHT,
+                            displayWidthPixels = config.widthPixels,
+                            displayHeightPixels = config.heightPixels,
+                        ),
+                    )
+                }
                 val requested = streamAt(requestedScale)
                 // The smaller-map preset enlarges the encoded canvas beyond this panel. Probe
                 // the same selected hardware decoder as the main-screen enlargement guard.

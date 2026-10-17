@@ -2350,7 +2350,12 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                     if (false) {
                         // v100: DiLink 5.1 自动主题分支已随 BYD 集成删除(占位保持结构)
                     } else {
-                    if (diLink4) clusterSafeAreaControls(card)
+                    // v107 B561: 安全区控件**无条件**显示。上游把它挂在 diLink4 分支下
+                    // (DiLink4 仪表指纹命中才出现)，但 B561 的 diLink4 恒 false ——
+                    // 门控活着等于功能从来点不到。B561 走 HDMI 外接副屏 + 用户选屏，
+                    // 默认矩形由 ClusterLayout.defaultSafeAreaRect(标记步进) 给出，
+                    // 与 DiLink4ClusterDisplay 的那套是同构替换。
+                    clusterSafeAreaControls(card)
                         val sizes = CarPlayClusterDisplay.scalePresets
                         val contents = CarPlayClusterDisplay.Content.entries
                         val content = AirPlayPersistence.loadClusterContent(this)
@@ -2484,7 +2489,10 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                                 .also { it.onSave = { v -> AirPlayPersistence.saveClusterMapScalePercent(this, v) } }
                                 .also { it.onCommit = { markReconnectNeeded() } })
                         }
-                        if (!diLink4 || AirPlayPersistence.loadClusterSafeAreaRect(this) == null) {
+                        // v107 B561: 保存过自定义安全区框时隐藏标记偏移滑块 ——
+                        // 自定义框已取代标记偏移算 safeArea(见 clusterDisplayConfig)，
+                        // 留着滑块只是死控件。语义与上游 DiLink4 分支一致。
+                        if (AirPlayPersistence.loadClusterSafeAreaRect(this) == null) {
                             card.addView(overlaySliderRow(
                                 getString(if (turnCard) R.string.turn_card_horizontal else R.string.car_marker_horizontal),
                                 CarPlayClusterDisplay.markerXPercents,
@@ -3391,6 +3399,27 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                     applyWirelessLink(WirelessHotspotMode.MANUAL)
                 }
             }, matchButton(12, 60))
+            // v107 B561: 自动开热点开关。上游把它挂在 BYD 门控下
+            // (CarHotspotSetup.isBydHeadUnit，B561 恒 false)，开关永远不显示；
+            // 但运行时链路(CarPlayController → CarHotspotTethering 的
+            // startTethering 反射 + ADB 兜底)本身不依赖 BYD，放开入口即可用。
+            // 生效条件：无线连接 + 手册热点模式(见 CarHotspotSettings.shouldEnable)。
+            toggle(
+                parent,
+                getString(R.string.auto_car_hotspot_title),
+                getString(R.string.auto_car_hotspot_description),
+                CarHotspotSettings.enabled(this),
+            ) { enabled -> CarHotspotSettings.setEnabled(this, enabled) }
+            // startTethering 反射需要 WRITE_SETTINGS；平台签名应用通常自带，
+            // 缺权限时引导去系统设置开(不改动已保存的热点名/密码)。
+            if (!CarHotspotTethering.permitted(this)) {
+                parent.addView(label(getString(R.string.auto_car_hotspot_permission_hint), 15, WARNING).apply {
+                    setPadding(0, dp(8), 0, 0)
+                })
+                parent.addView(button(getString(R.string.settings), false) {
+                    startActivity(Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS, Uri.parse("package:$packageName")))
+                }, matchButton(12, 56))
+            }
             parent.addView(label(if (pendingCarHotspotSetup) getString(R.string.finish_setup_save_your_hotspot_details_to_use_this_mode) else if (carHotspotOff()) getString(R.string.hotspot_details_off) else getString(R.string.hotspot_details_saved), 15, if (carHotspotOff()) WARNING else MUTED).apply { setPadding(0, dp(12), 0, 0) })
             val join = hotspotJoinControls ?: HotspotJoinControls(this,
                 { CarPlayBackgroundSession.hasSession() }, beforeAction = { startupHotspotCancelled = true },
