@@ -7,3 +7,9 @@ local.properties
 *.pem
 *.jks
 *.apk.sha256
+
+# local-only MFi accessory identity (bundled into APK via DIPLAY_AUTH_ASSETS_DIR,
+# never committed — see scripts/build-b561.sh and scripts/check_public_tree.py)
+local-auth/
+*.pk8
+*.p7b

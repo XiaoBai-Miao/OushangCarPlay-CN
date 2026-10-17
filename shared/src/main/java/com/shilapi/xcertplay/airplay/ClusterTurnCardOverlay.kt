@@ -28,14 +28,24 @@ object ClusterTurnCardOverlay {
     const val STEP_PERCENT = 1
     const val DEFAULT_X_PERCENT = 76
     const val DEFAULT_Y_PERCENT = 30
-    val xPercents = (8..92).toList()
+    /**
+     * v109: 水平位置值域放宽到全屏 **0..100**（原 8..92）。
+     *
+     * 用户实测"卡片位置被限制"——想贴左/右边缘摆放做不到。位置是**中心坐标**
+     * （[card]：`left = panelWidth * x / 100 - width / 2`），且 left/top 都有
+     * `coerceIn(0, panel - size)` 钳制 —— 0 与 100 只是把卡片中心移到屏幕边缘、
+     * 卡片本身仍完整留在屏内（ClusterTurnCardOverlayTest.percentStepsStayOnThePanel
+     * 逐值域验证过该不变式）。
+     */
+    val xPercents = (0..100).toList()
     val smallWindowXPercents = (10..90 step 1).toList()
     val smallWindowYPercents = (15..70 step 1).toList()
     /** Opacity choices for the slider: 20..100 in steps of 5, default 85. */
     val opacityPercents = listOf(20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100)
     const val DEFAULT_OPACITY_PERCENT = 85
 
-    val yPercents = (12..72).toList()
+    /** 同 [xPercents]：v109 垂直值域一并放宽到 0..100（原 12..72）。 */
+    val yPercents = (0..100).toList()
 
     /** Card width as percent of the **panel height**; one slider step = 5 %. */
     val sizePercents = listOf(30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95)
