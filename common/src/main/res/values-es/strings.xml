@@ -919,4 +919,7 @@
         <string name="audio_enforced_audibility_description">Desactivado (predeterminado): no cambia nada. Activado: marca nuestra solicitud de audio como «debe seguir siendo audible» para que el equipo no la silencie ni la atenúe. Las aplicaciones de fábrica usan esta marca; al activarla, el audio de CarPlay puede dejar de silenciarse cuando entren en juego otras políticas de audio. Si el sonido queda fijo al máximo, desactívalo.</string>
         <string name="audio_group_volume_diagnostic">Diagnóstico de grupos de volumen</string>
         <string name="audio_group_volume_diagnostic_description">Desactivado (predeterminado): sin salida. Activado: al iniciar el audio, registra los grupos de volumen del equipo y sus niveles actuales (solo lectura, no cambia nada). Sirve para comprobar cómo el coche asigna el audio de CarPlay a sus deslizadores de navegación y música. Lee el registro con: adb logcat -s NavVolumeFollower</string>
+    <string name="settings_navigation_attenuation">Volumen de las indicaciones de navegación</string>
+    <string name="settings_navigation_attenuation_value">%1$d dB</string>
+    <string name="settings_navigation_attenuation_description">Reduce solo las indicaciones de navegación de CarPlay, sin cambiar música ni llamadas. Se aplica al instante; sigue funcionando el volumen de navegación de la unidad.</string>
 </resources>

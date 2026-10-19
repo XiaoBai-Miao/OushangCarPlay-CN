@@ -979,4 +979,7 @@
         <string name="audio_enforced_audibility_description">オフ（既定）：何も変わりません。オン：オーディオ要求を「必ず聞こえる」と宣言し、ヘッドユニットにミュートやダッキングされなくします。純正アプリもこのフラグを使っています。オンにすると、他の音量ポリシーが働いても CarPlay の音声がミュートされないことがあります。最大音量に固定される場合はオフに戻してください。</string>
         <string name="audio_group_volume_diagnostic">音量グループの診断</string>
         <string name="audio_group_volume_diagnostic_description">オフ（既定）：何も出力しません。オン：音声の再生開始時に、ヘッドユニットの音量グループと現在のレベルをログに出力します（読み取り専用で、何も変更しません）。車が CarPlay 音声をナビゲーション／音楽の音量スライダーにどう割り当てているか確認できます。確認方法：adb logcat -s NavVolumeFollower</string>
+    <string name="settings_navigation_attenuation">ナビ案内の音量</string>
+    <string name="settings_navigation_attenuation_value">%1$d dB</string>
+    <string name="settings_navigation_attenuation_description">CarPlayのナビ案内だけ音量を下げます。音楽や通話の音量は変わりません。変更はすぐに反映され、車載端末側のナビ音量も引き続き使用できます。</string>
 </resources>

@@ -931,4 +931,7 @@
         <string name="audio_enforced_audibility_description">Вимкнено (типово): нічого не змінюється. Увімкнено: позначає наш запит звуку як «обов’язково має бути чутним», щоб головний пристрій не приглушував і не вимикав його. Штатні застосунки використовують цей прапорець; під час увімкнення звук CarPlay може не вимикатися, коли діють інші аудіополітики. Якщо звук застряг на максимумі, вимкніть.</string>
         <string name="audio_group_volume_diagnostic">Діагностика груп гучності</string>
         <string name="audio_group_volume_diagnostic_description">Вимкнено (типово): виводу немає. Увімкнено: під час відтворення записує в журнал групи гучності головного пристрою та їхні поточні рівні (лише читання, нічого не змінює). Допомагає зрозуміти, як автомобіль зіставляє звук CarPlay із повзунками навігації та музики. Читати журнал: adb logcat -s NavVolumeFollower</string>
+    <string name="settings_navigation_attenuation">Гучність навігаційних підказок</string>
+    <string name="settings_navigation_attenuation_value">%1$d дБ</string>
+    <string name="settings_navigation_attenuation_description">Зменшує лише гучність навігаційних підказок CarPlay, не змінюючи музику та виклики. Застосовується одразу; регулювання навігації на пристрої лишається доступним.</string>
 </resources>

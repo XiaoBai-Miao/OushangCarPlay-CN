@@ -1020,4 +1020,7 @@
         <string name="audio_enforced_audibility_description">Off (default): nothing changes. On: marks our audio request as “must stay audible” so the head unit cannot silence or duck it. The car’s own apps set this flag; enabling it may stop CarPlay audio being muted when other audio policies kick in. Turn it off if audio gets stuck at full volume.</string>
         <string name="audio_group_volume_diagnostic">Volume group diagnostics</string>
         <string name="audio_group_volume_diagnostic_description">Off (default): no output. On: when audio starts playing, log the head unit’s own volume groups and current levels (read-only, changes nothing). Useful for confirming how the car maps CarPlay audio to its navigation and music volume sliders. Read the log with: adb logcat -s NavVolumeFollower</string>
+    <string name="settings_navigation_attenuation">Navigation guidance volume</string>
+    <string name="settings_navigation_attenuation_value">%1$d dB</string>
+    <string name="settings_navigation_attenuation_description">Reduce CarPlay navigation guidance without changing music or call volume. Applies immediately; your head unit’s navigation volume still works.</string>
 </resources>

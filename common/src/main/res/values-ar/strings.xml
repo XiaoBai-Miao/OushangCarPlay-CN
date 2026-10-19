@@ -968,4 +968,7 @@
         <string name="audio_enforced_audibility_description">إيقاف (افتراضي): لا يتغير أي شيء. تشغيل: يوسم طلب الصوت بأنه «يجب أن يبقى مسموعًا» حتى لا يخفضه النظام أو يكتمه. تطبيقات السيارة الأصلية تستخدم هذه العلامة؛ قد يبقى صوت CarPlay مسموعًا عند تفعيل سياسات صوتية أخرى. إذا بدا الصوت مثبتًا على الحد الأقصى، أوقفه.</string>
         <string name="audio_group_volume_diagnostic">تشخيص مجموعات الصوت</string>
         <string name="audio_group_volume_diagnostic_description">إيقاف (افتراضي): لا يُخرج أي شيء. تشغيل: عند بدء تشغيل الصوت، يسجّل مجموعات الصوت في النظام ومستوياتها الحالية (قراءة فقط، دون تغيير أي شيء). مفيد لتأكيد كيفية ربط النظام صوت CarPlay بمحددات مستوى الصوت للملاحة والموسيقى. اقرأ السجل بـ: adb logcat -s NavVolumeFollower</string>
+    <string name="settings_navigation_attenuation">مستوى صوت إرشادات الملاحة</string>
+    <string name="settings_navigation_attenuation_value">%1$d ديسيبل</string>
+    <string name="settings_navigation_attenuation_description">يخفض صوت إرشادات ملاحة CarPlay فقط دون تغيير صوت الموسيقى أو المكالمات. يُطبَّق التغيير فورًا وتظل وحدة السيارة تتحكم بمستوى صوت الملاحة.</string>
 </resources>

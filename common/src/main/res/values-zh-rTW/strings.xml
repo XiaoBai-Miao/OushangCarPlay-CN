@@ -979,4 +979,7 @@
         <string name="audio_enforced_audibility_description">關閉（預設）：行為完全不變。開啟：把我們的音訊請求標記為「必須保持有聲」，讓車機不靜音也不壓低它。原廠應用帶了這個標記；開啟後，其他音訊策略介入時 CarPlay 音訊可能不會被靜音。若發現音量被鎖在最大，請關閉。</string>
         <string name="audio_group_volume_diagnostic">音量分組診斷</string>
         <string name="audio_group_volume_diagnostic_description">關閉（預設）：無任何輸出。開啟：在音訊開始播放時，把車機自己的音量分組與各組目前音量寫進日誌（唯讀，不做任何修改）。用於確認車機如何把 CarPlay 音訊對應到它的導航/音樂音量條。檢視方式：adb logcat -s NavVolumeFollower</string>
+    <string name="settings_navigation_attenuation">導航提示音量</string>
+    <string name="settings_navigation_attenuation_value">%1$d dB</string>
+    <string name="settings_navigation_attenuation_description">只降低 CarPlay 導航提示音量，不影響音樂與通話。調整立即生效，仍可使用車機本身的導航音量。</string>
 </resources>
