@@ -1023,4 +1023,7 @@
     <string name="settings_navigation_attenuation">Navigation guidance volume</string>
     <string name="settings_navigation_attenuation_value">%1$d dB</string>
     <string name="settings_navigation_attenuation_description">Reduce CarPlay navigation guidance without changing music or call volume. Applies immediately; your head unit’s navigation volume still works.</string>
+    <string name="cluster_call_card_description">Show the caller and call duration on the instrument cluster during a CarPlay call.</string>
+    <string name="carplay_call_controls">Wheel call controls</string>
+    <string name="carplay_call_controls_description">During a CarPlay call, the steering wheel answer key answers and the hang-up key ends or declines it. Outside a call the keys keep working for the car\'s own phone.</string>
 </resources>

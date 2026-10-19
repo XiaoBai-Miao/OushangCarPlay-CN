@@ -59,6 +59,9 @@ internal class ClusterCardPreview(context: Context) : View(context) {
     /** B561: 路口放大图。默认不画（与实车一致：没车道数据就不显示）。 */
     private var showJunctionCard = false
 
+    /** v110 B561: 通话卡。默认不画（与实车一致：没来电就不显示）。 */
+    private var showCallCard = false
+
     /**
      * v108: 当前选中的卡片 —— 预览框下方的位置滑块调的就是它。
      *
@@ -90,6 +93,7 @@ internal class ClusterCardPreview(context: Context) : View(context) {
     private val turnCard = ClusterTurnCardView(context)
     private val mediaCard = ClusterMediaCardView(context)
     private val junctionCard = ClusterJunctionCardView(context)
+    private val callCard = ClusterCallCardView(context)
 
     init {
         // 预览里的卡片不吃触摸，也不需要真实数据 ——
@@ -99,6 +103,12 @@ internal class ClusterCardPreview(context: Context) : View(context) {
         // B561: 路口放大图给一组示意车道（3 车道、中间那条推荐），
         //   这样设置页里能看出它长什么样、以及该摆在哪。
         junctionCard.setLane(sampleLanes())
+        // v110: 通话卡给一通"来电中"的示意 —— 暖色竖条 + 两行文字。
+        callCard.setCall(
+            com.shilapi.xcertplay.media.CarPlayCallCard(
+                com.shilapi.xcertplay.media.CarPlayCallCard.Phase.RINGING, "示例来电",
+            ), 0L,
+        )
         cardPaint.color = Color.argb(255, 18, 22, 30)
         borderPaint.color = Color.argb(120, 255, 255, 255)
     }
@@ -127,6 +137,7 @@ internal class ClusterCardPreview(context: Context) : View(context) {
         place(turnCard, "turn")
         place(mediaCard, "media")
         place(junctionCard, "junction")
+        place(callCard, "call")
         panelPaint.color = if (night) Color.rgb(18, 20, 26) else Color.rgb(226, 232, 240)
         hintPaint.color = if (night) Color.argb(110, 255, 255, 255) else Color.argb(150, 0, 0, 0)
         // 夜间面板底色接近卡片底色，亮蓝在两种底色上都清晰；白天用更饱和的蓝。
@@ -151,8 +162,14 @@ internal class ClusterCardPreview(context: Context) : View(context) {
         invalidate()
     }
 
+    /** v110 B561: 通话卡是否在预览里显示。 */
+    fun setCallVisible(visible: Boolean) {
+        showCallCard = visible
+        invalidate()
+    }
+
     /**
-     * v108: 选中一张卡（"turn" / "media" / "junction"）。
+     * v108: 选中一张卡（"turn" / "media" / "junction" / "call"）。
      *
      * 高亮只画描边不改卡片本身 —— 未选中的卡照常显示，
      * 用户能看到三张卡的相对位置（这正是这个预览框相对
@@ -223,6 +240,7 @@ internal class ClusterCardPreview(context: Context) : View(context) {
         drawCard(canvas, turnCard, cardWidth, cardHeight, showTurnCard, "turn")
         drawCard(canvas, mediaCard, cardWidth, cardHeight, showMediaCard, "media")
         drawCard(canvas, junctionCard, cardWidth, cardHeight, showJunctionCard, "junction")
+        drawCard(canvas, callCard, cardWidth, cardHeight, showCallCard, "call")
         canvas.restore()
 
         canvas.drawText(

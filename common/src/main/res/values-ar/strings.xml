@@ -971,4 +971,7 @@
     <string name="settings_navigation_attenuation">مستوى صوت إرشادات الملاحة</string>
     <string name="settings_navigation_attenuation_value">%1$d ديسيبل</string>
     <string name="settings_navigation_attenuation_description">يخفض صوت إرشادات ملاحة CarPlay فقط دون تغيير صوت الموسيقى أو المكالمات. يُطبَّق التغيير فورًا وتظل وحدة السيارة تتحكم بمستوى صوت الملاحة.</string>
+    <string name="cluster_call_card_description">تعرض المتصل معك ومدة المكالمة على لوحة العدادات أثناء مكالمة CarPlay.</string>
+    <string name="carplay_call_controls">مفاتيح المكالمة على القائدة</string>
+    <string name="carplay_call_controls_description">أثناء مكالمة CarPlay، مفتاح الرد على القائدة يرد، ومفتاح الإنهاء يُنهي أو يرفض المكالمة. خارج المكالمات تبقى المفاتيح لهاتف السيارة.</string>
 </resources>

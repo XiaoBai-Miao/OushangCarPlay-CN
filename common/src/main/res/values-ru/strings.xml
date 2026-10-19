@@ -922,4 +922,7 @@
     <string name="settings_navigation_attenuation">Громкость навигационных подсказок</string>
     <string name="settings_navigation_attenuation_value">%1$d дБ</string>
     <string name="settings_navigation_attenuation_description">Уменьшает только громкость навигационных подсказок CarPlay, не меняя музыку и звонки. Применяется сразу; регулировка громкости навигации на устройстве сохраняется.</string>
+    <string name="cluster_call_card_description">Показывает абонента и длительность звонка CarPlay на приборной панели.</string>
+    <string name="carplay_call_controls">Клавиши звонка на руле</string>
+    <string name="carplay_call_controls_description">Во время звонка CarPlay клавиша ответа на руле принимает звонок, а клавиша завершения — завершает или отклоняет. Вне звонка клавиши работают как раньше.</string>
 </resources>

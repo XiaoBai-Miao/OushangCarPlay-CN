@@ -1316,6 +1316,14 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             AirPlayPersistence.saveClusterMediaCardEnabled(this, it)
             render()
         }
+        // ★ v110 B561: 通话卡开关（默认开）。与媒体卡并列 —— 通话卡压住歌名卡，
+        //   用户在音乐卡旁边单独摆它（位置在「统一卡片预览」里选"通话"chip 调）。
+        toggle(card, getString(R.string.cluster_call_card),
+            getString(R.string.cluster_call_card_description),
+            AirPlayPersistence.loadClusterCallCardEnabled(this)) {
+            AirPlayPersistence.saveClusterCallCardEnabled(this, it)
+            render()
+        }
         if (mediaOn) {
             // 封面：仪表屏窄时纯文字两行更清爽，所以给开关而不是写死。
             toggle(card, getString(R.string.cluster_media_card_artwork),
@@ -1464,11 +1472,17 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                     AirPlayPersistence.loadClusterJunctionYPercent(this),
                     AirPlayPersistence.loadClusterJunctionSizePercent(this),
                 ),
+                "call" to Triple(
+                    AirPlayPersistence.loadClusterCallXPercent(this),
+                    AirPlayPersistence.loadClusterCallYPercent(this),
+                    AirPlayPersistence.loadClusterCallSizePercent(this),
+                ),
             ),
             opacity = mapOf(
                 "turn" to AirPlayPersistence.loadClusterTurnCardOpacityPercent(this),
                 "media" to AirPlayPersistence.loadClusterMediaOpacityPercent(this),
                 "junction" to AirPlayPersistence.loadClusterJunctionOpacityPercent(this),
+                "call" to AirPlayPersistence.loadClusterCallOpacityPercent(this),
             ),
             night = lastKnownNight,
         )
@@ -1508,10 +1522,12 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             AirPlayPersistence.loadClusterContent(this))
         val mediaAvailable = AirPlayPersistence.loadClusterMediaCardEnabled(this)
         val junctionAvailable = AirPlayPersistence.loadClusterJunctionCardEnabled(this)
+        val callAvailable = AirPlayPersistence.loadClusterCallCardEnabled(this)
         val available = buildList {
             if (turnAvailable) add("turn")
             if (mediaAvailable) add("media")
             if (junctionAvailable) add("junction")
+            if (callAvailable) add("call")
         }
         card.addView(label(getString(R.string.card_preview_title), 16, TEXT, true))
         if (available.isEmpty()) {
@@ -1533,6 +1549,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             card.addView(preview, LinearLayout.LayoutParams(-1, dp(240)))
             preview.setVisibleCards(turnAvailable, mediaAvailable)
             preview.setJunctionVisible(junctionAvailable)
+            preview.setCallVisible(callAvailable)
             preview.setSelectedCard(clusterPreviewCard)
         }
         card.addView(label(getString(R.string.card_preview_note), 14, MUTED).apply {
@@ -1562,6 +1579,17 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                 saveY = { AirPlayPersistence.saveClusterJunctionYPercent(this, it) },
                 saveSize = { AirPlayPersistence.saveClusterJunctionSizePercent(this, it) },
                 saveOpacity = { AirPlayPersistence.saveClusterJunctionOpacityPercent(this, it) },
+            )
+            "call" -> clusterCardSliders(
+                card,
+                loadX = { AirPlayPersistence.loadClusterCallXPercent(this) },
+                loadY = { AirPlayPersistence.loadClusterCallYPercent(this) },
+                loadSize = { AirPlayPersistence.loadClusterCallSizePercent(this) },
+                loadOpacity = { AirPlayPersistence.loadClusterCallOpacityPercent(this) },
+                saveX = { AirPlayPersistence.saveClusterCallXPercent(this, it) },
+                saveY = { AirPlayPersistence.saveClusterCallYPercent(this, it) },
+                saveSize = { AirPlayPersistence.saveClusterCallSizePercent(this, it) },
+                saveOpacity = { AirPlayPersistence.saveClusterCallOpacityPercent(this, it) },
             )
             else -> clusterCardSliders(
                 card,
@@ -1634,6 +1662,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         val title = getString(when (key) {
             "media" -> R.string.cluster_media_card
             "junction" -> R.string.cluster_junction_card
+            "call" -> R.string.cluster_call_card
             else -> R.string.cluster_preview_card_turn
         })
         return android.widget.Button(this).apply {
@@ -4065,6 +4094,13 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             NavigationWheelSettings.enabled(this)) {
             NavigationWheelSettings.setEnabled(this, it)
             render()
+        }
+        // ★ v110 B561: 方控接听/挂断（默认开）。CarPlay 通话中才接管按键，
+        //   非通话态全部放行给车机自己的蓝牙电话。
+        toggle(card, getString(R.string.carplay_call_controls),
+            getString(R.string.carplay_call_controls_description),
+            AirPlayPersistence.loadCarPlayCallControlsEnabled(this)) {
+            AirPlayPersistence.saveCarPlayCallControlsEnabled(this, it)
         }
         if (!NavigationWheelSettings.enabled(this) || WheelKeyService.connected()) return
         card.addView(label(getString(R.string.settings_navigation_wheel_service_required), 14, WARNING))

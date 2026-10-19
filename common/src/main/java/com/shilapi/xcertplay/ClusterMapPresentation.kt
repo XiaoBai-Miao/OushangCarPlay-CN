@@ -58,6 +58,9 @@ internal class ClusterMapPresentation(
     /** B561: 媒体信息卡 / 通话卡。默认 GONE，有数据才显示（见各自 setXxx）。 */
     private var mediaCardView: ClusterMediaCardView? = null
 
+    /** B561: 通话卡（来电方 / 通话时长）。默认 GONE，见 [setCallCard]。 */
+    private var callCardView: ClusterCallCardView? = null
+
     /** B561: 路口放大图（车道级导航图）。默认 GONE，见 [setJunctionLanes]。 */
     private var junctionCardView: ClusterJunctionCardView? = null
     private var videoView: View? = null
@@ -184,6 +187,10 @@ internal class ClusterMapPresentation(
         //   addView 顺序即叠放次序：后加的盖在上面。
         mediaCardView = ClusterMediaCardView(context).apply { visibility = View.GONE }
         root.addView(mediaCardView, FrameLayout.LayoutParams(-1, -1))
+        // ★ B561 通话卡。挂在媒体卡**之上**：通话优先级高于音乐，来电时应当压住歌名卡。
+        //   几何与转向/媒体卡共用同一套 x/y/size（见 [setCardGeometry]）。
+        callCardView = ClusterCallCardView(context).apply { visibility = View.GONE }
+        root.addView(callCardView, FrameLayout.LayoutParams(-1, -1))
         // ★ B561 路口放大图（车道级导航图）。iOS 不发成品图，只发 0x5202 的路口
         //   几何与 0x5204 的车道数据，由这里自己渲染 —— 详见
         //   [ClusterJunctionCardView] 顶部的说明。挂在三张卡**之上**：
@@ -348,6 +355,15 @@ internal class ClusterMapPresentation(
     ) {
         turnCardView?.setLayout(turn.first, turn.second, turn.third)
         mediaCardView?.setLayout(media.first, media.second, media.third)
+        callCardView?.setLayout(call.first, call.second, call.third)
+    }
+
+    /**
+     * B561: 通话卡内容。[elapsedSeconds] 由调用方按秒推进（仅 ACTIVE 相位有意义）。
+     * null = 无通话，整卡隐藏。
+     */
+    fun setCallCard(card: com.shilapi.xcertplay.media.CarPlayCallCard?, elapsedSeconds: Long) {
+        callCardView?.setCall(card, elapsedSeconds)
     }
 
     /**
@@ -372,11 +388,13 @@ internal class ClusterMapPresentation(
     fun setCardOpacity(turnPercent: Int, mediaPercent: Int, callPercent: Int) {
         turnCardView?.setOpacity(turnPercent)
         mediaCardView?.setOpacity(mediaPercent)
+        callCardView?.setOpacity(callPercent)
     }
 
     fun setClusterCardNightMode(night: Boolean) {
         turnCardView?.setNightMode(night)
         mediaCardView?.setNightMode(night)
+        callCardView?.setNightMode(night)
         junctionCardView?.setNightMode(night)
     }
 

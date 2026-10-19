@@ -232,11 +232,18 @@ class CarPlayController(
     private val dashboardMapEpoch = AtomicInteger()
     private val playbackStatus = com.shilapi.xcertplay.media.CarPlayPlaybackStatus()
 
+    /** B561: iPhone 通话状态（iAP2 CallStateUpdate 0x4155 解析）。 */
+    private val callState = com.shilapi.xcertplay.media.CarPlayCallState()
+
     private val albumReplayLock = Any()
     private var initialArtworkReplay: com.shilapi.xcertplay.transport.Iap2ArtworkTransfer? = null
 
     fun nowPlayingSnapshot(): com.shilapi.xcertplay.media.CarPlayNowPlaying =
         synchronized(playbackStatus) { playbackStatus.nowPlaying }
+
+    /** B561: 当前 CarPlay 通话卡（来电/通话中/空）。 */
+    fun callCardSnapshot(): com.shilapi.xcertplay.media.CarPlayCallCard? =
+        synchronized(callState) { callState.current() }
 
     /** One bounded payload, never a nearest-cover guess when a reference is absent. */
     fun matchingArtworkSnapshot(id: Int?): com.shilapi.xcertplay.transport.Iap2ArtworkTransfer? =
@@ -248,6 +255,9 @@ class CarPlayController(
 
     /** Told when retained iPhone now-playing metadata changes; may run on any thread. */
     @Volatile var nowPlayingListener: ((com.shilapi.xcertplay.media.CarPlayNowPlaying) -> Unit)? = null
+
+    /** B561: Told when the iPhone's call state changes (ringing/active/ended); may run on any thread. */
+    @Volatile var callStateListener: ((com.shilapi.xcertplay.media.CarPlayCallCard?) -> Unit)? = null
 
     /** Told when an iAP2 Now Playing artwork transfer completes; may run on the link worker. */
     @Volatile var artworkListener: ((Int, ByteArray) -> Unit)? = null
@@ -342,6 +352,12 @@ class CarPlayController(
                     nowPlayingListener?.invoke(cleared)
                     if (wasPlaying) playbackListener?.invoke(false)
                 }
+                val endedCall = synchronized(callState) {
+                    val current = callState.current()
+                    callState.clear()
+                    current
+                }
+                if (endedCall != null) callStateListener?.invoke(null)
             }
             debugLog("AirPlay session ended peer=${session.host}")
             uiListener?.onSessionEnded(session)
@@ -766,6 +782,9 @@ class CarPlayController(
     private fun onRouteFrame(frame: com.shilapi.xcertplay.iap2.wire.Iap2Frame) {
         com.shilapi.xcertplay.glance.CarPlayGlance.onFrame(frame)
         com.shilapi.xcertplay.guidance.ClusterGuidanceFeed.onFrame(frame)
+        synchronized(callState) {
+            if (callState.accept(frame)) callState.current() else null
+        }?.let { callStateListener?.invoke(it) }
         synchronized(playbackStatus) {
             val previousPlaying = playbackStatus.playing
             playbackStatus.acceptUpdate(frame)?.let { it to (it.playing != previousPlaying) }

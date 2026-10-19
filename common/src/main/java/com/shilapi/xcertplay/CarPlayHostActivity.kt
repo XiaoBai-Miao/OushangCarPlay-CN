@@ -412,6 +412,10 @@ class CarPlayHostActivity : ComponentActivity() {
     private var clusterMediaArtist: String? = null
     private var clusterMediaAlbum: String? = null
     private var clusterMediaPlaying = false
+    /** v110 B561: 仪表通话卡数据(来自 iAP2 CallStateUpdate)。 */
+    private var clusterCallCard: com.shilapi.xcertplay.media.CarPlayCallCard? = null
+    /** 通话秒表,仅 ACTIVE 相位由 [callTicker] 按秒推进。 */
+    private var callElapsedSeconds = 0L
     // Copies of stream 111 outside the dashboard (centre card, launcher maps) each get their own decoder.
     private val mirrorSink: (String, Surface?) -> Unit = { key, surface -> sink?.setMirrorSurface(SCREEN_TYPE_ALT, key, surface) }
     private val mirrorsChanged: () -> Unit = {
@@ -1209,17 +1213,24 @@ class CarPlayHostActivity : ComponentActivity() {
             AirPlayPersistence.loadClusterMediaYPercent(this),
             AirPlayPersistence.loadClusterMediaSizePercent(this),
         )
+        // v110: 通话卡自己的一套几何（原先这里传的是 turnGeometry —— 通话卡
+        // 会跟转向卡重叠，且滑块调不动它）。
+        val callGeometry = Triple(
+            AirPlayPersistence.loadClusterCallXPercent(this),
+            AirPlayPersistence.loadClusterCallYPercent(this),
+            AirPlayPersistence.loadClusterCallSizePercent(this),
+        )
         val artworkOn = AirPlayPersistence.loadClusterMediaArtwork(this)
         for (presentation in presentations) {
             presentation.setTurnCardOverlay(xPercent, yPercent, sizePercent)
             presentation.setTurnCardOpacity(effectiveOpacity)
             presentation.setTurnCardNightMode(effectiveNight)
             presentation.setTurnCardGuidance(if (showTurn) clusterTurnGuidance else null)
-            presentation.setCardGeometry(turnGeometry, mediaGeometry, turnGeometry)
+            presentation.setCardGeometry(turnGeometry, mediaGeometry, callGeometry)
             presentation.setCardOpacity(
                 effectiveOpacity,
                 AirPlayPersistence.loadClusterMediaOpacityPercent(this),
-                effectiveOpacity,
+                AirPlayPersistence.loadClusterCallOpacityPercent(this),
             )
             presentation.setClusterCardNightMode(effectiveNight)
             // 等待页/底衬也跟着昼夜换色。
@@ -1249,6 +1260,7 @@ class CarPlayHostActivity : ComponentActivity() {
             presentation.setJunctionOpacity(AirPlayPersistence.loadClusterJunctionOpacityPercent(this))
         }
         pushClusterMedia(presentations)
+        pushClusterCall(presentations)
     }
 
     /**
@@ -1268,6 +1280,42 @@ class CarPlayHostActivity : ComponentActivity() {
                 CarPlayMediaKeys.currentArtwork(),
             )
         }
+    }
+
+    /**
+     * v110 B561: 把通话状态推给仪表通话卡。
+     *
+     * 与媒体卡同款「有数据才画」;设置关掉时推 null 整卡隐藏。
+     * [applyClusterTurnOverlay] 里也会调它 —— 改卡片设置要立刻反映到通话卡上。
+     */
+    private fun pushClusterCall(presentations: List<ClusterMapPresentation>? = null) {
+        val targets = presentations
+            ?: (clusterLayers.values + listOfNotNull(clusterPresentation)).distinct()
+        val card = if (AirPlayPersistence.loadClusterCallCardEnabled(this)) clusterCallCard else null
+        for (presentation in targets) {
+            presentation.setCallCard(card, callElapsedSeconds)
+        }
+    }
+
+    /** 通话秒表:只在 ACTIVE 相位按秒推进,驱动卡上的 mm:ss。 */
+    private val callTicker = object : Runnable {
+        override fun run() {
+            val card = clusterCallCard ?: return
+            val since = card.activeSinceMillis ?: return
+            if (card.phase != com.shilapi.xcertplay.media.CarPlayCallCard.Phase.ACTIVE) return
+            callElapsedSeconds = (System.currentTimeMillis() - since) / 1000
+            pushClusterCall()
+            mainHandler.postDelayed(this, 1_000L)
+        }
+    }
+
+    private fun startCallTicker() {
+        mainHandler.removeCallbacks(callTicker)
+        mainHandler.post(callTicker)
+    }
+
+    private fun stopCallTicker() {
+        mainHandler.removeCallbacks(callTicker)
     }
 
     /** v100 B561: 订阅 glance 歌曲快照 + 封面到达,驱动仪表媒体卡。 */
@@ -1440,6 +1488,24 @@ class CarPlayHostActivity : ComponentActivity() {
         }
 
         // During a CarPlay call the wheel's call key answers on the iPhone instead of opening BYD's phone app.
+        if (downOrUp && AirPlayPersistence.loadCarPlayCallControlsEnabled(this)) {
+            val callAction = CarPlayCallKeyPolicy.onKey(
+                event.keyCode,
+                down = event.action == KeyEvent.ACTION_DOWN,
+                call = controller?.callCardSnapshot(),
+                session = activeAirPlaySession != null,
+            )
+            if (callAction != CarPlayCallKeyPolicy.Action.PASS) {
+                if (callAction == CarPlayCallKeyPolicy.Action.ANSWER) {
+                    val sent = controller?.answerCall() == true
+                    Log.i(TAG, "call key ${event.keyCode}: answer CarPlay call sent=$sent")
+                } else if (callAction == CarPlayCallKeyPolicy.Action.END) {
+                    val sent = controller?.endCall() == true
+                    Log.i(TAG, "call key ${event.keyCode}: end CarPlay call sent=$sent")
+                }
+                return true
+            }
+        }
 
         // The wheel key service, when it runs, takes an assigned Siri key before this window sees it.
         val assignedKey = WheelZoomSettings.isSiriKey(this, WheelKey.of(event))
@@ -5420,6 +5486,27 @@ class CarPlayHostActivity : ComponentActivity() {
         resetSidePanel() // a new session starts without the side panel
         updateClusterMapShown()
         CarPlayMediaKeys.attach(this, next)
+        // v110 B561: 仪表通话卡 + 方控接挂的状态源。通话卡优先级高于媒体卡,
+        // 有通话时压住歌名卡;秒表只在 ACTIVE 相位跑。
+        next.callStateListener = { card ->
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                clusterCallCard = card
+                // activeSinceMillis 是 shared 模块 data class 的 public val，跨模块不能智能
+                // 转换 —— 先取局部值再用。
+                val since = card?.activeSinceMillis
+                if (card?.phase == com.shilapi.xcertplay.media.CarPlayCallCard.Phase.ACTIVE &&
+                    since != null
+                ) {
+                    callElapsedSeconds = (System.currentTimeMillis() - since) / 1000
+                    startCallTicker()
+                } else {
+                    stopCallTicker()
+                    callElapsedSeconds = 0L
+                }
+                pushClusterCall()
+            }
+        }
         if (airPlayConfig.videoInCar) CarPlayVideo.attach(this, next)
         val display = CarPlaySessionDisplay(
             airPlayConfig.main.widthPixels, airPlayConfig.main.heightPixels,

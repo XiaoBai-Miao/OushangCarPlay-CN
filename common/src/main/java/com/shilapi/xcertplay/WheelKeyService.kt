@@ -32,8 +32,9 @@ import com.shilapi.xcertplay.media.NavigationPlayback
  * to map zoom until it is pressed again, or, in the timed behaviour, until a few seconds after the last
  * zoom. With the joystick setting on, the joystick key (BYD's media key by default) turns the joystick on
  * and off; while it is on the keys drive CarPlay's main screen as a car's rotary knob would (see
- * [WheelJoystick]). A call always keeps the keys for the call. During a CarPlay call the call key answers on
- * the iPhone (see [CarPlayCallKeys]), and with a CarPlay session DiLink 3's CarPlay voice keys open Siri.
+ * [WheelJoystick]). A call always keeps the keys for the call. During a CarPlay call the wheel's answer
+ * key answers on the iPhone and the hang-up key ends the call (see [CarPlayCallKeyPolicy]), and with a
+ * CarPlay session DiLink 3's CarPlay voice keys open Siri.
  * With the Siri key setting on, a key the user assigns opens Siri while CarPlay is connected.
  * Every other key passes on unchanged. On
  * the Tang the console's volume sends the same codes as the wheel's, so it zooms and moves too.
@@ -124,6 +125,33 @@ class WheelKeyService : AccessibilityService() {
         if (event.action != KeyEvent.ACTION_DOWN && event.action != KeyEvent.ACTION_UP) return false
         val down = event.action == KeyEvent.ACTION_DOWN
         val physicalKey = PhysicalWheelKey(event.deviceId, event.keyCode, event.scanCode)
+        // v110 B561: CarPlay 通话中的方控接听/挂断。无障碍服务在位时先于任何窗口拿到按键，
+        // 不在此接住，接听键就会落到车机自家电话应用、盖在 CarPlay 上面（与
+        // CarPlayHostActivity.dispatchKeyEvent 同一策略，两处都接，谁先拿到谁执行）。
+        // 设置关、无 CarPlay 会话或无 iPhone 通话时策略一律 PASS，下面既有分支原样走。
+        if (AirPlayPersistence.loadCarPlayCallControlsEnabled(this)) {
+            val callSnapshot = CarPlayBackgroundSession.snapshot()?.controller?.callCardSnapshot()
+            val callAction = CarPlayCallKeyPolicy.onKey(
+                event.keyCode,
+                down,
+                callSnapshot,
+                session() != null,
+            )
+            if (callAction != CarPlayCallKeyPolicy.Action.PASS) {
+                when (callAction) {
+                    CarPlayCallKeyPolicy.Action.ANSWER -> {
+                        val sent = CarPlayBackgroundSession.snapshot()?.controller?.answerCall() == true
+                        Log.i(TAG, "call key ${event.keyCode}: answer CarPlay call sent=$sent")
+                    }
+                    CarPlayCallKeyPolicy.Action.END -> {
+                        val sent = CarPlayBackgroundSession.snapshot()?.controller?.endCall() == true
+                        Log.i(TAG, "call key ${event.keyCode}: end CarPlay call sent=$sent")
+                    }
+                    else -> Unit // CONSUME：按下半次与非响铃接听，静默消费不动作
+                }
+                return true
+            }
+        }
         if (keys.hasConsumedPress(physicalKey)) {
             refreshEligibility()
             val calling = inCall(this)

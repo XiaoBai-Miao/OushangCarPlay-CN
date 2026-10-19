@@ -982,4 +982,7 @@
     <string name="settings_navigation_attenuation">导航播报音量</string>
     <string name="settings_navigation_attenuation_value">%1$d dB</string>
     <string name="settings_navigation_attenuation_description">仅降低 CarPlay 导航播报音量，不影响音乐和通话。调整立即生效，车机自身的导航音量仍可使用。</string>
+    <string name="cluster_call_card_description">CarPlay 通话时在仪表上显示来电方与通话时长。</string>
+    <string name="carplay_call_controls">方控接听/挂断</string>
+    <string name="carplay_call_controls_description">CarPlay 通话中，方向盘接听键接听、挂断键挂断或拒接。非通话状态时按键仍属车机自己的电话。</string>
 </resources>

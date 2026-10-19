@@ -922,4 +922,7 @@
     <string name="settings_navigation_attenuation">Volumen de las indicaciones de navegación</string>
     <string name="settings_navigation_attenuation_value">%1$d dB</string>
     <string name="settings_navigation_attenuation_description">Reduce solo las indicaciones de navegación de CarPlay, sin cambiar música ni llamadas. Se aplica al instante; sigue funcionando el volumen de navegación de la unidad.</string>
+    <string name="cluster_call_card_description">Muestra quién llama y la duración de la llamada en el cuadro durante una llamada CarPlay.</string>
+    <string name="carplay_call_controls">Controles de llamada en el volante</string>
+    <string name="carplay_call_controls_description">Durante una llamada CarPlay, la tecla de respuesta del volante responde y la de colgado cuelga o rechaza. Fuera de una llamada las teclas siguen siendo del teléfono del coche.</string>
 </resources>

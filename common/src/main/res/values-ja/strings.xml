@@ -982,4 +982,7 @@
     <string name="settings_navigation_attenuation">ナビ案内の音量</string>
     <string name="settings_navigation_attenuation_value">%1$d dB</string>
     <string name="settings_navigation_attenuation_description">CarPlayのナビ案内だけ音量を下げます。音楽や通話の音量は変わりません。変更はすぐに反映され、車載端末側のナビ音量も引き続き使用できます。</string>
+    <string name="cluster_call_card_description">CarPlay 通話中、着信者と通話時間をクラスターに表示します。</string>
+    <string name="carplay_call_controls">ステアリング通話操作</string>
+    <string name="carplay_call_controls_description">CarPlay 通話中、ステアリングの着信受託キーで応答、通話終了キーで終了または拒否します。通話中以外のキーは車載端本体の電話に影響しません。</string>
 </resources>

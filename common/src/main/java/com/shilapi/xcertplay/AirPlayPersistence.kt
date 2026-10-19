@@ -1548,6 +1548,27 @@ object AirPlayPersistence {
         overlaySettingsListener?.invoke()
     }
 
+    /** v110 B561: 仪表通话卡开关。默认**开** —— 来电/通话时仪表显示来电方与时长。 */
+    fun loadClusterCallCardEnabled(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getBoolean("cluster_call_card_enabled", true)
+
+    fun saveClusterCallCardEnabled(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putBoolean("cluster_call_card_enabled", enabled).apply()
+        overlaySettingsListener?.invoke()
+    }
+
+    /** v110 B561: 方控接听/挂断 CarPlay 通话开关。默认**开**。 */
+    fun loadCarPlayCallControlsEnabled(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getBoolean("carplay_call_controls_enabled", true)
+
+    fun saveCarPlayCallControlsEnabled(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putBoolean("carplay_call_controls_enabled", enabled).apply()
+    }
+
     /** 仪表转向卡(DiPlay 自绘自定义转向卡)独立开关。默认**开**。 */
     fun loadClusterTurnCardEnabled(context: Context): Boolean =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -1667,6 +1688,47 @@ object AirPlayPersistence {
     fun saveClusterMediaOpacityPercent(context: Context, percent: Int) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putInt("cluster_media_card_opacity_percent", percent.coerceIn(20, 100)).apply()
+        overlaySettingsListener?.invoke()
+    }
+
+    // ===== v110 B561: 通话卡几何（与媒体卡同款的一套，默认值不同）=====
+    fun loadClusterCallXPercent(context: Context): Int =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getInt("cluster_call_card_x_percent", 24)
+
+    fun saveClusterCallXPercent(context: Context, percent: Int) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putInt("cluster_call_card_x_percent", percent).apply()
+        overlaySettingsListener?.invoke()
+    }
+
+    fun loadClusterCallYPercent(context: Context): Int =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getInt("cluster_call_card_y_percent", 24)
+
+    fun saveClusterCallYPercent(context: Context, percent: Int) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putInt("cluster_call_card_y_percent", percent).apply()
+        overlaySettingsListener?.invoke()
+    }
+
+    fun loadClusterCallSizePercent(context: Context): Int =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getInt("cluster_call_card_size_percent", ClusterTurnCardOverlay.DEFAULT_SIZE_PERCENT)
+
+    fun saveClusterCallSizePercent(context: Context, percent: Int) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putInt("cluster_call_card_size_percent", percent).apply()
+        overlaySettingsListener?.invoke()
+    }
+
+    fun loadClusterCallOpacityPercent(context: Context): Int =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getInt("cluster_call_card_opacity_percent", ClusterTurnCardOverlay.DEFAULT_OPACITY_PERCENT)
+
+    fun saveClusterCallOpacityPercent(context: Context, percent: Int) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putInt("cluster_call_card_opacity_percent", percent.coerceIn(20, 100)).apply()
         overlaySettingsListener?.invoke()
     }
 
