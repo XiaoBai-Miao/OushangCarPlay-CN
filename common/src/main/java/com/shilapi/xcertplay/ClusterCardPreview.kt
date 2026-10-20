@@ -70,6 +70,12 @@ internal class ClusterCardPreview(context: Context) : View(context) {
      */
     private var selectedCard = "turn"
 
+    /** v111: 最近一次 [update] 的几何，选中描边靠它算卡片真实矩形。 */
+    private var cardGeometry: Map<String, Triple<Int, Int, Int>> = emptyMap()
+    private var mediaWidthPercent = ClusterTurnCardOverlay.DEFAULT_MEDIA_WIDTH_PERCENT
+    private var mediaHeightPercent = ClusterTurnCardOverlay.DEFAULT_MEDIA_HEIGHT_PERCENT
+    private var mediaOrientation = ClusterTurnCardOverlay.CardOrientation.HORIZONTAL
+
     private val panelPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
@@ -123,6 +129,8 @@ internal class ClusterCardPreview(context: Context) : View(context) {
         night: Boolean,
     ) {
         this.night = night
+        // v111: 记下几何，选中描边要靠它算卡片真实矩形（contentRect）。
+        cardGeometry = geometry
         val defaults = Triple(
             ClusterTurnCardOverlay.DEFAULT_X_PERCENT,
             ClusterTurnCardOverlay.DEFAULT_Y_PERCENT,
@@ -204,6 +212,10 @@ internal class ClusterCardPreview(context: Context) : View(context) {
         heightPercent: Int,
         orientation: com.shilapi.xcertplay.airplay.ClusterTurnCardOverlay.CardOrientation,
     ) {
+        // v111: 同样记下来给 contentRect 用（媒体卡的矩形要宽/高两个滑块 + 版式）。
+        mediaWidthPercent = widthPercent
+        mediaHeightPercent = heightPercent
+        mediaOrientation = orientation
         (mediaCard as? ClusterMediaCardView)?.setMediaShape(widthPercent, heightPercent, orientation)
         invalidate()
     }
@@ -254,16 +266,19 @@ internal class ClusterCardPreview(context: Context) : View(context) {
         canvas.drawRect(0f, 0f, w, h, borderPaint)
 
         val scale = w / panelWidth
-        val cardHeight = h.toInt()
-        val cardWidth = w.toInt()
-        // 卡片 View 用"整块面板当父容器"的几何（与实车Presentation 同构），
-        // 缩放由画布的 scale 承担，所以传原始像素尺寸即可。
+        // v111 修正：卡片 View 的**测量尺寸就是"面板尺寸"**（四张卡的 onDraw 都用
+        // `ClusterTurnCardOverlay.xxxCard(width, height, …)`，把自己当 1920×720 的
+        // 仪表屏来算几何）。而画布已被 scale 映射成"1920×720 的面板空间"，所以这里
+        // 必须传 panelWidth/panelHeight。
+        //
+        // 之前传的是 View 自身的像素尺寸（1544×579），等于把面板当成 1544×579 算了一遍
+        // 几何，再被 scale 缩一次 —— 卡片整体缩到 (579/720)=80%、挤在左上角。
         canvas.save()
         canvas.scale(scale, scale)
-        drawCard(canvas, turnCard, cardWidth, cardHeight, showTurnCard, "turn")
-        drawCard(canvas, mediaCard, cardWidth, cardHeight, showMediaCard, "media")
-        drawCard(canvas, junctionCard, cardWidth, cardHeight, showJunctionCard, "junction")
-        drawCard(canvas, callCard, cardWidth, cardHeight, showCallCard, "call")
+        drawCard(canvas, turnCard, showTurnCard, "turn")
+        drawCard(canvas, mediaCard, showMediaCard, "media")
+        drawCard(canvas, junctionCard, showJunctionCard, "junction")
+        drawCard(canvas, callCard, showCallCard, "call")
         canvas.restore()
 
         canvas.drawText(
@@ -271,35 +286,64 @@ internal class ClusterCardPreview(context: Context) : View(context) {
         )
     }
 
-    private fun drawCard(
-        canvas: Canvas,
-        card: View,
-        cardWidth: Int,
-        cardHeight: Int,
-        visible: Boolean,
-        key: String,
-    ) {
+    private fun drawCard(canvas: Canvas, card: View, visible: Boolean, key: String) {
         if (!visible) return
         // 没有数据的卡片不画 —— 与实车"宁缺勿画"一致：
         // 预览里画个空壳会让用户以为仪表上也会出现空卡。
         if (card is ClusterTurnCardView && !card.hasContent()) return
         if (card is ClusterJunctionCardView && !card.hasContent()) return
+        // 面板尺寸，不是 View 像素尺寸 —— 见 onDraw 里的说明。
         card.measure(
-            MeasureSpec.makeMeasureSpec(cardWidth, MeasureSpec.EXACTLY),
-            MeasureSpec.makeMeasureSpec(cardHeight, MeasureSpec.EXACTLY),
+            MeasureSpec.makeMeasureSpec(panelWidth, MeasureSpec.EXACTLY),
+            MeasureSpec.makeMeasureSpec(panelHeight, MeasureSpec.EXACTLY),
         )
-        card.layout(0, 0, cardWidth, cardHeight)
+        card.layout(0, 0, panelWidth, panelHeight)
         card.draw(canvas)
         // v108: 选中卡的描边画在卡片之上（卡片自身背景不透明，垫在下面会被盖住）。
-        // 圆角与卡片圆角一致，看起来就是卡片自己的边框被点亮。
+        // v111: 描边要框的是卡片**实际内容矩形**，不是 View 边界 —— View 现在铺满整块
+        // 面板（1920×720），拿它的 left/right 去画等于框住整个预览，看着就是
+        // 「预览画面没占满区域」。这里用同一套几何函数把内容矩形算出来。
         if (key == selectedCard) {
-            val rect = Rect(
-                card.left + dp(3), card.top + dp(3),
-                card.right - dp(3), card.bottom - dp(3),
-            )
+            val rect = contentRect(key) ?: return
             selectionPaint.style = Paint.Style.STROKE
-            selectionPaint.strokeWidth = 3f * density
-            canvas.drawRoundRect(RectF(rect), 10f * density, 10f * density, selectionPaint)
+            selectionPaint.strokeWidth = SELECTION_STROKE
+            canvas.drawRoundRect(
+                RectF(
+                    (rect.left + SELECTION_INSET).toFloat(),
+                    (rect.top + SELECTION_INSET).toFloat(),
+                    (rect.left + rect.width - SELECTION_INSET).toFloat(),
+                    (rect.top + rect.height - SELECTION_INSET).toFloat(),
+                ),
+                SELECTION_RADIUS,
+                SELECTION_RADIUS,
+                selectionPaint,
+            )
+        }
+    }
+
+    /**
+     * 选中卡在**面板坐标**里的真实矩形。
+     *
+     * 刻意复用卡片 View 自己的几何函数（而不是抄一份算法）—— 同一份输入必然算出
+     * 同一个矩形，预览与实车不会漂。
+     */
+    private fun contentRect(key: String): ClusterTurnCardOverlay.CardRect? {
+        val (x, y, size) = cardGeometry[key] ?: return null
+        return when (key) {
+            "media" ->
+                if (mediaOrientation == ClusterTurnCardOverlay.CardOrientation.FREEFORM) {
+                    ClusterTurnCardOverlay.mediaCard(
+                        panelWidth, panelHeight, x, y,
+                        mediaWidthPercent, mediaHeightPercent, mediaOrientation,
+                    )
+                } else {
+                    ClusterTurnCardOverlay.mediaCard(
+                        panelWidth, panelHeight, x, y, size, size, mediaOrientation,
+                    )
+                }
+            "junction" -> ClusterTurnCardOverlay.junctionCard(panelWidth, panelHeight, x, y, size)
+            // 转向卡与通话卡共用同一套矩形规则（见各自 onDraw）。
+            else -> ClusterTurnCardOverlay.card(panelWidth, panelHeight, x, y, size)
         }
     }
 
@@ -340,5 +384,11 @@ internal class ClusterCardPreview(context: Context) : View(context) {
 
         /** 两个方向都没约束时的兜底宽度（8:3 → 高 240dp）。 */
         const val DEFAULT_PREVIEW_WIDTH_DP = 640
+
+        // 选中描边画在**面板坐标**里（画布已按 w/1920 缩放），所以这几项是面板像素，
+        // 不再乘 density —— 乘了会在缩放后变得又粗又偏。
+        const val SELECTION_INSET = 6f
+        const val SELECTION_STROKE = 8f
+        const val SELECTION_RADIUS = 24f
     }
 }

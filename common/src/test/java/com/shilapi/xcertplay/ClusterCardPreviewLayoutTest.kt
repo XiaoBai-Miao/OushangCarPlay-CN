@@ -1,11 +1,16 @@
 package com.shilapi.xcertplay
 
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
 import android.os.Looper
 import android.view.View
 import android.view.ViewGroup
+import com.shilapi.xcertplay.airplay.ClusterTurnCardOverlay
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
@@ -13,6 +18,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 import org.robolectric.util.ReflectionHelpers
 
 /**
@@ -66,6 +72,77 @@ class ClusterCardPreviewLayoutTest {
         )
     }
 
+    /**
+     * v111 回归：卡片在预览里的位置/大小必须与实车公式一致。
+     *
+     * 曾经的 bug：`canvas.scale(w/1920)` 之后画布已是"面板空间"，但 drawCard 拿
+     * **View 像素尺寸**去measure 卡片 —— 卡片按 (w,h) 当面板算了一遍几何再被缩放，
+     * 整体缩到 (h/720) ≈ 80% 并挤向左上角；选中框又画在 View 边界上，于是框住了
+     * 整块面板、经缩放后止于 80%，看着就是"预览画面没占满"。
+     *
+     * 这里直接渲染像素，量选中卡的框是否落在公式算出的位置上。
+     */
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun selectedCardIsDrawnWhereTheClusterGeometrySaysItShouldBe() {
+        val preview = ClusterCardPreview(context)
+        preview.update(
+            geometry = mapOf(
+                "turn" to Triple(
+                    ClusterTurnCardOverlay.DEFAULT_X_PERCENT,
+                    ClusterTurnCardOverlay.DEFAULT_Y_PERCENT,
+                    ClusterTurnCardOverlay.DEFAULT_SIZE_PERCENT,
+                ),
+            ),
+            opacity = mapOf("turn" to 100),
+            night = false,
+        )
+        preview.setVisibleCards(true, false)
+        preview.setSelectedCard("turn")
+
+        val w = 1544
+        val h = w * 720 / 1920
+        preview.measure(
+            View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(h, View.MeasureSpec.EXACTLY),
+        )
+        preview.layout(0, 0, w, h)
+        val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        preview.draw(Canvas(bitmap))
+
+        // 选中框是纯蓝 #2563EB。卡内也有蓝色箭头，所以只取**最上**的蓝行与
+        // **最右**的蓝列 —— 箭头碰不到这两个极值。
+        var topRow = Int.MAX_VALUE
+        var rightCol = -1
+        for (y in 0 until h) {
+            for (x in 0 until w) {
+                val p = bitmap.getPixel(x, y)
+                if (kotlin.math.abs(Color.red(p) - 0x25) <= 10 &&
+                    kotlin.math.abs(Color.green(p) - 0x63) <= 10 &&
+                    kotlin.math.abs(Color.blue(p) - 0xEB) <= 10
+                ) {
+                    if (y < topRow) topRow = y
+                    if (x > rightCol) rightCol = x
+                }
+            }
+        }
+        assertTrue("预览里没找到选中框", rightCol > 0)
+
+        // 公式算出的卡片矩形（面板坐标）映射到预览像素。
+        val card = ClusterTurnCardOverlay.card(1920, 720,
+            ClusterTurnCardOverlay.DEFAULT_X_PERCENT,
+            ClusterTurnCardOverlay.DEFAULT_Y_PERCENT,
+            ClusterTurnCardOverlay.DEFAULT_SIZE_PERCENT,
+        )
+        val scale = w / 1920f
+        val expectedTop = card.top * scale
+        val expectedRight = (card.left + card.width) * scale
+        val detail = "实测 top=$topRow right=$rightCol；期望 top≈${expectedTop.toInt()} " +
+            "right≈${expectedRight.toInt()}（含描边内缩 ${SELECTION_INSET_PX}px）"
+        assertEquals("选中卡上边应落在公式位置（$detail）", expectedTop.toDouble(), topRow.toDouble(), TOLERANCE_PX.toDouble())
+        assertEquals("选中卡右边应落在公式位置（$detail）", expectedRight.toDouble(), rightCol.toDouble(), TOLERANCE_PX.toDouble())
+    }
+
     private fun openNavigationSettings(qualifiers: String): DiPlayActivity {
         // 仪表段整块内容被「仪表地图总开关」门控（默认关），预览框在里面。
         AirPlayPersistence.saveClusterMapEnabled(context, true)
@@ -97,5 +174,13 @@ class ClusterCardPreviewLayoutTest {
     private fun descendants(view: View): Sequence<View> = sequence {
         yield(view)
         if (view is ViewGroup) for (index in 0 until view.childCount) yieldAll(descendants(view.getChildAt(index)))
+    }
+
+    private companion object {
+        /** 描边内缩（面板像素），见 ClusterCardPreview.SELECTION_INSET。 */
+        const val SELECTION_INSET_PX = 6f
+
+        /** 允许的像素误差：抗锯齿 + 四舍五入 + 内缩换算，10px 足够宽松又能抓住 20% 的缩放 bug。 */
+        const val TOLERANCE_PX = 10
     }
 }
