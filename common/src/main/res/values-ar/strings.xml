@@ -974,4 +974,22 @@
     <string name="cluster_call_card_description">تعرض المتصل معك ومدة المكالمة على لوحة العدادات أثناء مكالمة CarPlay.</string>
     <string name="carplay_call_controls">مفاتيح المكالمة على القائدة</string>
     <string name="carplay_call_controls_description">أثناء مكالمة CarPlay، مفتاح الرد على القائدة يرد، ومفتاح الإنهاء يُنهي أو يرفض المكالمة. خارج المكالمات تبقى المفاتيح لهاتف السيارة.</string>
+    <string name="settings_cluster">لوحة العدادات</string>
+    <string name="settings_cluster_summary">ما تعرضه لوحة العدادات وأين تكون البطاقات</string>
+    <string name="settings_wheel">المقود</string>
+    <string name="settings_wheel_summary">ما الذي يفعله كل مفتاح في المقود</string>
+    <string name="call_key_section">أزرار المكالمات</string>
+    <string name="call_key_answer">زر الرد</string>
+    <string name="call_key_end">زر الإنهاء</string>
+    <string name="call_key_description">أثناء رنين مكالمة CarPlay، زر الرد يرد وزر الإنهاء يرفض. خارج المكالمات تبقى الأزرار لتبديل الأغنية ولعمل السيارة.</string>
+    <string name="call_key_learn_prompt">اضغط المفتاح الذي تريد استخدامه</string>
+    <string name="call_key_cancel_learn">إلغاء</string>
+    <string name="call_key_choice_custom">مخصص…</string>
+    <string name="call_key_choice_custom_value">مخصص (رمز %1$d)</string>
+    <string name="call_key_choice_call">زر الرد</string>
+    <string name="call_key_choice_endcall">زر الإنهاء</string>
+    <string name="call_key_choice_headset">خطاف السماعة</string>
+    <string name="call_key_choice_play_pause">تشغيل / إيقاف</string>
+    <string name="call_key_choice_byd_answer">زر الرد (BYD)</string>
+    <string name="call_key_choice_byd_hangup">زر الإنهاء (BYD)</string>
 </resources>

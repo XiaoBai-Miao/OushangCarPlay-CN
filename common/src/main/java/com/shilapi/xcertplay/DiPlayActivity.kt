@@ -85,13 +85,16 @@ import java.util.Locale
 import kotlin.math.roundToInt
 
 internal enum class SettingsCategory {
-    OVERVIEW, CONNECTION, DISPLAY, AUDIO, NAVIGATION, VEHICLE, LANGUAGE, DIAGNOSTICS, ADVANCED, ABOUT,
+    // v113: 仪表与方控各自独立成菜单 —— 仪表的设置原来散在「导航」里，
+    // 方控的设置一半在「车辆」一半在「高级」，两边都不好找。
+    OVERVIEW, CONNECTION, DISPLAY, AUDIO, NAVIGATION, CLUSTER, WHEEL, VEHICLE, LANGUAGE, DIAGNOSTICS, ADVANCED, ABOUT,
 }
 
 /** A settings card. Every entry needs one category in [SettingsInformationArchitecture]; see AGENTS.md. */
 internal enum class SettingsSection {
     CARPLAY_CONTROLS,
     WHEEL_KEYS,
+    CALL_KEYS,
     CONNECTION_SETUP,
     DIAGNOSTICS,
     AUTOMATIC_CONNECTION,
@@ -123,18 +126,26 @@ internal object SettingsInformationArchitecture {
         SettingsCategory.AUDIO to setOf(SettingsSection.AUDIO_ROUTING),
         SettingsCategory.NAVIGATION to setOf(
             SettingsSection.LOCATION,
+        ),
+        // v113: 仪表的全部设置都归到「仪表」菜单。
+        SettingsCategory.CLUSTER to setOf(
             SettingsSection.CLUSTER_MAP,
+        ),
+        // v113: 方控的全部设置都归到「方控」菜单。
+        SettingsCategory.WHEEL to setOf(
+            SettingsSection.WHEEL_KEYS,
+            SettingsSection.CALL_KEYS,
+            SettingsSection.NAVIGATION_WHEEL,
         ),
         SettingsCategory.VEHICLE to setOf(
             SettingsSection.CARPLAY_CONTROLS,
-            SettingsSection.WHEEL_KEYS,
             SettingsSection.CAR_BUTTON,
         ),
         SettingsCategory.DIAGNOSTICS to setOf(SettingsSection.DIAGNOSTICS),
+        // v113: NAVIGATION_WHEEL 已挪到「方控」分类（原来在「高级」里）。
         SettingsCategory.ADVANCED to setOf(
             SettingsSection.EXPERIMENTAL_DISPLAY,
             SettingsSection.ADVANCED_MEDIA,
-            SettingsSection.NAVIGATION_WHEEL,
         ),
     )
 }
@@ -150,6 +161,9 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     private var appearanceRenderPending = false
     private var appearanceButtonFocusPending = false
     private var windowLearning: WindowKeyLearning? = null
+    /** v113: 正在等用户按下一个键，用来绑接听键或挂断键。 */
+    private var callKeyLearning: CallKeyTarget? = null
+    private val endCallKeyLearning = Runnable { cancelCallKeyLearning() }
     private val windowLearningPresses = WheelKeyPresses()
     private val endWindowLearning = Runnable { cancelKeyLearning() }
     private var page = "home"
@@ -1077,6 +1091,8 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         SettingsCategory.DISPLAY -> R.drawable.ic_dp_display
         SettingsCategory.AUDIO -> R.drawable.ic_dp_audio
         SettingsCategory.NAVIGATION -> R.drawable.ic_dp_navigation
+        SettingsCategory.CLUSTER -> R.drawable.ic_dp_dashboard
+        SettingsCategory.WHEEL -> R.drawable.ic_dp_controls
         SettingsCategory.VEHICLE -> R.drawable.ic_dp_car
         SettingsCategory.DIAGNOSTICS -> R.drawable.ic_dp_diagnostics
         SettingsCategory.ADVANCED -> R.drawable.ic_dp_advanced
@@ -1090,6 +1106,8 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         SettingsCategory.DISPLAY -> R.string.settings_display
         SettingsCategory.AUDIO -> R.string.audio
         SettingsCategory.NAVIGATION -> R.string.settings_navigation
+        SettingsCategory.CLUSTER -> R.string.settings_cluster
+        SettingsCategory.WHEEL -> R.string.settings_wheel
         SettingsCategory.VEHICLE -> R.string.settings_vehicle
         SettingsCategory.DIAGNOSTICS -> R.string.diagnostics
         SettingsCategory.ADVANCED -> R.string.settings_advanced
@@ -1104,6 +1122,8 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             SettingsCategory.DISPLAY -> displaySettings(content)
             SettingsCategory.AUDIO -> audioSettings(content)
             SettingsCategory.NAVIGATION -> navigationSettings(content)
+            SettingsCategory.CLUSTER -> clusterSettings(content)
+            SettingsCategory.WHEEL -> wheelSettings(content)
             SettingsCategory.VEHICLE -> vehicleSettings(content)
             SettingsCategory.DIAGNOSTICS -> diagnosticsSettings(content)
             SettingsCategory.ADVANCED -> advancedSettings(content)
@@ -1135,6 +1155,8 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             SettingsCategory.DISPLAY to R.string.settings_display_summary,
             SettingsCategory.AUDIO to R.string.settings_audio_summary,
             SettingsCategory.NAVIGATION to R.string.settings_navigation_summary,
+            SettingsCategory.CLUSTER to R.string.settings_cluster_summary,
+            SettingsCategory.WHEEL to R.string.settings_wheel_summary,
             SettingsCategory.VEHICLE to R.string.settings_vehicle_summary,
             SettingsCategory.LANGUAGE to R.string.settings_language_summary,
             SettingsCategory.ABOUT to R.string.about_diplay,
@@ -1730,6 +1752,18 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         }
     }
 
+    /** v113: 仪表菜单 —— 仪表屏显示、卡片位置/大小/透明度、安全区都在这里。 */
+    private fun clusterSettings(content: LinearLayout) {
+        settingsPageTitle(content, getString(R.string.settings_cluster), getString(R.string.settings_cluster_summary))
+        renderSections(content, SettingsInformationArchitecture.sectionsByCategory.getValue(SettingsCategory.CLUSTER))
+    }
+
+    /** v113: 方控菜单 —— 方向盘按键：缩放/摇杆/Siri、通话接听挂断键位、导航音量。 */
+    private fun wheelSettings(content: LinearLayout) {
+        settingsPageTitle(content, getString(R.string.settings_wheel), getString(R.string.settings_wheel_summary))
+        renderSections(content, SettingsInformationArchitecture.sectionsByCategory.getValue(SettingsCategory.WHEEL))
+    }
+
     private fun vehicleSettings(content: LinearLayout) {
         settingsPageTitle(content, getString(R.string.settings_vehicle), getString(R.string.settings_vehicle_summary))
         renderSections(content, SettingsInformationArchitecture.sectionsByCategory.getValue(SettingsCategory.VEHICLE))
@@ -2075,6 +2109,11 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         }
         filteredSection(content, SettingsSection.WHEEL_KEYS,
             getString(R.string.settings_wheel_keys), R.drawable.ic_dp_controls, ::wheelKeysSettings)
+        // v113: 通话按键（接听/挂断）独立成段，放在方控菜单里。
+        filteredSection(content, SettingsSection.CALL_KEYS,
+            getString(R.string.call_key_section), R.drawable.ic_dp_controls) { card ->
+            callKeyControls(card)
+        }
         filteredSection(content, SettingsSection.CONNECTION_SETUP,
             getString(R.string.connection_setup), R.drawable.ic_dp_connection) { card ->
             card.addView(label(getString(R.string.choose_how_to_connect_follow_the_setup_steps_and_save_your), 16, MUTED))
@@ -4098,13 +4137,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             NavigationWheelSettings.setEnabled(this, it)
             render()
         }
-        // ★ v110 B561: 方控接听/挂断（默认开）。CarPlay 通话中才接管按键，
-        //   非通话态全部放行给车机自己的蓝牙电话。
-        toggle(card, getString(R.string.carplay_call_controls),
-            getString(R.string.carplay_call_controls_description),
-            AirPlayPersistence.loadCarPlayCallControlsEnabled(this)) {
-            AirPlayPersistence.saveCarPlayCallControlsEnabled(this, it)
-        }
         if (!NavigationWheelSettings.enabled(this) || WheelKeyService.connected()) return
         card.addView(label(getString(R.string.settings_navigation_wheel_service_required), 14, WARNING))
         card.addView(button(getString(R.string.wheel_keys_open_settings), false) {
@@ -4121,6 +4153,106 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                 }
             }, "diplay-navigation-wheel-enable").start()
         }, matchButton(10, 56))
+    }
+
+    /**
+     * v113：方控菜单里的「通话按键」段。
+     *
+     * 接听键默认**下一首**、挂断键默认**上一首**（上游 DiLink 3 的语义）。
+     * 两个键位都能换成别的预设，或用「按键学习」绑一个任意键。
+     */
+    private fun callKeyControls(card: LinearLayout) {
+        toggle(card, getString(R.string.carplay_call_controls),
+            getString(R.string.carplay_call_controls_description),
+            AirPlayPersistence.loadCarPlayCallControlsEnabled(this)) {
+            AirPlayPersistence.saveCarPlayCallControlsEnabled(this, it)
+        }
+        val answerKey = AirPlayPersistence.loadCarPlayCallAnswerKey(this)
+        val endKey = AirPlayPersistence.loadCarPlayCallEndKey(this)
+        callKeyPicker(card, getString(R.string.call_key_answer), answerKey, endKey, CallKeyTarget.ANSWER)
+        callKeyPicker(card, getString(R.string.call_key_end), endKey, answerKey, CallKeyTarget.END)
+        card.addView(label(getString(R.string.call_key_description), 14, MUTED))
+    }
+
+    private enum class CallKeyTarget { ANSWER, END }
+
+    /**
+     * 一个键位选择器。
+     *
+     * [otherKeyCode] 是另一个键位已占用的键 —— 从选项里剔掉，避免同一个键既是
+     * 接听又是挂断（策略里接听优先，那样挂断就永远按不到）。
+     */
+    private fun callKeyPicker(
+        card: LinearLayout,
+        title: String,
+        keyCode: Int,
+        otherKeyCode: Int,
+        target: CallKeyTarget,
+    ) {
+        if (callKeyLearning == target) {
+            card.addView(label(getString(R.string.call_key_learn_prompt), 15, WARNING))
+            card.addView(button(getString(R.string.call_key_cancel_learn), false) {
+                cancelCallKeyLearning()
+            }, matchButton(0, 56))
+            return
+        }
+        val presets = CarPlayCallKeyPolicy.Choice.entries.filter { it.keyCode != otherKeyCode }
+        val options = presets.map { callKeyLabel(it.keyCode) } + getString(R.string.call_key_choice_custom)
+        val button = button("$title · ${callKeyLabel(keyCode)}", false) {}
+        button.setOnClickListener {
+            appDialogBuilder().setTitle(title)
+                .setSingleChoiceItems(options.toTypedArray(), -1) { dialog, which ->
+                    dialog.dismiss()
+                    if (which < presets.size) saveCallKey(target, presets[which].keyCode)
+                    else startCallKeyLearning(target)
+                }
+                .setNegativeButton(getString(R.string.cancel), null).show()
+        }
+        card.addView(button, matchButton(0, 60))
+        card.addView(space(12))
+    }
+
+    /** 键位在界面上显示的名字；自定义键显示 keyCode。 */
+    private fun callKeyLabel(keyCode: Int): String = when (CarPlayCallKeyPolicy.choiceOf(keyCode)) {
+        CarPlayCallKeyPolicy.Choice.NEXT -> getString(R.string.wheel_key_role_next)
+        CarPlayCallKeyPolicy.Choice.PREVIOUS -> getString(R.string.wheel_key_role_previous)
+        CarPlayCallKeyPolicy.Choice.CALL -> getString(R.string.call_key_choice_call)
+        CarPlayCallKeyPolicy.Choice.ENDCALL -> getString(R.string.call_key_choice_endcall)
+        CarPlayCallKeyPolicy.Choice.HEADSET_HOOK -> getString(R.string.call_key_choice_headset)
+        CarPlayCallKeyPolicy.Choice.PLAY_PAUSE -> getString(R.string.call_key_choice_play_pause)
+        CarPlayCallKeyPolicy.Choice.BYD_ANSWER -> getString(R.string.call_key_choice_byd_answer)
+        CarPlayCallKeyPolicy.Choice.BYD_HANG_UP -> getString(R.string.call_key_choice_byd_hangup)
+        null -> getString(R.string.call_key_choice_custom_value, keyCode)
+    }
+
+    /** 进入「按下要绑定的键」状态。 */
+    private fun startCallKeyLearning(target: CallKeyTarget) {
+        // 与 Siri 键的学习流程互斥 —— 两个都在等键会互相抢。
+        cancelKeyLearning()
+        callKeyLearning = target
+        CarPlayCallKeyLearning.start { keyCode ->
+            callKeyLearning = null
+            handler.removeCallbacks(endCallKeyLearning)
+            saveCallKey(target, keyCode)
+        }
+        handler.postDelayed(endCallKeyLearning, WheelKeyService.LEARNING_TIMEOUT_MILLIS)
+        render()
+    }
+
+    private fun cancelCallKeyLearning() {
+        handler.removeCallbacks(endCallKeyLearning)
+        if (callKeyLearning == null) return
+        callKeyLearning = null
+        CarPlayCallKeyLearning.stop()
+        render()
+    }
+
+    private fun saveCallKey(target: CallKeyTarget, keyCode: Int) {
+        when (target) {
+            CallKeyTarget.ANSWER -> AirPlayPersistence.saveCarPlayCallAnswerKey(this, keyCode)
+            CallKeyTarget.END -> AirPlayPersistence.saveCarPlayCallEndKey(this, keyCode)
+        }
+        render()
     }
 
     /** Steering-wheel keys for the dashboard map zoom and the CarPlay joystick: the switches, the key service and the keys. */
@@ -4303,6 +4435,8 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.action != KeyEvent.ACTION_DOWN && event.action != KeyEvent.ACTION_UP) return super.dispatchKeyEvent(event)
+        // v113: 正在学按键时，先把这个键收下（无障碍服务没开时走这条路）。
+        if (CarPlayCallKeyLearning.offer(event.keyCode)) return true
         val action = windowLearningPresses.filter(
             Triple(event.deviceId, event.keyCode, event.scanCode),
             event.action == KeyEvent.ACTION_DOWN, event.repeatCount == 0,

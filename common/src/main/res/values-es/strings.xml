@@ -925,4 +925,22 @@
     <string name="cluster_call_card_description">Muestra quién llama y la duración de la llamada en el cuadro durante una llamada CarPlay.</string>
     <string name="carplay_call_controls">Controles de llamada en el volante</string>
     <string name="carplay_call_controls_description">Durante una llamada CarPlay, la tecla de respuesta del volante responde y la de colgado cuelga o rechaza. Fuera de una llamada las teclas siguen siendo del teléfono del coche.</string>
+    <string name="settings_cluster">Cuadro de instrumentos</string>
+    <string name="settings_cluster_summary">Qué muestra el cuadro y dónde están las tarjetas</string>
+    <string name="settings_wheel">Volante</string>
+    <string name="settings_wheel_summary">Qué hace cada tecla del volante</string>
+    <string name="call_key_section">Teclas de llamada</string>
+    <string name="call_key_answer">Tecla de respuesta</string>
+    <string name="call_key_end">Tecla de colgado</string>
+    <string name="call_key_description">Mientras suena una llamada de CarPlay, la tecla de respuesta contesta y la de colgado la rechaza. Fuera de una llamada las teclas siguen cambiando de canción y sirviendo al coche.</string>
+    <string name="call_key_learn_prompt">Pulsa la tecla que quieras usar</string>
+    <string name="call_key_cancel_learn">Cancelar</string>
+    <string name="call_key_choice_custom">Personalizada…</string>
+    <string name="call_key_choice_custom_value">Personalizada (tecla %1$d)</string>
+    <string name="call_key_choice_call">Tecla de respuesta</string>
+    <string name="call_key_choice_endcall">Tecla de colgado</string>
+    <string name="call_key_choice_headset">Gancho de auriculares</string>
+    <string name="call_key_choice_play_pause">Reproducir / pausar</string>
+    <string name="call_key_choice_byd_answer">Tecla de respuesta BYD</string>
+    <string name="call_key_choice_byd_hangup">Tecla de colgado BYD</string>
 </resources>

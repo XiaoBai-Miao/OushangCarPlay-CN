@@ -53,7 +53,7 @@ class ClusterCardPreviewLayoutTest {
     }
 
     private fun assertFillsCard(qualifiers: String) {
-        val screen = openNavigationSettings(qualifiers)
+        val screen = openClusterSettings(qualifiers)
         val preview = descendants(screen.window.decorView).filterIsInstance<ClusterCardPreview>().single()
         val parent = preview.parent as ViewGroup
         val m = screen.resources.displayMetrics
@@ -143,7 +143,8 @@ class ClusterCardPreviewLayoutTest {
         assertEquals("选中卡右边应落在公式位置（$detail）", expectedRight.toDouble(), rightCol.toDouble(), TOLERANCE_PX.toDouble())
     }
 
-    private fun openNavigationSettings(qualifiers: String): DiPlayActivity {
+    /** v113: 仪表设置已整体移进「仪表」分类（原先挂在「导航」下）。 */
+    private fun openClusterSettings(qualifiers: String): DiPlayActivity {
         // 仪表段整块内容被「仪表地图总开关」门控（默认关），预览框在里面。
         AirPlayPersistence.saveClusterMapEnabled(context, true)
         RuntimeEnvironment.setQualifiers(qualifiers)
@@ -154,7 +155,7 @@ class ClusterCardPreviewLayoutTest {
             activity = it
             ReflectionHelpers.callInstanceMethod<Unit>(
                 it, "openSettingsCategory",
-                ReflectionHelpers.ClassParameter(SettingsCategory::class.java, SettingsCategory.NAVIGATION),
+                ReflectionHelpers.ClassParameter(SettingsCategory::class.java, SettingsCategory.CLUSTER),
             )
             layoutRoot(it)
         }

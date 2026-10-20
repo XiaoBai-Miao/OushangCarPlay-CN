@@ -988,7 +988,8 @@ class AdaptiveSettingsUiTest {
                 destination.contentDescription?.endsWith(" settings") == true &&
                 descendants(destination).filterIsInstance<ImageView>().count() == 1
         }.toList()
-        assertEquals(10, destinations.size)
+        // v113: 新增「仪表」「方控」两个分类，rail 上的入口从 10 个变成 12 个。
+        assertEquals(SettingsCategory.entries.size, destinations.size)
         destinations.forEach { destination ->
             assertEquals(1, descendants(destination).filterIsInstance<ImageView>().count())
         }

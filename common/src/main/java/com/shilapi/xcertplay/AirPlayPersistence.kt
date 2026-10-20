@@ -1569,6 +1569,35 @@ object AirPlayPersistence {
             .putBoolean("carplay_call_controls_enabled", enabled).apply()
     }
 
+    /**
+     * v113 B561: 接听 CarPlay 通话的键位（Android keyCode）。
+     *
+     * 默认 [CarPlayCallKeyPolicy.DEFAULT_ANSWER_KEY] —— **下一首**（87）。
+     * 用户可在方控菜单里改成别的预设键，或按键学习绑一个自定义键。
+     */
+    fun loadCarPlayCallAnswerKey(context: Context): Int =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getInt("carplay_call_answer_key", CarPlayCallKeyPolicy.DEFAULT_ANSWER_KEY)
+
+    fun saveCarPlayCallAnswerKey(context: Context, keyCode: Int) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putInt("carplay_call_answer_key", keyCode).apply()
+    }
+
+    /**
+     * v113 B561: 挂断/拒接 CarPlay 通话的键位（Android keyCode）。
+     *
+     * 默认 [CarPlayCallKeyPolicy.DEFAULT_END_KEY] —— **上一首**（88）。
+     */
+    fun loadCarPlayCallEndKey(context: Context): Int =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getInt("carplay_call_end_key", CarPlayCallKeyPolicy.DEFAULT_END_KEY)
+
+    fun saveCarPlayCallEndKey(context: Context, keyCode: Int) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putInt("carplay_call_end_key", keyCode).apply()
+    }
+
     /** 仪表转向卡(DiPlay 自绘自定义转向卡)独立开关。默认**开**。 */
     fun loadClusterTurnCardEnabled(context: Context): Boolean =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)

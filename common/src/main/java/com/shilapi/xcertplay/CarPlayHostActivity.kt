@@ -1488,12 +1488,15 @@ class CarPlayHostActivity : ComponentActivity() {
         }
 
         // During a CarPlay call the wheel's call key answers on the iPhone instead of opening BYD's phone app.
+        // v113: 接听/挂断键位由用户在「方控」菜单里指定（默认下一首/上一首）。
         if (downOrUp && AirPlayPersistence.loadCarPlayCallControlsEnabled(this)) {
             val callAction = CarPlayCallKeyPolicy.onKey(
                 event.keyCode,
                 down = event.action == KeyEvent.ACTION_DOWN,
                 call = controller?.callCardSnapshot(),
                 session = activeAirPlaySession != null,
+                answerKey = AirPlayPersistence.loadCarPlayCallAnswerKey(this),
+                endKey = AirPlayPersistence.loadCarPlayCallEndKey(this),
             )
             if (callAction != CarPlayCallKeyPolicy.Action.PASS) {
                 if (callAction == CarPlayCallKeyPolicy.Action.ANSWER) {

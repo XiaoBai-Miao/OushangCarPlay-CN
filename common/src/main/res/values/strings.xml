@@ -1026,4 +1026,22 @@
     <string name="cluster_call_card_description">Show the caller and call duration on the instrument cluster during a CarPlay call.</string>
     <string name="carplay_call_controls">Wheel call controls</string>
     <string name="carplay_call_controls_description">During a CarPlay call, the steering wheel answer key answers and the hang-up key ends or declines it. Outside a call the keys keep working for the car\'s own phone.</string>
+    <string name="settings_cluster">Instrument cluster</string>
+    <string name="settings_cluster_summary">What the instrument cluster shows and where the cards sit</string>
+    <string name="settings_wheel">Steering wheel</string>
+    <string name="settings_wheel_summary">Which steering-wheel key does what</string>
+    <string name="call_key_section">Call keys</string>
+    <string name="call_key_answer">Answer key</string>
+    <string name="call_key_end">Hang-up key</string>
+    <string name="call_key_description">While a CarPlay call is ringing, the answer key answers it and the hang-up key declines it. Outside a call the keys keep working for the car and for music.</string>
+    <string name="call_key_learn_prompt">Press the key you want to use</string>
+    <string name="call_key_cancel_learn">Cancel</string>
+    <string name="call_key_choice_custom">Custom…</string>
+    <string name="call_key_choice_custom_value">Custom (key %1$d)</string>
+    <string name="call_key_choice_call">Answer key</string>
+    <string name="call_key_choice_endcall">Hang-up key</string>
+    <string name="call_key_choice_headset">Headset hook</string>
+    <string name="call_key_choice_play_pause">Play / pause</string>
+    <string name="call_key_choice_byd_answer">BYD answer key</string>
+    <string name="call_key_choice_byd_hangup">BYD hang-up key</string>
 </resources>

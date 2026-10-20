@@ -985,4 +985,22 @@
     <string name="cluster_call_card_description">CarPlay 通話時在儀表上顯示來電方與通話時長。</string>
     <string name="carplay_call_controls">方控接聽/掛斷</string>
     <string name="carplay_call_controls_description">CarPlay 通話中，方向盤接聽鍵接聽、掛斷鍵掛斷或拒接。非通話狀態時按鍵仍屬車機自己的電話。</string>
+    <string name="settings_cluster">儀表</string>
+    <string name="settings_cluster_summary">儀表螢幕顯示什麼、卡片擺在哪</string>
+    <string name="settings_wheel">方控</string>
+    <string name="settings_wheel_summary">方向盤各按鍵的作用</string>
+    <string name="call_key_section">通話按鍵</string>
+    <string name="call_key_answer">接聽鍵</string>
+    <string name="call_key_end">掛斷鍵</string>
+    <string name="call_key_description">CarPlay 來電響鈴時，接聽鍵接聽、掛斷鍵拒接。非通話狀態下按鍵照常切歌、交給車機。</string>
+    <string name="call_key_learn_prompt">請按下要綁定的按鍵</string>
+    <string name="call_key_cancel_learn">取消</string>
+    <string name="call_key_choice_custom">自訂…</string>
+    <string name="call_key_choice_custom_value">自訂（鍵碼 %1$d）</string>
+    <string name="call_key_choice_call">接聽鍵</string>
+    <string name="call_key_choice_endcall">掛斷鍵</string>
+    <string name="call_key_choice_headset">耳機鉤子</string>
+    <string name="call_key_choice_play_pause">播放/暫停</string>
+    <string name="call_key_choice_byd_answer">比亞迪接聽鍵</string>
+    <string name="call_key_choice_byd_hangup">比亞迪掛斷鍵</string>
 </resources>

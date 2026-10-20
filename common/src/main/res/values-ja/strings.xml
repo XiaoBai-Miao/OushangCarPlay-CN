@@ -985,4 +985,22 @@
     <string name="cluster_call_card_description">CarPlay 通話中、着信者と通話時間をクラスターに表示します。</string>
     <string name="carplay_call_controls">ステアリング通話操作</string>
     <string name="carplay_call_controls_description">CarPlay 通話中、ステアリングの着信受託キーで応答、通話終了キーで終了または拒否します。通話中以外のキーは車載端本体の電話に影響しません。</string>
+    <string name="settings_cluster">メータークラスター</string>
+    <string name="settings_cluster_summary">メータークラスターの表示とカードの位置</string>
+    <string name="settings_wheel">ステアリング</string>
+    <string name="settings_wheel_summary">ステアリングの各キーの役割</string>
+    <string name="call_key_section">通話キー</string>
+    <string name="call_key_answer">応答キー</string>
+    <string name="call_key_end">終了キー</string>
+    <string name="call_key_description">CarPlay の着信中は応答キーで応答、終了キーで拒否します。通話中以外は曲送りや車機の操作に使えます。</string>
+    <string name="call_key_learn_prompt">使用したいキーを押してください</string>
+    <string name="call_key_cancel_learn">キャンセル</string>
+    <string name="call_key_choice_custom">カスタム…</string>
+    <string name="call_key_choice_custom_value">カスタム（キーコード %1$d）</string>
+    <string name="call_key_choice_call">応答キー</string>
+    <string name="call_key_choice_endcall">終了キー</string>
+    <string name="call_key_choice_headset">ヘッドセットのフック</string>
+    <string name="call_key_choice_play_pause">再生/一時停止</string>
+    <string name="call_key_choice_byd_answer">BYD の応答キー</string>
+    <string name="call_key_choice_byd_hangup">BYD の終了キー</string>
 </resources>

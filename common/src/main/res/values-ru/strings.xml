@@ -925,4 +925,22 @@
     <string name="cluster_call_card_description">Показывает абонента и длительность звонка CarPlay на приборной панели.</string>
     <string name="carplay_call_controls">Клавиши звонка на руле</string>
     <string name="carplay_call_controls_description">Во время звонка CarPlay клавиша ответа на руле принимает звонок, а клавиша завершения — завершает или отклоняет. Вне звонка клавиши работают как раньше.</string>
+    <string name="settings_cluster">Приборная панель</string>
+    <string name="settings_cluster_summary">Что показывает приборная панель и где стоят карточки</string>
+    <string name="settings_wheel">Руль</string>
+    <string name="settings_wheel_summary">Какая клавиша руля что делает</string>
+    <string name="call_key_section">Клавиши вызова</string>
+    <string name="call_key_answer">Клавиша ответа</string>
+    <string name="call_key_end">Клавиша завершения</string>
+    <string name="call_key_description">Пока звонит вызов CarPlay, клавиша ответа принимает, а клавиша завершения отклоняет. Вне звонка клавиши по-прежнему переключают треки и работают с автомобилем.</string>
+    <string name="call_key_learn_prompt">Нажмите клавишу, которую хотите использовать</string>
+    <string name="call_key_cancel_learn">Отмена</string>
+    <string name="call_key_choice_custom">Другая…</string>
+    <string name="call_key_choice_custom_value">Другая (код %1$d)</string>
+    <string name="call_key_choice_call">Клавиша ответа</string>
+    <string name="call_key_choice_endcall">Клавиша завершения</string>
+    <string name="call_key_choice_headset">Крючок гарнитуры</string>
+    <string name="call_key_choice_play_pause">Воспроизведение / пауза</string>
+    <string name="call_key_choice_byd_answer">Клавиша ответа BYD</string>
+    <string name="call_key_choice_byd_hangup">Клавиша завершения BYD</string>
 </resources>

@@ -124,6 +124,9 @@ class WheelKeyService : AccessibilityService() {
     override fun onKeyEvent(event: KeyEvent): Boolean {
         if (event.action != KeyEvent.ACTION_DOWN && event.action != KeyEvent.ACTION_UP) return false
         val down = event.action == KeyEvent.ACTION_DOWN
+        // v113: 设置页在学「自定义通话按键」时，这个键要先交给学习通道 ——
+        // 无障碍服务在位时按键到不了设置页的窗口，只能在这里截。
+        if (CarPlayCallKeyLearning.offer(event.keyCode)) return true
         val physicalKey = PhysicalWheelKey(event.deviceId, event.keyCode, event.scanCode)
         // v110 B561: CarPlay 通话中的方控接听/挂断。无障碍服务在位时先于任何窗口拿到按键，
         // 不在此接住，接听键就会落到车机自家电话应用、盖在 CarPlay 上面（与
@@ -136,6 +139,9 @@ class WheelKeyService : AccessibilityService() {
                 down,
                 callSnapshot,
                 session() != null,
+                // v113: 键位由用户在「方控」菜单里指定（默认下一首接听/上一首挂断）。
+                answerKey = AirPlayPersistence.loadCarPlayCallAnswerKey(this),
+                endKey = AirPlayPersistence.loadCarPlayCallEndKey(this),
             )
             if (callAction != CarPlayCallKeyPolicy.Action.PASS) {
                 when (callAction) {
