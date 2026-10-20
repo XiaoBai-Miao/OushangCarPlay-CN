@@ -1546,7 +1546,10 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         card.addView(chipRow)
 
         ensureClusterPreview(card)?.let { preview ->
-            card.addView(preview, LinearLayout.LayoutParams(-1, dp(240)))
+            // v111: 高度改WRAP_CONTENT —— 预览自己按 1920:720 推高度。
+            // 之前固定 dp(240) 高，宽度被 8:3 卡在 1248px，比卡片（1344px）窄，
+            // 右侧空一块，看着就是"预览没占满预览区域"。
+            card.addView(preview, LinearLayout.LayoutParams(-1, LinearLayout.LayoutParams.WRAP_CONTENT))
             preview.setVisibleCards(turnAvailable, mediaAvailable)
             preview.setJunctionVisible(junctionAvailable)
             preview.setCallVisible(callAvailable)

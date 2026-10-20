@@ -209,18 +209,41 @@ internal class ClusterCardPreview(context: Context) : View(context) {
     }
 
     /**
-     * 缩略图里按屏幕比例显示仪表。
+     * 缩略图按屏幕比例（1920×720，8:3）占满给它的空间。
      *
-     * 高度铺满可用空间、宽度按 8:3 推；宽度不够时反过来以宽度为准 ——
-     * 车机是横屏 1920×720，设置页右侧空间通常偏宽，所以以高度为准更常见。
+     * v111：**宽度优先**。设置卡片通常比 8:3 宽得多（实测 1344px 宽的卡片只给了
+     * 240dp 高），先前是"高度定尺寸、宽度按比例反推"，于是宽度被高度卡在 1248px，
+     * 右侧空出 96px —— 用户看到的正是「预览的画面没有占满预览区域」。
+     *
+     * 先把宽度铺满、高度按 8:3 推；只有推导出的高度超过可用高度时，才反过来
+     * 以高度为准（那时是高度在卡，宽度只能让步）。
+     *
+     * [boundOf] 必须看 MeasureSpec 的 mode：ScrollView 里的 WRAP_CONTENT 高度
+     * 传下来是 UNSPECIFIED，而 `getSize()` 对它返回 0 —— 直接拿来算会把预览
+     * 压成 1px。
      */
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        val available = MeasureSpec.getSize(heightMeasureSpec)
-        val byHeight = (available * panelWidth.toFloat() / panelHeight).toInt()
-        val availableWidth = MeasureSpec.getSize(widthMeasureSpec)
-        val width = minOf(availableWidth, byHeight)
-        val height = (width * panelHeight.toFloat() / panelWidth).toInt()
+        val ratio = panelWidth.toFloat() / panelHeight
+        val maxWidth = boundOf(widthMeasureSpec)
+        val maxHeight = boundOf(heightMeasureSpec)
+        var width = if (maxWidth == UNBOUNDED) 0 else maxWidth
+        var height = if (width == 0) 0 else (width / ratio).toInt()
+        if (width == 0 || (maxHeight != UNBOUNDED && height > maxHeight)) {
+            height = if (maxHeight == UNBOUNDED) 0 else maxHeight
+            width = if (height == 0) 0 else (height * ratio).toInt()
+        }
+        if (width == 0 || height == 0) {
+            // 两个方向都没有约束：用默认宽度兜底，绝不能返回 0。
+            width = dp(DEFAULT_PREVIEW_WIDTH_DP)
+            height = (width / ratio).toInt()
+        }
         setMeasuredDimension(width.coerceAtLeast(1), height.coerceAtLeast(1))
+    }
+
+    /** 该MeasureSpec 允许的最大尺寸；UNSPECIFIED（无约束）记为 [UNBOUNDED]。 */
+    private fun boundOf(spec: Int): Int = when (MeasureSpec.getMode(spec)) {
+        MeasureSpec.UNSPECIFIED -> UNBOUNDED
+        else -> MeasureSpec.getSize(spec)
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -310,4 +333,12 @@ internal class ClusterCardPreview(context: Context) : View(context) {
         primaryLane = 1,
         showing = true,
     )
+
+    private companion object {
+        /** MeasureSpec 无约束时的占位值；不可能是真实尺寸（远小于 Int.MAX_VALUE）。 */
+        const val UNBOUNDED = 0
+
+        /** 两个方向都没约束时的兜底宽度（8:3 → 高 240dp）。 */
+        const val DEFAULT_PREVIEW_WIDTH_DP = 640
+    }
 }
