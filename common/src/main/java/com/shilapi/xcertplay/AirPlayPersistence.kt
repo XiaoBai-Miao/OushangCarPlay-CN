@@ -1835,6 +1835,66 @@ object AirPlayPersistence {
     }
 
     // ─────────────────────────────────────────────────────────────
+    // v118: 车道信息卡片（只画 0x5204 车道带，横幅版式）
+    //
+    // 与路口放大图是两张卡：路口图带"路口岔路 + 车道带"的方块版式，
+    // 车道卡片只有车道带、走横幅比例，可以压在仪表底边当常驻条。
+    // 默认**开** —— 与路口卡一致；解不出 0x5204 时它自己会整块隐藏，
+    // 开着不会画出任何假数据。
+    // ─────────────────────────────────────────────────────────────
+
+    /** 车道信息卡片开关。默认开。 */
+    fun loadClusterLaneCardEnabled(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getBoolean("cluster_lane_card_enabled", true)
+
+    fun saveClusterLaneCardEnabled(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putBoolean("cluster_lane_card_enabled", enabled).apply()
+        overlaySettingsListener?.invoke()
+    }
+
+    fun loadClusterLaneXPercent(context: Context): Int =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getInt("cluster_lane_card_x_percent", 30)
+
+    fun saveClusterLaneXPercent(context: Context, percent: Int) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putInt("cluster_lane_card_x_percent", percent).apply()
+        overlaySettingsListener?.invoke()
+    }
+
+    fun loadClusterLaneYPercent(context: Context): Int =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getInt("cluster_lane_card_y_percent", 78)
+
+    fun saveClusterLaneYPercent(context: Context, percent: Int) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putInt("cluster_lane_card_y_percent", percent).apply()
+        overlaySettingsListener?.invoke()
+    }
+
+    fun loadClusterLaneSizePercent(context: Context): Int =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getInt("cluster_lane_card_size_percent", ClusterTurnCardOverlay.DEFAULT_SIZE_PERCENT)
+
+    fun saveClusterLaneSizePercent(context: Context, percent: Int) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putInt("cluster_lane_card_size_percent", percent).apply()
+        overlaySettingsListener?.invoke()
+    }
+
+    fun loadClusterLaneOpacityPercent(context: Context): Int =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getInt("cluster_lane_card_opacity_percent", ClusterTurnCardOverlay.DEFAULT_OPACITY_PERCENT)
+
+    fun saveClusterLaneOpacityPercent(context: Context, percent: Int) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putInt("cluster_lane_card_opacity_percent", percent.coerceIn(20, 100)).apply()
+        overlaySettingsListener?.invoke()
+    }
+
+    // ─────────────────────────────────────────────────────────────
     // v100 B561: 通话相关开关(原存于 BYD DiLink 设置区,改为本地 prefs)
     // ─────────────────────────────────────────────────────────────
 

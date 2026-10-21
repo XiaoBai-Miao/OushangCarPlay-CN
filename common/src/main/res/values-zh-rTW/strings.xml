@@ -955,7 +955,9 @@
     <string name="cluster_media_height">Card height</string>
     <string name="cluster_media_height_option">Card height %1$d%%</string>
     <string name="cluster_junction_card">路口放大圖</string>
-    <string name="cluster_junction_card_description">用 iPhone 下發的路口幾何與車道資料畫出前方路口和推薦車道。CarPlay 本身不發圖片，所以由 DiPlay 自行繪製（與原廠儀表同一思路）。沒有車道資料時整塊不顯示。</string>
+    <string name="cluster_junction_card_description">按 iPhone 發來的幾何資料繪制即將到達的路口，收到車道資料時一併畫出車道帶。CarPlay 不會發圖片，DiPlay 按原廠儀表的方式自己渲染。路口形狀自己就會出現，只有車道帶需要等手機發資料。</string>
+    <string name="cluster_lane_card">車道資訊卡片</string>
+    <string name="cluster_lane_card_description">只顯示車道帶，寬片版式，可以固定在儀表底邊。CarPlay 不會發圖片，DiPlay 按 iPhone 發來的幾何資料自己畫。收不到車道資料時整塊隱藏。</string>
     <string name="cluster_call_card">Call card</string>
     <string name="cluster_card_size">Size</string>
     <string name="cluster_card_opacity">Opacity</string>

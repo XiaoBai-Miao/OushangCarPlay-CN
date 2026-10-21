@@ -74,6 +74,15 @@ internal class RouteGuidanceState(
     private var laneGuidanceShowing = false
 
     /**
+     * 是否见过 `laneGuidanceShowing == 1`。
+     *
+     * 没见过 true 之前，`0x12` 的取值一律当**未知**处理（见
+     * [currentLaneGuidance] 的说明）—— 那个字段的语义没有实车抓包定论，
+     * 拿它当硬门禁会把解析成功的车道数据一起挡死。
+     */
+    private var laneGuidanceSawShowing = false
+
+    /**
      * B561: 上一次成功解析用的布局，用于在**变化时**才打日志。
      *
      * 只在切换时打一次（而不是每帧），否则一秒一次的 1Hz tick 会把日志刷爆。
@@ -126,10 +135,17 @@ internal class RouteGuidanceState(
      *
      * 路口几何（[ClusterLaneGuidance.junctionAngles] 等）从**当前 maneuver**
      * 取过来：车道是独立事件，但路口形状属于那一次转向。
+     *
+     * ★ v118 放宽 `showing` 门禁：`0x5201` 的 `0x12` 是不是"该显示车道"这个
+     *   语义本身也是反推的（和 `0x5204` 的字节布局一样没有实车抓包定论）。
+     *   从没见过 `showing == 1` 就把它当**未知**而不是 false，否则
+     *   `0x5204` 解析成功也会被这个假门禁挡死，车道卡永远出不来。
+     *   见过 true 之后才认 false 为显式隐藏 —— 那时它是可信的。
      */
     fun currentLaneGuidance(): ClusterLaneGuidance? {
         val maneuver = activeManeuver() ?: return null
-        if (!laneGuidanceShowing || laneGuidanceIndex < 0) return null
+        if (laneGuidanceSawShowing && !laneGuidanceShowing) return null
+        if (laneGuidanceIndex < 0) return null
         val event = laneEvents[laneGuidanceIndex] ?: return null
         if (!event.drawable || !event.sane) return null
         // 路口几何（0x5202 的 0x09/0x0A/0x0B）只挂在 maneuver 上，0x5204 里没有，
@@ -140,6 +156,34 @@ internal class RouteGuidanceState(
             junctionAngles = maneuver.junctionAngles,
             junctionExitAngle = maneuver.junctionExitAngle,
         )
+    }
+
+    /**
+     * B561 v118: 当前该显示的路口放大图。
+     *
+     * ## 与 [currentLaneGuidance] 的分工
+     *
+     * 路口形状属于**那一次转向**（挂在 maneuver 上，来自 `0x5202`），
+     * 车道带是**独立事件**（`0x5204`）。改之前两者被绑在一起：
+     * 车道解不出来 → 路口也不画。现在路口单独取，
+     * 车道只作为可选项挂在 [ClusterJunctionGuidance.lanes] 上。
+     *
+     * 门禁与转向卡完全相同（同一条 stale 窗口），所以"转向卡在显示"
+     * 就等价于"路口图有数据可画"—— 不会出现转向卡亮着、路口图却空了。
+     */
+    fun currentJunction(): ClusterJunctionGuidance? {
+        val maneuver = activeManeuver() ?: return null
+        val lanes = currentLaneGuidance()
+        val guidance = ClusterJunctionGuidance(
+            maneuverType = maneuver.type,
+            drivingSide = maneuver.drivingSide,
+            distanceMeters = distanceMeters,
+            junctionType = maneuver.junctionType,
+            junctionAngles = maneuver.junctionAngles,
+            junctionExitAngle = maneuver.junctionExitAngle,
+            lanes = lanes,
+        )
+        return guidance.takeIf { it.drawable && it.sane }
     }
 
     fun clear(): Boolean {
@@ -159,6 +203,7 @@ internal class RouteGuidanceState(
         laneEvents.clear()
         laneGuidanceIndex = -1
         laneGuidanceShowing = false
+        laneGuidanceSawShowing = false
         return wasActive
     }
 
@@ -207,6 +252,7 @@ internal class RouteGuidanceState(
                 type == 0x10 && valueLength >= 2 -> laneGuidanceIndex = u16(data, value)
                 type == 0x12 && valueLength >= 1 -> {
                     laneGuidanceShowing = (data[value].toInt() and 0xff) == 1
+                    if (laneGuidanceShowing) laneGuidanceSawShowing = true
                 }
             }
         }
@@ -322,6 +368,15 @@ internal class RouteGuidanceState(
                 TAG,
                 "lane guidance 0x5204 source=${parsed.source} lanes=${parsed.laneCount} " +
                     "primary=${parsed.primaryLane} angles=${parsed.angles}",
+            )
+        }
+        if (!parsed.drawable) {
+            // 解析成功但画不出东西（车道数为 0 / 全空方向）—— 这与"解析失败"
+            // 是两回事，日志必须分开，否则实车排查时会把两者混为一谈。
+            android.util.Log.i(
+                TAG,
+                "lane guidance 0x5204 parsed but empty lanes=${parsed.laneCount} " +
+                    "angles=${parsed.angles} bytes=${ClusterLaneGuidance.dump(payload)}",
             )
         }
         if (laneEvents.size >= MAX_LANE_EVENTS) {

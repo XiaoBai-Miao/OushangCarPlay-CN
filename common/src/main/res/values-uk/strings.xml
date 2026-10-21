@@ -907,7 +907,9 @@
     <string name="cluster_media_height">Card height</string>
     <string name="cluster_media_height_option">Card height %1$d%%</string>
     <string name="cluster_junction_card">Схема перехрестя</string>
-    <string name="cluster_junction_card_description">Малює найближчий перехрест і рекомендовану смугу за геометрією, яку надсилає телефон. CarPlay не передає зображень, тому DiPlay малює її так само, як штатна панель приладів. Прихована, доки телефон не надішле дані про смуги.</string>
+    <string name="cluster_junction_card_description">Малює предстояче перехрестя за геометрією від iPhone і полоси руху, коли приходять дані про полоси. CarPlay ніколи не надсилає зображення, тому DiPlay малює його так, як заводський прилад. Форма перехрестя з’являється сама; лише полоси чекають на дані від телефона.</string>
+    <string name="cluster_lane_card">Картка полос</string>
+    <string name="cluster_lane_card_description">Показує лише полоси руху — широку картку, що можна закріпити внизу приладної панелі. CarPlay ніколи не надсилає зображення, тому DiPlay малює полоси за геометрією від iPhone. Приховується, доки телефон не надшле дані про полоси.</string>
     <string name="cluster_call_card">Call card</string>
     <string name="cluster_card_size">Size</string>
     <string name="cluster_card_opacity">Opacity</string>

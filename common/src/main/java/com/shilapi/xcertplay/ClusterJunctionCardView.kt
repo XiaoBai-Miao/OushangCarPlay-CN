@@ -7,8 +7,8 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
 import com.shilapi.xcertplay.airplay.ClusterTurnCardOverlay
+import com.shilapi.xcertplay.guidance.ClusterJunctionGuidance
 import com.shilapi.xcertplay.guidance.ClusterLaneGuidance
-import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -23,21 +23,24 @@ import kotlin.math.sin
  * 这也是 Apple 的设计意图（车机决定样式）。
  *
  * 所以准确的说法是：**拿不到成品图，但拿得到画它所需的全部几何**，
- * 本类就是那份几何的渲染器。数据源见 [ClusterLaneGuidance]。
+ * 本类就是那份几何的渲染器。数据源见 [ClusterJunctionGuidance]。
  *
  * ## 画的是什么
  *
  * 三部分，从上到下：
- * 1. **路口岔路**（上半）：以本车行驶方向为基准，按 `junctionAngles` 画
- *    几条辐射线 + 推荐方向那一根加粗。普通路口没给角度时只画一个箭头。
+ * 1. **路口岔路**（上半）：以本车行驶方向为基准，按 [ClusterJunctionGuidance.branches] 画
+ *    几条辐射线 + 推荐方向那一根加粗。普通路口没给角度时由 maneuver 类型推导一条，
+ *    再没有就只画一个箭头。
  * 2. **车道带**（下半）：每条车道一个格子，格子里画该车道的可行驶方向箭头，
  *    推荐车道整格高亮（蓝底）。这就是"该走哪条道"的答案。
+ *    `0x5204` 解析不出来时**整条不画**，只留上面的路口岔路 ——
+ *    见 [ClusterJunctionGuidance] 顶部关于"两半不能互相绑架"的说明。
  * 3. **出口编号**（若有）：右上角一枚小徽章，写 `junctionExitAngle` 对应的
  *    出口序号 —— 高速出口场景最有用。
  *
  * ## 宁缺勿画
  *
- * [ClusterLaneGuidance.drawable] 为 false 时整块隐藏（[setLane] 收到 null）。
+ * [ClusterJunctionGuidance.drawable] 为 false 时整块隐藏（[setJunction] 收到 null）。
  * 只画一个空壳框比不画更糟：驾驶员会以为导航坏了。
  */
 internal class ClusterJunctionCardView(context: Context) : android.view.View(context), ClusterTurnCardOverlayHost {
@@ -47,7 +50,7 @@ internal class ClusterJunctionCardView(context: Context) : android.view.View(con
     private var sizePercent = ClusterTurnCardOverlay.DEFAULT_SIZE_PERCENT
     private var opacityPercent = ClusterTurnCardOverlay.DEFAULT_OPACITY_PERCENT
     private var night = false
-    private var lanes: ClusterLaneGuidance? = null
+    private var junction: ClusterJunctionGuidance? = null
 
     private val accent = Color.rgb(10, 132, 255)
 
@@ -69,6 +72,14 @@ internal class ClusterJunctionCardView(context: Context) : android.view.View(con
     }
     private val rect = RectF()
     private val path = Path()
+
+    /** 右上角出口编号徽章的底与字。 */
+    private val exitBadgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(255, 149, 0) }
+    private val exitTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE
+        typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
+        textAlign = Paint.Align.CENTER
+    }
 
     init {
         applyPalette()
@@ -97,25 +108,25 @@ internal class ClusterJunctionCardView(context: Context) : android.view.View(con
     }
 
     /**
-     * B561: 推一份车道数据。
+     * B561: 推一份路口数据。
      *
      * null / 不可画 → 整块隐藏。[visibility] 与 [bringToFront] 必须在这里做
      * （卡片初始是 GONE，只设数据不切 visibility 等于白设）。
      */
-    fun setLane(next: ClusterLaneGuidance?) {
+    fun setJunction(next: ClusterJunctionGuidance?) {
         val usable = next?.takeIf { it.drawable && it.sane }
-        if (usable == lanes) {
+        if (usable == junction) {
             visibility = if (usable == null) GONE else VISIBLE
             return
         }
-        lanes = usable
+        junction = usable
         visibility = if (usable == null) GONE else VISIBLE
         if (usable != null) bringToFront()
         invalidate()
     }
 
     /** 是否有内容可画。给设置页预览用。 */
-    fun hasContent(): Boolean = lanes != null
+    fun hasContent(): Boolean = junction != null
 
     /**
      * B561 v67: 白天改**浅色卡片 + 深色车道线**（原先白天也是深底）。
@@ -156,7 +167,7 @@ internal class ClusterJunctionCardView(context: Context) : android.view.View(con
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        val data = lanes ?: return
+        val data = junction ?: return
         val card = ClusterTurnCardOverlay.junctionCard(width, height, xPercent, yPercent, sizePercent)
         val w = card.width.toFloat()
         val h = card.height.toFloat()
@@ -170,21 +181,64 @@ internal class ClusterJunctionCardView(context: Context) : android.view.View(con
 
         val pad = h * 0.06f
         // 车道带占下半，路口岔路占上半 —— 车道是驾驶员真正要看的，放大一点。
+        // ★ v118: 没有车道数据（0x5204 解不出来）时车道带整段不画，
+        //   路口岔路**独占整卡**。改之前这种情况是整块 GONE，
+        //   于是 0x5202 的路口几何明明解出来了也看不见。
+        val laneData = data.lanes?.takeIf { it.drawable && it.sane }
+        val contentTop = top + pad * 0.6f
+        val contentBottom = top + h - pad
+        if (laneData == null) {
+            drawJunction(canvas, data, left + pad, contentTop, w - pad * 2, contentBottom - contentTop)
+            drawExitBadge(canvas, data, left, top, w, h)
+            return
+        }
         val laneBandTop = top + h * 0.52f
-        drawJunction(canvas, data, left + pad, top + pad * 0.6f, w - pad * 2, laneBandTop - (top + pad * 0.6f))
-        drawLanes(canvas, data, left + pad, laneBandTop, w - pad * 2, top + h - pad - laneBandTop)
+        drawJunction(canvas, data, left + pad, contentTop, w - pad * 2, laneBandTop - contentTop)
+        drawLanes(canvas, laneData, left + pad, laneBandTop, w - pad * 2, contentBottom - laneBandTop)
+        drawExitBadge(canvas, data, left, top, w, h)
+    }
+
+    /**
+     * 右上角的出口编号徽章。
+     *
+     * `junctionExitAngle` 是**偏角**不是编号，但高速出口场景里它就是
+     * "第几个出口"的语义来源；拿不到有意义的值就什么都不画。
+     */
+    private fun drawExitBadge(
+        canvas: Canvas,
+        data: ClusterJunctionGuidance,
+        left: Float,
+        top: Float,
+        w: Float,
+        h: Float,
+    ) {
+        val exit = data.junctionExitAngle ?: return
+        if (exit <= 0) return
+        // 与 onDraw 的 pad 同基准（h * 0.06），但那是 onDraw 的局部变量 ——
+        // 这里按同一公式自算，不把它拆成字段（绘图里多一个可变状态只会互相踩）。
+        val inset = h * 0.06f
+        val badgeH = h * 0.16f
+        val badgeW = badgeH * 1.5f
+        val cx = left + w - inset * 0.6f - badgeW / 2f
+        val cy = top + inset * 0.6f + badgeH / 2f
+        rect.set(cx - badgeW / 2f, cy - badgeH / 2f, cx + badgeW / 2f, cy + badgeH / 2f)
+        canvas.drawRoundRect(rect, badgeH * 0.28f, badgeH * 0.28f, exitBadgePaint)
+        exitTextPaint.textSize = badgeH * 0.62f
+        val text = exit.toString()
+        val textWidth = exitTextPaint.measureText(text)
+        canvas.drawText(text, cx - textWidth / 2f, cy + exitTextPaint.textSize * 0.36f, exitTextPaint)
     }
 
     /**
      * 上半：路口岔路。
      *
-     * 以卡片底部中点为"本车"，往上画 [ClusterLaneGuidance.junctionAngles]
-     * 里的每条岔路。没有角度数据（普通路口常常没有）就退回一个居中直行箭头 ——
+     * 以卡片底部中点为"本车"，往上画 [ClusterJunctionGuidance.branches]
+     * 里的每条岔路。没有几何数据（普通路口常常没有）就退回一个居中直行箭头 ——
      * 那仍然比空框有用。
      */
     private fun drawJunction(
         canvas: Canvas,
-        data: ClusterLaneGuidance,
+        data: ClusterJunctionGuidance,
         left: Float,
         top: Float,
         width: Float,
@@ -196,28 +250,19 @@ internal class ClusterJunctionCardView(context: Context) : android.view.View(con
         val length = height * 0.92f
         val halfWidth = width * 0.42f
 
-        val angles = data.junctionAngles.filter { it in -180..180 }
+        val angles = data.branches
         if (angles.isEmpty()) {
             // 无几何数据：只画本车前方那一根。
             drawBranch(canvas, originX, originY, 0f, length, halfWidth, primary = true)
             return
         }
-        // 推荐方向：优先用转向类型推出的角度（由调用方塞进 junctionAngles 的第一项），
-        // 这里按"离正前方最近"判定 —— 驾驶员看的永远是即将拐的那条。
-        val recommended = pickRecommendedAngle(angles)
+        // 推荐方向：[ClusterJunctionGuidance.recommended] 已经算好（离正前方最近）。
+        //   驾驶员看的永远是即将拐的那条。
+        val recommended = data.recommended
         for (angle in angles) {
             drawBranch(canvas, originX, originY, angle.toFloat(), length, halfWidth, angle == recommended)
         }
     }
-
-    /**
-     * 挑"推荐岔路"：绝对值最小的那个（也就是最接近直行的那条）。
-     *
-     * 高速出口场景下最小绝对值是 ±30° 之类的缓弯，正好对应"继续走主路"，
-     * 所以这个规则同时覆盖直行、优先路口、环岛入口。
-     */
-    private fun pickRecommendedAngle(angles: List<Int>): Int =
-        angles.minByOrNull { abs(it) } ?: 0
 
     /**
      * 一条岔路：从原点沿 [angle] 度方向画一条渐宽的road，两端各留一点圆角。

@@ -1495,6 +1495,11 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                     AirPlayPersistence.loadClusterJunctionYPercent(this),
                     AirPlayPersistence.loadClusterJunctionSizePercent(this),
                 ),
+                "lane" to Triple(
+                    AirPlayPersistence.loadClusterLaneXPercent(this),
+                    AirPlayPersistence.loadClusterLaneYPercent(this),
+                    AirPlayPersistence.loadClusterLaneSizePercent(this),
+                ),
                 "call" to Triple(
                     AirPlayPersistence.loadClusterCallXPercent(this),
                     AirPlayPersistence.loadClusterCallYPercent(this),
@@ -1505,6 +1510,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                 "turn" to AirPlayPersistence.loadClusterTurnCardOpacityPercent(this),
                 "media" to AirPlayPersistence.loadClusterMediaOpacityPercent(this),
                 "junction" to AirPlayPersistence.loadClusterJunctionOpacityPercent(this),
+                "lane" to AirPlayPersistence.loadClusterLaneOpacityPercent(this),
                 "call" to AirPlayPersistence.loadClusterCallOpacityPercent(this),
             ),
             night = lastKnownNight,
@@ -1545,11 +1551,15 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             AirPlayPersistence.loadClusterContent(this))
         val mediaAvailable = AirPlayPersistence.loadClusterMediaCardEnabled(this)
         val junctionAvailable = AirPlayPersistence.loadClusterJunctionCardEnabled(this)
+        // v118: 车道信息卡片。官方转向卡模式下同样不可用 ——
+        // 那张卡只有自定义内容(clusterContent)时才谈得上摆位。
+        val laneAvailable = AirPlayPersistence.loadClusterLaneCardEnabled(this)
         val callAvailable = AirPlayPersistence.loadClusterCallCardEnabled(this)
         val available = buildList {
             if (turnAvailable) add("turn")
             if (mediaAvailable) add("media")
             if (junctionAvailable) add("junction")
+            if (laneAvailable) add("lane")
             if (callAvailable) add("call")
         }
         card.addView(label(getString(R.string.card_preview_title), 16, TEXT, true))
@@ -1575,6 +1585,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             card.addView(preview, LinearLayout.LayoutParams(-1, LinearLayout.LayoutParams.WRAP_CONTENT))
             preview.setVisibleCards(turnAvailable, mediaAvailable)
             preview.setJunctionVisible(junctionAvailable)
+            preview.setLaneVisible(laneAvailable)
             preview.setCallVisible(callAvailable)
             preview.setSelectedCard(clusterPreviewCard)
         }
@@ -1605,6 +1616,18 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                 saveY = { AirPlayPersistence.saveClusterJunctionYPercent(this, it) },
                 saveSize = { AirPlayPersistence.saveClusterJunctionSizePercent(this, it) },
                 saveOpacity = { AirPlayPersistence.saveClusterJunctionOpacityPercent(this, it) },
+            )
+            // v118: 车道信息卡片 —— 横幅版式,默认压在仪表底边。
+            "lane" -> clusterCardSliders(
+                card,
+                loadX = { AirPlayPersistence.loadClusterLaneXPercent(this) },
+                loadY = { AirPlayPersistence.loadClusterLaneYPercent(this) },
+                loadSize = { AirPlayPersistence.loadClusterLaneSizePercent(this) },
+                loadOpacity = { AirPlayPersistence.loadClusterLaneOpacityPercent(this) },
+                saveX = { AirPlayPersistence.saveClusterLaneXPercent(this, it) },
+                saveY = { AirPlayPersistence.saveClusterLaneYPercent(this, it) },
+                saveSize = { AirPlayPersistence.saveClusterLaneSizePercent(this, it) },
+                saveOpacity = { AirPlayPersistence.saveClusterLaneOpacityPercent(this, it) },
             )
             "call" -> clusterCardSliders(
                 card,
@@ -1688,6 +1711,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         val title = getString(when (key) {
             "media" -> R.string.cluster_media_card
             "junction" -> R.string.cluster_junction_card
+            "lane" -> R.string.cluster_lane_card
             "call" -> R.string.cluster_call_card
             else -> R.string.cluster_preview_card_turn
         })
@@ -2672,6 +2696,15 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                             getString(R.string.cluster_junction_card_description),
                             AirPlayPersistence.loadClusterJunctionCardEnabled(this)) {
                             AirPlayPersistence.saveClusterJunctionCardEnabled(this, it)
+                            render()
+                        }
+                        // v118 B561: 车道信息卡片 —— 只画 0x5204 车道带的横幅卡。
+                        //   与路口放大图是两张卡:路口图带"岔路+车道"的方块版式且
+                        //   车道解不出时照样画岔路;这张只有车道带,解不出就整块隐藏。
+                        toggle(card, getString(R.string.cluster_lane_card),
+                            getString(R.string.cluster_lane_card_description),
+                            AirPlayPersistence.loadClusterLaneCardEnabled(this)) {
+                            AirPlayPersistence.saveClusterLaneCardEnabled(this, it)
                             render()
                         }
                         // v108: 路口卡的位置/大小/透明度滑块已整合到下方「统一卡片预览」块。

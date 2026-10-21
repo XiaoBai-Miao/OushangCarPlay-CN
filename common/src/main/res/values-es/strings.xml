@@ -895,7 +895,9 @@
     <string name="cluster_media_height">Card height</string>
     <string name="cluster_media_height_option">Card height %1$d%%</string>
     <string name="cluster_junction_card">Vista del cruce</string>
-    <string name="cluster_junction_card_description">Dibuja el cruce inminente y el carril recomendado a partir de la geometría que envía el teléfono. CarPlay nunca envía una imagen, así que DiPlay la dibuja igual que el cuadro de instrumentos de fábrica. Permanece oculto hasta que el teléfono envía datos de carriles.</string>
+    <string name="cluster_junction_card_description">Dibuja el cruce inminente a partir de la geometría que envía el iPhone, y la banda de carriles cuando llegan datos de carriles. CarPlay nunca envía una imagen, así que DiPlay lo renderiza como el cuadro de fábrica. La forma del cruce aparece por sí sola; solo la banda de carriles espera al teléfono.</string>
+    <string name="cluster_lane_card">Tarjeta de carriles</string>
+    <string name="cluster_lane_card_description">Muestra solo la banda de carriles, como una tarjeta ancha que puedes fijar cerca de la parte inferior del cuadro. CarPlay nunca envía una imagen, así que DiPlay dibuja los carriles a partir de la geometría que envía el iPhone. Permanece oculta hasta que el teléfono envíe datos de carriles.</string>
     <string name="cluster_call_card">Call card</string>
     <string name="cluster_card_size">Size</string>
     <string name="cluster_card_opacity">Opacity</string>

@@ -438,6 +438,21 @@ class CarPlayHostActivity : ComponentActivity() {
             applyClusterTurnOverlay()
         }
     }
+
+    /**
+     * v118 B561: 路口放大图（0x5202 路口几何 + 可选 0x5204 车道带）。
+     *
+     * 与 [clusterLaneListener] 是两条独立通道 —— 改之前路口卡只吃后者，
+     * 于是 `0x5204` 解不出来时，`0x5202` 已经解出来的路口几何也一起被隐藏，
+     * 表现就是"路口放大图画不出来"。
+     */
+    private var clusterJunctionGuidance: com.shilapi.xcertplay.guidance.ClusterJunctionGuidance? = null
+    private val clusterJunctionListener: (com.shilapi.xcertplay.guidance.ClusterJunctionGuidance?) -> Unit = { junction ->
+        runOnUiThread {
+            clusterJunctionGuidance = junction
+            applyClusterTurnOverlay()
+        }
+    }
     /** v100 B561: 仪表媒体卡数据(来自 glance 快照)。 */
     private var clusterMediaTitle: String? = null
     private var clusterMediaArtist: String? = null
@@ -1126,6 +1141,7 @@ class CarPlayHostActivity : ComponentActivity() {
         AirPlayPersistence.overlaySettingsListener = { runOnUiThread { applyClusterTurnOverlay() } }
         ClusterGuidanceFeed.setTurnOverlayListener(clusterTurnOverlayListener)
         ClusterGuidanceFeed.setLaneGuidanceListener(clusterLaneListener)
+        ClusterGuidanceFeed.setJunctionListener(clusterJunctionListener)
         mainHandler.removeCallbacks(refreshTurnOverlay)
         mainHandler.post(refreshTurnOverlay)
         subscribeClusterMedia()
@@ -1212,6 +1228,8 @@ class CarPlayHostActivity : ComponentActivity() {
                     appendLog("Cluster gate: active display=${result.displayId}")
                     Log.i(CastGateClient.TAG, "gate active display=${result.displayId}")
                     createClusterPresentation()
+                    // 通道已定,把之前因为"申请中"而推迟的会话启动放行。
+                    maybeStartCarPlay()
                 } else if (result.status == CastGateProtocol.STATUS_OPENING) {
                     // 还在准备中,后面还有 active —— 等着。
                     appendLog("Cluster gate: opening")
@@ -1224,6 +1242,7 @@ class CarPlayHostActivity : ComponentActivity() {
                     appendLog("Cluster gate: ${result.status} ${result.errorCode ?: ""}")
                     Log.w(CastGateClient.TAG, "gate -> ${CastGateProtocol.describe(result)}, fallback")
                     createClusterPresentation()
+                    maybeStartCarPlay()
                 }
             }
         }
@@ -1240,6 +1259,8 @@ class CarPlayHostActivity : ComponentActivity() {
         // 否则 CastGateClient 里会一直挂着一个 sessionId,close 也会白发一条。
         releaseCastGateChannel()
         createClusterPresentation()
+        // 超时也意味着"申请中"结束了,把推迟的会话启动放行。
+        maybeStartCarPlay()
     }
 
     /** 真正建 presentation。通道若已就绪,用 SuperUni 指定的 displayId。 */
@@ -1247,6 +1268,15 @@ class CarPlayHostActivity : ComponentActivity() {
         if (clusterPresentation != null) {
             applyClusterTurnOverlay()
             return
+        }
+        // ★ v118: 通道已经 active 但它给的屏在这台车机上取不到。
+        //   继续攥着物理仪表通道不出图是最坏的情况 —— 通道被占着,
+        //   别的 App 也用不了,我们自己又什么都不显示。这里主动 close,
+        //   退回 v114 之前的 Presentation 路径,并留下明确日志。
+        if (CastGateClient.isActive && !castGateDisplayResolvable()) {
+            appendLog("Cluster gate: display ${CastGateClient.displayId} not usable, closing gate")
+            Log.w(CastGateClient.TAG, "gate display ${CastGateClient.displayId} unusable, closing")
+            releaseCastGateChannel()
         }
         val display = clusterTargetDisplay() ?: run {
             appendLog("Cluster map: no cluster projection display among ${ClusterMapPresentation.describeDisplays(this)}")
@@ -1273,10 +1303,49 @@ class CarPlayHostActivity : ComponentActivity() {
             applyClusterTurnOverlay()
             Log.i(ClusterMapPresentation.TAG, "cluster presentation shown display=${display.displayId} name=${display.name}")
             appendLog("Cluster map: presentation shown display=${display.displayId} name=${display.name}")
+            // ★ v118: 出图屏与 111 流当初谈好的那块**不是同一块**时,重新谈一次流。
+            //   这是"飞屏开启时仪表无画面"的正主:CAST_GATE 的 active 回调是异步的,
+            //   可能在 AirPlay 会话已经把 111 流按回退屏谈完之后才到,
+            //   于是 presentation 建在通道屏上、流却发在另一块屏上。
+            //   重协商走的是 onDisplayAdded 一直在用的同一条路(reconnectAfterLoss)。
+            reconcileClusterStreamDisplay(display.displayId)
         } catch (error: RuntimeException) {
             Log.w(ClusterMapPresentation.TAG, "cluster presentation failed", error)
             appendLog("Cluster map: presentation failed ${error.javaClass.simpleName}: ${error.message}")
         }
+    }
+
+    /**
+     * v118: 通道返回的 displayId 在这台车机上是否真的能当出图目标。
+     *
+     * 只做"取不取得到"的判断 —— 取不到就说明 SuperUni 说的那块屏
+     * 与当前 display 列表对不上（服务重启过 / 屏被拔了 /  id 是占位的）。
+     */
+    private fun castGateDisplayResolvable(): Boolean {
+        val gateId = CastGateClient.displayId
+        if (gateId == CastGateProtocol.DISPLAY_ID_UNAVAILABLE) return false
+        val display = getSystemService(android.hardware.display.DisplayManager::class.java)
+            ?.getDisplay(gateId)
+        return display != null && display.isValid
+    }
+
+    /**
+     * v118: 出图屏变了就重新谈 111 流。
+     *
+     * @param shownDisplayId 刚建好 presentation 的那块屏
+     *
+     * 条件：会话在跑、且这块屏与 [clusterStreamDisplayId] 记录的不是同一块。
+     * 相同就直接返回 —— 重启 presentation 是常态（熄屏/切界面都会），
+     * 每次都重连会把用户踢出 CarPlay。
+     */
+    private fun reconcileClusterStreamDisplay(shownDisplayId: Int) {
+        if (controller == null) return
+        if (shownDisplayId == clusterStreamDisplayId) return
+        val previous = clusterStreamDisplayId
+        clusterStreamDisplayId = shownDisplayId
+        appendLog("Cluster map: stream was for display $previous, now showing on $shownDisplayId; re-requesting stream")
+        Log.i(ClusterMapPresentation.TAG, "cluster stream display changed $previous -> $shownDisplayId")
+        reconnectAfterLoss("Cluster display changed to $shownDisplayId; requesting its stream")
     }
 
     /**
@@ -1380,8 +1449,11 @@ class CarPlayHostActivity : ComponentActivity() {
                 AirPlayPersistence.loadClusterMediaOrientation(this),
             )
             // 路口放大图(车道级导航图),由 iOS 0x5204/0x5202 几何渲染而成。
-            presentation.setJunctionLanes(
-                if (AirPlayPersistence.loadClusterJunctionCardEnabled(this)) clusterLaneGuidance else null,
+            // ★ v118: 走 setJunction（0x5202 路口几何 + 可选车道带）。
+            //   车道带解不出来时路口图照样画 —— 这正是"路口放大图画不出来"的修复。
+            //   （旧入口 setJunctionLanes 现为车道带专用包装，无调用方保留。）
+            presentation.setJunction(
+                if (AirPlayPersistence.loadClusterJunctionCardEnabled(this)) clusterJunctionGuidance else null,
             )
             presentation.setJunctionGeometry(
                 AirPlayPersistence.loadClusterJunctionXPercent(this),
@@ -1389,6 +1461,18 @@ class CarPlayHostActivity : ComponentActivity() {
                 AirPlayPersistence.loadClusterJunctionSizePercent(this),
             )
             presentation.setJunctionOpacity(AirPlayPersistence.loadClusterJunctionOpacityPercent(this))
+            // ★ v118 车道信息卡片：只画 0x5204 车道带，横幅版式。
+            //   解不出 0x5204 时整块隐藏 —— 不用 maneuver 编车道充数。
+            presentation.setLaneCard(
+                if (AirPlayPersistence.loadClusterLaneCardEnabled(this)) clusterLaneGuidance else null,
+            )
+            presentation.setLaneCardGeometry(
+                AirPlayPersistence.loadClusterLaneXPercent(this),
+                AirPlayPersistence.loadClusterLaneYPercent(this),
+                AirPlayPersistence.loadClusterLaneSizePercent(this),
+            )
+            presentation.setLaneCardOpacity(AirPlayPersistence.loadClusterLaneOpacityPercent(this))
+            presentation.setLaneCardNightMode(effectiveNight)
             // ★ v117 车速表。数据来自 B561 VHAL（与原厂仪表同源），
             //   开关关闭或读不到车速时整块隐藏。
             presentation.setSpeedometerLayout(
@@ -1508,6 +1592,9 @@ class CarPlayHostActivity : ComponentActivity() {
         clusterPresentation = null
         clusterSurface?.let { sink?.clearSurface(SCREEN_TYPE_ALT, it) }
         clusterSurface = null
+        // 出图目标没了,流的记录一起作废 —— 下次建 presentation 时
+        // 该重协商的才会重协商(见 reconcileClusterStreamDisplay)。
+        clusterStreamDisplayId = -1
         presentations.forEach { runCatching { it.dismiss() } }
         controller?.setDashboardMapOutputVisible(false)
         // ★ v115: 通道也必须关。规范要求 close 用**同一个 sessionId 和通道**,
@@ -1549,6 +1636,18 @@ class CarPlayHostActivity : ComponentActivity() {
     // Whether the running session's cluster stream was sized for a physical cluster display.
     private var clusterStreamOnDisplay = false
 
+    /**
+     * v118: 当前 AirPlay 会话的 111 流是给哪块屏算的。
+     *
+     * 与 [clusterStreamOnDisplay] 配对：那个说"流有没有落在物理仪表屏上"，
+     * 这个说"落在**哪一块**"。没有会话 / 没配 cluster 时为 -1。
+     *
+     * 存在的唯一目的是修 CAST_GATE 的竞态：通道的 `active` 回调可能晚于
+     * 会话启动，届时流已按回退屏谈好，presentation 却要建在通道屏上。
+     * 两边屏不一致就必须重新谈一次流，否则仪表收不到任何画面。
+     */
+    private var clusterStreamDisplayId = -1
+
     // DiLink 3 creates its cluster display only after DiPlay first projects to the cluster, which can
     // finish after the session has already asked for the virtual fallback stream.
     private val clusterDisplayListener = object : android.hardware.display.DisplayManager.DisplayListener {
@@ -1569,6 +1668,9 @@ class CarPlayHostActivity : ComponentActivity() {
     private fun clusterDisplayConfig(): AirPlayDisplayConfig? {
         clusterStreamOnDisplay = false
         requestedSmallWindowForStream = null
+        // 关着仪表投屏时也把记录清掉 —— 否则留下一块旧屏的 id,
+        // 下次开仪表时会误判"流已经在那块屏上"而跳过必要的重协商。
+        clusterStreamDisplayId = -1
         if (!AirPlayPersistence.loadClusterMapEnabled(this)) return null
         // ★ v115: 用通道返回的屏(若有),保证 111 流和出图落在同一块屏上。
         val display = clusterTargetDisplay()
@@ -1576,6 +1678,12 @@ class CarPlayHostActivity : ComponentActivity() {
             val size = ClusterMapPresentation.sizeOf(display)
             if (size.x > 0 && size.y > 0) {
                 clusterStreamOnDisplay = true
+                // ★ v118: 记下这一份流配置是给哪块屏算的。
+                //   CAST_GATE 的 active 回调是**异步**的，可能晚于 AirPlay 会话启动；
+                //   那时 111 流已经按回退屏谈好了，presentation 却建在通道屏上 ——
+                //   两边不是同一块屏，仪表就收不到流（"飞屏开启时仪表无画面"）。
+                //   有了这个 id，通道激活时才能判断"要不要重新谈一次流"。
+                clusterStreamDisplayId = display.displayId
                 // CN: in small-window navi the marker keeps a second position inside the visible window.
                 val smallWindow = smallWindowActive()
                 requestedSmallWindowForStream = smallWindow
@@ -1878,7 +1986,9 @@ class CarPlayHostActivity : ComponentActivity() {
         AirPlayPersistence.overlaySettingsListener = null
         ClusterGuidanceFeed.setTurnOverlayListener(null)
         ClusterGuidanceFeed.setLaneGuidanceListener(null)
+        ClusterGuidanceFeed.setJunctionListener(null)
         clusterLaneGuidance = null
+        clusterJunctionGuidance = null
         CarPlayGlance.listener = null
         CarPlayMediaKeys.artworkObserver = null
         getSystemService(android.hardware.display.DisplayManager::class.java)
@@ -6126,6 +6236,15 @@ class CarPlayHostActivity : ComponentActivity() {
 
     private fun maybeStartCarPlay() {
         if (shuttingDown.get()) return
+        // ★ v118: 飞屏通道正在申请中 —— 等它定了再启动会话。
+        //   否则 clusterDisplayConfig() 会把 111 流按回退屏谈好,而随后
+        //   presentation 建在通道屏上,两边不是同一块屏(仪表无画面)。
+        //   超时兜底见 [CAST_GATE_TIMEOUT_MS]:超时会关通道并建 presentation,
+        //   那时 castGateOpening 已置 false,这里自然放行。
+        if (castGateOpening) {
+            mainHandler.postDelayed({ maybeStartCarPlay() }, CAST_GATE_POLL_MILLIS)
+            return
+        }
         if (CarPlayBackgroundSession.hasSession() && !CarPlayBackgroundSession.isOwner(this)) {
             if (!adoptBackgroundSession()) mainHandler.postDelayed({ maybeStartCarPlay() }, 500)
             return
@@ -6910,6 +7029,16 @@ class CarPlayHostActivity : ComponentActivity() {
          * 没有这个上限,仪表投屏会永远卡在"申请中"。
          */
         const val CAST_GATE_TIMEOUT_MS = 5_000L
+
+        /**
+         * v118: 通道申请期间轮询 [maybeStartCarPlay] 的间隔。
+         *
+         * 通道的 `active` 回调可能晚于会话启动，那时 111 流已经按回退屏谈好了。
+         * 所以申请期间**不启动** CarPlay，等通道定了再谈流。
+         * 上限由 [CAST_GATE_TIMEOUT_MS] 兜着：超时会关通道并建 presentation，
+         * 之后这里自然放行，不会把启动永久卡住。
+         */
+        const val CAST_GATE_POLL_MILLIS = 120L
         const val SIDE_PANEL_REFRESH_MILLIS = 5_000L
         /** CarPlay's share past which letting go of the panel edge closes the panel: halfway from two thirds to all. */
         const val SIDE_PANEL_CLOSE_SHARE = 5f / 6f
