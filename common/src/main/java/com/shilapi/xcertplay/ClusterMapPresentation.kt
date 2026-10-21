@@ -63,6 +63,9 @@ internal class ClusterMapPresentation(
 
     /** B561: 路口放大图（车道级导航图）。默认 GONE，见 [setJunctionLanes]。 */
     private var junctionCardView: ClusterJunctionCardView? = null
+
+    /** v117: 车速表。默认 GONE，读到 VHAL 车速才显示，见 [setSpeedometerReading]。 */
+    private var speedometerView: ClusterSpeedometerView? = null
     private var videoView: View? = null
     private var streamActive = false
 
@@ -197,6 +200,11 @@ internal class ClusterMapPresentation(
         //   它就是转向信息的展开态，出现时应该在最上层。
         junctionCardView = ClusterJunctionCardView(context).apply { visibility = View.GONE }
         root.addView(junctionCardView, FrameLayout.LayoutParams(-1, -1))
+        // ★ v117 车速表。数据来自 B561 VHAL（与原厂仪表同源），
+        //   读不到时整块 GONE —— 报假的 0 速比空白更糟。
+        //   挂在最上层：它是驾驶员最需要随时看到的信息。
+        speedometerView = ClusterSpeedometerView(context).apply { visibility = View.GONE }
+        root.addView(speedometerView, FrameLayout.LayoutParams(-1, -1))
         // Start with the placeholder visible; SurfaceView would otherwise cover the light
         // backdrop with an empty black surface before the first stream notification.
         // SurfaceView ignores fractional alpha before API 34. Keep its decoder surface
@@ -383,6 +391,26 @@ internal class ClusterMapPresentation(
     /** B561: 推车道数据。null / 不可画时整块隐藏。 */
     fun setJunctionLanes(lanes: com.shilapi.xcertplay.guidance.ClusterLaneGuidance?) {
         junctionCardView?.setLane(lanes)
+    }
+
+    /**
+     * v117: 推 VHAL 车速读数。null（读不到）时整块隐藏。
+     *
+     * 走 VHAL 而不是抓 logcat —— 数据与原厂仪表同源，单位明确是 km/h。
+     */
+    fun setSpeedometerReading(reading: com.shilapi.xcertplay.vehicle.CarCabinVehicleStatus.CabinReading?) {
+        speedometerView?.setReading(reading)
+    }
+
+    /** v117: 车速表的位置/大小/透明度。 */
+    fun setSpeedometerLayout(xPercent: Int, yPercent: Int, sizePercent: Int, opacityPercent: Int) {
+        speedometerView?.setLayout(xPercent, yPercent, sizePercent)
+        speedometerView?.setOpacity(opacityPercent)
+    }
+
+    /** v117: 车速表的深浅色。 */
+    fun setSpeedometerNightMode(night: Boolean) {
+        speedometerView?.setNightMode(night)
     }
 
     fun setCardOpacity(turnPercent: Int, mediaPercent: Int, callPercent: Int) {

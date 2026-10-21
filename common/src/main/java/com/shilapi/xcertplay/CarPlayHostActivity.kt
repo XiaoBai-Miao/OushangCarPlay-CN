@@ -122,6 +122,8 @@ import com.shilapi.xcertplay.transport.BluetoothRadioCheck
 import com.shilapi.xcertplay.transport.IphoneUsbMatcher
 import com.shilapi.xcertplay.transport.UsbDeviceId
 import com.shilapi.xcertplay.transport.VehicleSpeedLocationProvider
+import com.shilapi.xcertplay.vehicle.B561VehicleSpeedSource
+import com.shilapi.xcertplay.vehicle.CarCabinVehicleStatus
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.ArrayDeque
@@ -190,10 +192,15 @@ class CarPlayHostActivity : ComponentActivity() {
             hardwareVersion = "1.0",
             carPlayUsbInterfaceNumber = 3,
             locationInformationEnabled = locationReportingEnabled,
-            // v100: B561 无 BYD 车辆数据源(电量/续航/轮速),车辆状态上报关闭。
-            vehicleStatusEnabled = false,
+            // v117: B561 车辆数据源已就位（VHAL，与原厂仪表同源）。
+            //   vehicleStatusEnabled 只在真的读到电量+续航时才会在 iAP2 侧生效
+            //   （见 Iap2IdentificationConfig.withVehicleStatusFrom），
+            //   所以这里开成 true 是安全的：读不到就自动降级回 false。
+            vehicleStatusEnabled = true,
             chargingConnectors = EvChargingConnectors.CCS2_TYPE2,
-            vehicleSpeedEnabled = false,
+            // v117: 打开轮速上报。$PASCD 句让 CarPlay 地图在无 GPS 锁定时
+            //   （隧道/地库）能靠轮速推算保持位置连续。
+            vehicleSpeedEnabled = true,
         ),
         label = "DiPlay",
         hostName = "diplay-" + DiPlayBootstrap.deviceId(airPlayIdentity).replace(":", "").lowercase(),
@@ -381,6 +388,20 @@ class CarPlayHostActivity : ComponentActivity() {
     private var externalActivityInProgress = false
     private var sink: AndroidMediaSink? = null
     private var controller: CarPlayController? = null
+    /**
+     * v117: B561 车辆数据源（VHAL）。
+     *
+     * 与原厂仪表同源，读的是 `android.car.hardware.cabin.CarCabinManager`。
+     * v100 重做时这一层被整个删掉了（旧实现的方法名与属性 ID 都是错的，
+     * 从来没读到过值），v117 按原厂 `CarConnectManager` 的官方范式重建。
+     */
+    private val vehicleStatus = CarCabinVehicleStatus()
+    /** v117: 把 VHAL 车速接到 iAP2 的 `$PASCD` 轮速句。 */
+    private val vehicleSpeedSource = B561VehicleSpeedSource(
+        speedProvider = { vehicleStatus.currentSpeedKph() },
+        gearProvider = { vehicleStatus.currentGearRaw() },
+        elapsedMillis = { android.os.SystemClock.elapsedRealtime() },
+    )
     private val videoSurfaceOwner = CarPlayVideoSurfaceOwner<Surface>(
         detach = { surface ->
             sink?.clearSurface(SCREEN_TYPE_MAIN, surface)
@@ -1368,9 +1389,24 @@ class CarPlayHostActivity : ComponentActivity() {
                 AirPlayPersistence.loadClusterJunctionSizePercent(this),
             )
             presentation.setJunctionOpacity(AirPlayPersistence.loadClusterJunctionOpacityPercent(this))
+            // ★ v117 车速表。数据来自 B561 VHAL（与原厂仪表同源），
+            //   开关关闭或读不到车速时整块隐藏。
+            presentation.setSpeedometerLayout(
+                AirPlayPersistence.loadClusterSpeedometerX(this),
+                AirPlayPersistence.loadClusterSpeedometerY(this),
+                AirPlayPersistence.loadClusterSpeedometerSize(this),
+                AirPlayPersistence.loadClusterSpeedometerOpacity(this),
+            )
+            presentation.setSpeedometerNightMode(effectiveNight)
+            presentation.setSpeedometerReading(
+                if (AirPlayPersistence.loadClusterSpeedometerEnabled(this)) vehicleStatus.currentReading()
+                else null,
+            )
         }
         pushClusterMedia(presentations)
         pushClusterCall(presentations)
+        // v117: 车速表。设置项改动要立刻反映到仪表上。
+        pushClusterSpeedometer(presentations)
     }
 
     /**
@@ -1389,6 +1425,25 @@ class CarPlayHostActivity : ComponentActivity() {
                 clusterMediaPlaying,
                 CarPlayMediaKeys.currentArtwork(),
             )
+        }
+    }
+
+    /**
+     * v117: 把 VHAL 车速推给仪表上的车速表。
+     *
+     * 开关关闭或读不到车速时推 null 整卡隐藏 —— 报假的 0 速比空白更糟。
+     */
+    private fun pushClusterSpeedometer(presentations: List<ClusterMapPresentation>? = null) {
+        val targets = presentations
+            ?: (clusterLayers.values + listOfNotNull(clusterPresentation)).distinct()
+        if (targets.isEmpty()) return
+        val reading = if (AirPlayPersistence.loadClusterSpeedometerEnabled(this)) {
+            vehicleStatus.currentReading()
+        } else {
+            null
+        }
+        for (presentation in targets) {
+            presentation.setSpeedometerReading(reading)
         }
     }
 
@@ -1805,6 +1860,9 @@ class CarPlayHostActivity : ComponentActivity() {
 
     override fun onDestroy() {
         discardLastPicture()
+        // v117: 车辆数据源随 Activity 一起结束，避免 Car Service 侧留着客户端。
+        vehicleSpeedSource.stop()
+        vehicleStatus.stop()
         if (pictureCopyThreadStarted) pictureCopyThread.quitSafely()
         resetSidePanel()
         releaseSidePanelEffects()
@@ -5561,9 +5619,27 @@ class CarPlayHostActivity : ComponentActivity() {
             size
         }
         val airPlayConfig = createAirPlayConfig(effectiveSize)
-        // v100: B561 无轮速数据源(vehicleSpeedEnabled 恒 false)。
+        // v117: B561 车辆数据源。VHAL 与原厂仪表同源，车速/电量/挡位都能读到。
+        //   轮速句 `$PASCD` 需要 locationReporting 打开（它走同一条 NMEA 流），
+        //   所以只有开了位置上报才把轮速源挂上去。
+        vehicleStatus.start(this)
+        // v117: 轮速源由 VHAL 读数驱动 —— 每次读数变化时记一个采样。
+        //   同一个回调也把车速推给仪表上的车速表（1 Hz 刷新）。
+        vehicleStatus.onReadingChanged = { reading ->
+            vehicleSpeedSource.sample()
+            runOnUiThread { pushClusterSpeedometer() }
+        }
         val locationProvider: Iap2LocationProvider? =
-            if (config.locationReportingEnabled) AndroidCarPlayLocationProvider(this) else null
+            if (config.locationReportingEnabled) {
+                val position = AndroidCarPlayLocationProvider(this)
+                if (config.identification.vehicleSpeedEnabled) {
+                    VehicleSpeedLocationProvider(position, vehicleSpeedSource)
+                } else {
+                    position
+                }
+            } else {
+                null
+            }
         appendLog(
             "Starting CarPlay controller at ${size.width}x${size.height} -> " +
                 "${airPlayConfig.main.widthPixels}x${airPlayConfig.main.heightPixels} " +
@@ -5615,8 +5691,10 @@ class CarPlayHostActivity : ComponentActivity() {
             savePairRecord = { record -> AirPlayPersistence.saveLockdownRecord(this, record) },
             clearPairRecord = { AirPlayPersistence.clearLockdownRecord(this) },
             locationProvider = locationProvider,
-            // v100: B561 无 BYD 车辆数据源。
-            vehicleStatusProvider = null,
+            // v117: B561 车辆数据源。读不到时 provider 返回 null，
+            //   iAP2 侧会自动把 vehicleStatusEnabled 置回 false，
+            //   绝不会向 iPhone 报一个假的续航/电量。
+            vehicleStatusProvider = vehicleStatus,
         )
         controller = next
         resetSidePanel() // a new session starts without the side panel
