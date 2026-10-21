@@ -85,6 +85,8 @@ import com.shilapi.xcertplay.airplay.AirPlayIdentity
 import com.shilapi.xcertplay.airplay.AirPlayIcon
 import com.shilapi.xcertplay.airplay.CarPlayClusterDisplay
 import com.shilapi.xcertplay.glance.CarPlayGlance
+import com.shilapi.xcertplay.cluster.CastGateClient
+import com.shilapi.xcertplay.cluster.CastGateProtocol
 import com.shilapi.xcertplay.guidance.ClusterGuidanceFeed
 import com.shilapi.xcertplay.transport.EvChargingConnectors
 import com.shilapi.xcertplay.airplay.AirPlaySafeArea
@@ -392,6 +394,14 @@ class CarPlayHostActivity : ComponentActivity() {
     private var clusterSurface: Surface? = null
     // Keep one surface per layer alive, including while its map card is hidden.
     private val clusterLayers = mutableMapOf<Boolean, ClusterMapPresentation>()
+
+    // ★ v115: CAST_GATE 仪表通道接入。
+    //   我们以前是**自己** Presentation 挂到副屏上,从没跟 com.thunder.tbxt 申请过
+    //   物理仪表通道 —— 通道若被 SuperUni 的内置投屏占着,画面就出不去。
+    //   现在改成:先 open 通道,拿到 active + displayId 后再在**它指定的**屏上出图。
+    //   open 是异步的,所以这里记状态,避免并发重复 open。
+    private var castGateOpening = false
+    private var castGateChannel: String? = null
     private var clusterTurnGuidance: com.shilapi.xcertplay.guidance.ClusterTurnGuidance? = null
     private val clusterTurnOverlayListener: (com.shilapi.xcertplay.guidance.ClusterTurnGuidance?) -> Unit = { guidance ->
         runOnUiThread {
@@ -1138,7 +1148,83 @@ class CarPlayHostActivity : ComponentActivity() {
             applyClusterTurnOverlay()
             return
         }
-        val display = ClusterMapPresentation.findDisplay(this) ?: run {
+        // ★ v115: 先向 SuperUni 申请物理仪表通道(异步),拿到 active 之后才出图。
+        //   返回 true 表示"已在申请中,本次先不建 presentation"。
+        if (requestCastGateChannel()) return
+        createClusterPresentation()
+    }
+
+    /**
+     * v115 B561: 申请仪表投屏通道。
+     *
+     * 返回 true 表示已经发起 open、正在等回调(本次不要再建 presentation)。
+     *
+     * 两种返回 false 的情形:
+     *  - 车上没装 `com.thunder.tbxt` → 走原有 Presentation 路径(老车机兼容);
+     *  - 通道已经 active → 直接出图。
+     *
+     * 规范明确 `sendBroadcast()` 返回**不代表成功**,所以只有回调里
+     * `status=active` 才算通道到手;`error`/`busy` 一律回退到原有路径,
+     * 不能因为通道没开成就把仪表投屏整个废掉。
+     */
+    private fun requestCastGateChannel(): Boolean {
+        val channel = CastGateProtocol.CHANNEL_PARTIAL
+        if (!CastGateClient.isAvailable(this)) return false
+        if (castGateOpening) return true
+        if (CastGateClient.isActive && CastGateClient.currentChannel() == channel) return false
+
+        castGateOpening = true
+        castGateChannel = channel
+        // ★ 兜底:规范说"未就绪时接口返回错误",但对方进程没起来/被杀时可能**一条回调都没有**。
+        //   没有超时兜底的话,仪表投屏会一直卡在"申请中"状态,永远不出图。
+        mainHandler.removeCallbacks(castGateTimeout)
+        mainHandler.postDelayed(castGateTimeout, CAST_GATE_TIMEOUT_MS)
+        CastGateClient.open(this, channel) { result ->
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                mainHandler.removeCallbacks(castGateTimeout)
+                castGateOpening = false
+                if (result.isActive) {
+                    appendLog("Cluster gate: active display=${result.displayId}")
+                    Log.i(CastGateClient.TAG, "gate active display=${result.displayId}")
+                    createClusterPresentation()
+                } else if (result.status == CastGateProtocol.STATUS_OPENING) {
+                    // 还在准备中,后面还有 active —— 等着。
+                    appendLog("Cluster gate: opening")
+                } else {
+                    // error / busy / closed / idle:通道没到手。
+                    // ★ 一律回退到原有 Presentation 路径。busy 虽然意味着"别人占着通道",
+                    //   但 v113 之前就是直接建 Presentation 的,回退路径**必须始终可用** ——
+                    //   否则通道一旦被占,仪表会从"有画面"变成"完全没画面",那是实打实的回归。
+                    //   通道是**新增**的正规通路,不是出图的唯一前提。
+                    appendLog("Cluster gate: ${result.status} ${result.errorCode ?: ""}")
+                    Log.w(CastGateClient.TAG, "gate -> ${CastGateProtocol.describe(result)}, fallback")
+                    createClusterPresentation()
+                }
+            }
+        }
+        return true
+    }
+
+    /** open 迟迟没有回调时的兜底:回退到原有出图路径。 */
+    private val castGateTimeout = Runnable {
+        if (!castGateOpening) return@Runnable
+        castGateOpening = false
+        appendLog("Cluster gate: open timed out, falling back")
+        Log.w(CastGateClient.TAG, "gate open timed out")
+        // 超时说明对方没响应,这个会话多半没成立 —— 把本地会话状态清掉,
+        // 否则 CastGateClient 里会一直挂着一个 sessionId,close 也会白发一条。
+        releaseCastGateChannel()
+        createClusterPresentation()
+    }
+
+    /** 真正建 presentation。通道若已就绪,用 SuperUni 指定的 displayId。 */
+    private fun createClusterPresentation() {
+        if (clusterPresentation != null) {
+            applyClusterTurnOverlay()
+            return
+        }
+        val display = clusterTargetDisplay() ?: run {
             appendLog("Cluster map: no cluster projection display among ${ClusterMapPresentation.describeDisplays(this)}")
             return
         }
@@ -1168,6 +1254,27 @@ class CarPlayHostActivity : ComponentActivity() {
             appendLog("Cluster map: presentation failed ${error.javaClass.simpleName}: ${error.message}")
         }
     }
+
+    /**
+     * v115: 出图目标屏。
+     *
+     * 通道已 active 时,**优先用 SuperUni 返回的 displayId** —— 它才是对方
+     * 认可的仪表屏;枚举副屏猜出来的可能是 passenger display 之类的屏。
+     * 通道没启用/没开成时,沿用原有的 [ClusterMapPresentation.findDisplay]。
+     */
+    private fun clusterTargetDisplay(): android.view.Display? {
+        if (CastGateClient.isActive) {
+            val gateId = CastGateClient.displayId
+            if (gateId != CastGateProtocol.DISPLAY_ID_UNAVAILABLE) {
+                val display = getSystemService(android.hardware.display.DisplayManager::class.java)
+                    ?.getDisplay(gateId)
+                if (display != null) return display
+                appendLog("Cluster gate: display $gateId not found, falling back")
+            }
+        }
+        return ClusterMapPresentation.findDisplay(this)
+    }
+
 
     /** Small-window positions apply when forced on. */
     private fun smallWindowActive(): Boolean =
@@ -1345,7 +1452,28 @@ class CarPlayHostActivity : ComponentActivity() {
         clusterSurface = null
         presentations.forEach { runCatching { it.dismiss() } }
         controller?.setDashboardMapOutputVisible(false)
+        // ★ v115: 通道也必须关。规范要求 close 用**同一个 sessionId 和通道**,
+        //   否则对方不认,通道会一直被占着 —— 下次别的 App 也用不了。
+        releaseCastGateChannel()
     }
+
+    /**
+     * v115: 关闭已申请的仪表通道。
+     *
+     * 只在**我们确实开过**时才发 close —— 没开过就发 close 属于
+     * "关闭别人(或不存在)的会话",规范明确那不会结束任何会话,但也没意义。
+     */
+    private fun releaseCastGateChannel() {
+        val channel = castGateChannel
+        if (channel == null) return
+        castGateChannel = null
+        castGateOpening = false
+        if (!CastGateClient.isAvailable(this)) return
+        CastGateClient.close(this) { result ->
+            Log.i(CastGateClient.TAG, "gate close -> ${CastGateProtocol.describe(result)}")
+        }
+    }
+
 
     private fun onClusterSurface(surface: Surface?) {
         if (clusterSurface === surface) return
@@ -1384,7 +1512,8 @@ class CarPlayHostActivity : ComponentActivity() {
         clusterStreamOnDisplay = false
         requestedSmallWindowForStream = null
         if (!AirPlayPersistence.loadClusterMapEnabled(this)) return null
-        val display = ClusterMapPresentation.findDisplay(this)
+        // ★ v115: 用通道返回的屏(若有),保证 111 流和出图落在同一块屏上。
+        val display = clusterTargetDisplay()
         if (display != null) {
             val size = ClusterMapPresentation.sizeOf(display)
             if (size.x > 0 && size.y > 0) {
@@ -1703,6 +1832,7 @@ class CarPlayHostActivity : ComponentActivity() {
         }
         if (MapMirrors.onChanged === mirrorsChanged) MapMirrors.onChanged = null
         dismissClusterPresentation()
+        mainHandler.removeCallbacks(castGateTimeout)
         mainHandler.removeCallbacks(applyDisplaySize)
         mainHandler.removeCallbacks(expireOldLogLines)
         mainHandler.removeCallbacks(pollConfiguration)
@@ -6692,6 +6822,13 @@ class CarPlayHostActivity : ComponentActivity() {
     private companion object {
         const val CLUSTER_SMALL_WINDOW_ON = 1
         const val CLUSTER_SMALL_WINDOW_AUTO = 2
+        /**
+         * v115: 仪表通道 open 等回调的上限。
+         *
+         * 规范说对方未就绪时会回 error,但对方进程没起来时可能一条回调都没有。
+         * 没有这个上限,仪表投屏会永远卡在"申请中"。
+         */
+        const val CAST_GATE_TIMEOUT_MS = 5_000L
         const val SIDE_PANEL_REFRESH_MILLIS = 5_000L
         /** CarPlay's share past which letting go of the panel edge closes the panel: halfway from two thirds to all. */
         const val SIDE_PANEL_CLOSE_SHARE = 5f / 6f

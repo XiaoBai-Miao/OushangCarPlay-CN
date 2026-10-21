@@ -19,9 +19,14 @@
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <!-- Optional, owner-enabled Usage Access for the verified DiLink 5.1 cluster profile. -->
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:ignore="ProtectedPermissions" />
+    <!-- 仪表投屏通道广播接口(com.thunder.tbxt CastGate v1)。
+         normal 级别权限,不同签名的开发者 App 也可接入,无需运行时权限弹窗。 -->
+    <uses-permission android:name="com.thunder.tbxt.permission.CONTROL_CAST_GATE" />
     <!-- The centre card also follows whichever launcher is the default home. -->
     <queries>
         <package android:name="com.byd.carsettings" />
+        <!-- 仪表投屏通道广播接口的目标包;targetSdk 30+ 下不声明就查不到它是否安装。 -->
+        <package android:name="com.thunder.tbxt" />
         <!-- Read-only visibility for the turn camera probe's OEM AVM presence hint. -->
         <package android:name="com.byd.avm" />
         <intent>
@@ -155,6 +160,10 @@
                 android:name="android.accessibilityservice"
                 android:resource="@xml/wheel_key_service" />
         </service>
+
+        <receiver
+            android:name="com.shilapi.xcertplay.cluster.CastGateResultReceiver"
+            android:exported="false" />
 
         <receiver
             android:name="com.shilapi.xcertplay.BootReceiver"
