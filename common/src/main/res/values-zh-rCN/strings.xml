@@ -1003,4 +1003,7 @@
     <string name="call_key_choice_play_pause">播放/暂停</string>
     <string name="call_key_choice_byd_answer">比亚迪接听键</string>
     <string name="call_key_choice_byd_hangup">比亚迪挂断键</string>
+    <string name="superuni_flyscreen">SuperUni 飞屏（仪表通道）</string>
+    <string name="superuni_flyscreen_description">向 SuperUni 申请物理仪表通道，让 CarPlay 地图显示到仪表屏。关闭后回退到直接投屏方式。</string>
+    <string name="superuni_flyscreen_unavailable">本车未安装 SuperUni，将使用直接投屏方式。</string>
 </resources>

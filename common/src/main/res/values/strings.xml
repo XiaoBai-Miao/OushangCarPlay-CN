@@ -1044,4 +1044,7 @@
     <string name="call_key_choice_play_pause">Play / pause</string>
     <string name="call_key_choice_byd_answer">BYD answer key</string>
     <string name="call_key_choice_byd_hangup">BYD hang-up key</string>
+    <string name="superuni_flyscreen">SuperUni fly screen (cluster channel)</string>
+    <string name="superuni_flyscreen_description">Asks SuperUni for the physical instrument channel so the CarPlay map reaches the dashboard. Without it the cluster falls back to the direct presentation path.</string>
+    <string name="superuni_flyscreen_unavailable">SuperUni is not installed on this car; the direct presentation path is used instead.</string>
 </resources>

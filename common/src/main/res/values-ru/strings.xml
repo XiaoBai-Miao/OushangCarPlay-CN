@@ -943,4 +943,7 @@
     <string name="call_key_choice_play_pause">Воспроизведение / пауза</string>
     <string name="call_key_choice_byd_answer">Клавиша ответа BYD</string>
     <string name="call_key_choice_byd_hangup">Клавиша завершения BYD</string>
+    <string name="superuni_flyscreen">Fly screen SuperUni (канал приборной панели)</string>
+    <string name="superuni_flyscreen_description">Запрашивает у SuperUni физический канал приборной панели, чтобы карта CarPlay попала на панель. Без него используется прямой путь отображения.</string>
+    <string name="superuni_flyscreen_unavailable">SuperUni не установлен в этом автомобиле; используется прямой путь отображения.</string>
 </resources>

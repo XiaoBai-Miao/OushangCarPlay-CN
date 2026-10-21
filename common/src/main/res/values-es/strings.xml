@@ -943,4 +943,7 @@
     <string name="call_key_choice_play_pause">Reproducir / pausar</string>
     <string name="call_key_choice_byd_answer">Tecla de respuesta BYD</string>
     <string name="call_key_choice_byd_hangup">Tecla de colgado BYD</string>
+    <string name="superuni_flyscreen">Pantalla flotante de SuperUni (canal del salpicadero)</string>
+    <string name="superuni_flyscreen_description">Pide a SuperUni el canal fisico del salpicadero para que el mapa de CarPlay llegue al panel. Sin el se usa la via de presentacion directa.</string>
+    <string name="superuni_flyscreen_unavailable">SuperUni no esta instalado en este coche; se usa la via de presentacion directa.</string>
 </resources>

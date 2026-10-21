@@ -1169,6 +1169,9 @@ class CarPlayHostActivity : ComponentActivity() {
      */
     private fun requestCastGateChannel(): Boolean {
         val channel = CastGateProtocol.CHANNEL_PARTIAL
+        // ★ v116: 飞屏开关关掉时,不去申请物理通道 —— 出图退回 v114 之前的老路
+        //   (自己 Presentation 挂副屏)。这是用户显式选择的行为,不是降级。
+        if (!AirPlayPersistence.loadSuperUniFlyScreen(this)) return false
         if (!CastGateClient.isAvailable(this)) return false
         if (castGateOpening) return true
         if (CastGateClient.isActive && CastGateClient.currentChannel() == channel) return false

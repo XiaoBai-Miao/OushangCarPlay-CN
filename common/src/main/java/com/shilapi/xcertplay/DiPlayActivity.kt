@@ -55,6 +55,7 @@ import com.shilapi.xcertplay.backup.SettingsBackupEndpoint
 import com.shilapi.xcertplay.backup.SettingsBackupServer
 import com.shilapi.xcertplay.backup.SettingsQrCode
 import com.shilapi.xcertplay.compat.closeCompat
+import com.shilapi.xcertplay.cluster.CastGateClient
 import com.shilapi.xcertplay.telecom.PhoneAudioRoute
 import com.shilapi.xcertplay.host.R
 import com.shilapi.xcertplay.media.MtkDecoderTuning
@@ -2546,6 +2547,19 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                 render()
             }
             if (clusterMapEnabled) {
+                // ★ v116: SuperUni 飞屏开关。
+                //   开启时向 SuperUni 申请物理仪表通道(CAST_GATE),由它负责合成导航与心跳;
+                //   关闭时退回"自己 Presentation 挂副屏"的老路。
+                //   车上没装 SuperUni 时给出明确提示,免得用户以为开关没生效。
+                val superUniPresent = CastGateClient.isAvailable(this)
+                reconnectingToggle(card, getString(R.string.superuni_flyscreen),
+                    if (superUniPresent) getString(R.string.superuni_flyscreen_description)
+                    else getString(R.string.superuni_flyscreen_unavailable),
+                    AirPlayPersistence.loadSuperUniFlyScreen(this),
+                    enabled = superUniPresent) {
+                    AirPlayPersistence.saveSuperUniFlyScreen(this, it)
+                    render()
+                }
                 clusterSpeedometerControls(card)
                 toggle(card, getString(R.string.center_map_card),
                     if (clusterDisplay != null || adbCluster) getString(R.string.center_map_card_description)
@@ -5470,8 +5484,8 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     // Routing changes affect the live cluster surface as soon as the host resumes.
     // Ask before saving them instead of promising to defer only part of the change.
     private fun reconnectingToggle(parent: LinearLayout, title: String, description: String,
-        value: Boolean, save: (Boolean) -> Unit) {
-        toggle(parent, title, description, value) { selected ->
+        value: Boolean, enabled: Boolean = true, save: (Boolean) -> Unit) {
+        toggle(parent, title, description, value, enabled) { selected ->
             if (!CarPlayBackgroundSession.hasSession()) {
                 save(selected)
             } else {

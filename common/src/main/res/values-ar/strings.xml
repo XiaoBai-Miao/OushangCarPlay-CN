@@ -992,4 +992,7 @@
     <string name="call_key_choice_play_pause">تشغيل / إيقاف</string>
     <string name="call_key_choice_byd_answer">زر الرد (BYD)</string>
     <string name="call_key_choice_byd_hangup">زر الإنهاء (BYD)</string>
+    <string name="superuni_flyscreen">شاشة SuperUni الطائرة (قناة لوحة العدادات)</string>
+    <string name="superuni_flyscreen_description">يطلب من SuperUni قناة العدادات المادية حتى تصل خريطة CarPlay إلى لوحة العدادات. بدونها يعود العرض إلى مسار العرض المباشر.</string>
+    <string name="superuni_flyscreen_unavailable">SuperUni غير مثبت على هذه السيارة؛ يُستخدم مسار العرض المباشر بدلاً من ذلك.</string>
 </resources>

@@ -1003,4 +1003,7 @@
     <string name="call_key_choice_play_pause">再生/一時停止</string>
     <string name="call_key_choice_byd_answer">BYD の応答キー</string>
     <string name="call_key_choice_byd_hangup">BYD の終了キー</string>
+    <string name="superuni_flyscreen">SuperUni フライングスクリーン（メータチャネル）</string>
+    <string name="superuni_flyscreen_description">SuperUni に物理メータチャネルを依頼し、CarPlay 地図をメータへ表示します。無効時は直接表示にフォールバックします。</string>
+    <string name="superuni_flyscreen_unavailable">この車両に SuperUni がインストールされていません。直接表示を使用します。</string>
 </resources>

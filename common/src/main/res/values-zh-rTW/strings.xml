@@ -1003,4 +1003,7 @@
     <string name="call_key_choice_play_pause">播放/暫停</string>
     <string name="call_key_choice_byd_answer">比亞迪接聽鍵</string>
     <string name="call_key_choice_byd_hangup">比亞迪掛斷鍵</string>
+    <string name="superuni_flyscreen">SuperUni 飛屏（儀表通道）</string>
+    <string name="superuni_flyscreen_description">向 SuperUni 申請實體儀表通道，讓 CarPlay 地圖顯示到儀表屏。關閉後回退到直接投放方式。</string>
+    <string name="superuni_flyscreen_unavailable">本車未安裝 SuperUni，將使用直接投放方式。</string>
 </resources>

@@ -82,6 +82,14 @@ object AirPlayPersistence {
     private const val KEY_FPS_COUNTER = "fps_counter"
     private const val KEY_CLUSTER_MAP = "cluster_map_enabled"
     private const val KEY_ADB_CLUSTER_ACTIVITY = "adb_cluster_activity_enabled"
+
+    /**
+     * v116: SuperUni 飞屏(CAST_GATE 仪表通道)开关。
+     *
+     * 默认 **开** —— v115 起我们就是先向 SuperUni 申请物理仪表通道再出图,
+     * 关掉等于退回"自己 Presentation 挂副屏"的老路,那正是通道被占时出不去的原因。
+     */
+    private const val KEY_SUPERUNI_FLYSCREEN = "superuni_flyscreen_enabled"
     private const val KEY_CENTER_MAP_OVERLAY = "center_map_overlay"
     private const val KEY_CENTER_MAP_AUTO_HIDE = "center_map_auto_hide"
     private const val KEY_LAUNCHER_MAP_SHARING = "launcher_map_sharing"
@@ -806,6 +814,20 @@ object AirPlayPersistence {
 
     fun saveClusterMapEnabled(context: Context, enabled: Boolean) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_CLUSTER_MAP, enabled).apply()
+    }
+
+    /**
+     * v116: SuperUni 飞屏(CAST_GATE 仪表通道)是否启用。默认开。
+     *
+     * 关闭时我们不去申请物理仪表通道,出图退回"自己 Presentation 挂副屏"的老路。
+     */
+    fun loadSuperUniFlyScreen(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getBoolean(KEY_SUPERUNI_FLYSCREEN, true)
+
+    fun saveSuperUniFlyScreen(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit().putBoolean(KEY_SUPERUNI_FLYSCREEN, enabled).apply()
     }
 
     /** The dashboard map as a card on the centre screen while DiPlay is in the background. */
