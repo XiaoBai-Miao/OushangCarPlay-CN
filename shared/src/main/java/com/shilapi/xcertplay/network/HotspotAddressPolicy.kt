@@ -30,30 +30,30 @@ internal object HotspotAddressPolicy {
     }
 
     fun select(addresses: List<InetAddress>, preferredFamily: String?): InetAddress? {
-        if (preferredFamily != FAMILY_IPV6) {
-            return select(addresses)
-        }
-        for (address in addresses) {
-            if (address is Inet6Address && address.isLinkLocalAddress) {
-                return address
-            }
+        if (preferredFamily == FAMILY_IPV6) {
+            // Only a routable IPv6 address can be published: a link-local one loses its zone
+            // when it is serialized into CarPlayStartSession, so the iPhone could never dial it.
+            addresses.firstOrNull(::routableIpv6)?.let { return it }
         }
         return select(addresses)
     }
 
     fun alternateFamilyCandidate(addresses: List<InetAddress>, published: InetAddress): InetAddress? {
         val publishedIsIpv6 = published is Inet6Address
-        var linkLocal: InetAddress? = null
         for (address in addresses) {
             if (address is Inet4Address && usable(address) && publishedIsIpv6) {
                 return address
             }
-            if (address is Inet6Address && address.isLinkLocalAddress && !publishedIsIpv6 && linkLocal == null) {
-                linkLocal = address
+            if (routableIpv6(address) && !publishedIsIpv6) {
+                return address
             }
         }
-        return if (publishedIsIpv6) null else linkLocal
+        return null
     }
+
+    /** True for an IPv6 address the iPhone can actually reach (not an fe80:: link-local). */
+    fun routableIpv6(address: InetAddress): Boolean =
+        address is Inet6Address && !address.isLinkLocalAddress && usable(address)
 
     private fun usable(address: InetAddress): Boolean =
         !address.isLoopbackAddress && !address.isAnyLocalAddress && !address.isLinkLocalAddress &&

@@ -35,8 +35,8 @@ class FirstTcpWatchdogTest {
         watch.startSessionSent(0)
         now = 20_000
         watch.startSessionSent(now * 1_000_000)
-        assertEquals(30_000L, deadline)
-        now = 30_000
+        assertEquals(60_000L, deadline)
+        now = 60_000
         timer!!()
         assertEquals(1, failures)
         assertTrue(watch.terminated)
@@ -59,7 +59,7 @@ class FirstTcpWatchdogTest {
         assertFalse(watch.accepted(event(internal = true)))
         assertFalse(watch.accepted(event(AirPlayListenerIdentity(6))))
         assertFalse(watch.accepted(event(AirPlayListenerIdentity(7))))
-        now = 30_000
+        now = 60_000
         timer!!()
         assertEquals(1, failures)
     }
@@ -67,7 +67,7 @@ class FirstTcpWatchdogTest {
     @Test fun acceptWinsAgainstAlreadyQueuedTimeout() {
         val watch = watchdog()
         watch.startSessionSent(0)
-        now = 30_000
+        now = 60_000
         assertTrue(watch.accepted(event()))
         timer!!()
         assertEquals(0, failures)
@@ -77,7 +77,7 @@ class FirstTcpWatchdogTest {
     @Test fun timeoutWinsAndLateAcceptCannotRevive() {
         val watch = watchdog()
         watch.startSessionSent(0)
-        now = 30_000
+        now = 60_000
         timer!!()
         assertFalse(watch.accepted(event()))
         assertFalse(watch.sessionEstablished())

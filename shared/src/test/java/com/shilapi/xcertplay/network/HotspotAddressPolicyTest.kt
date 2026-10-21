@@ -49,13 +49,24 @@ class HotspotAddressPolicyTest {
     }
 
     @Test
-    fun preferredIpv6PromotesTheLinkLocalAddressOverUsableIpv4() {
+    fun preferredIpv6PromotesARoutableIpv6OverUsableIpv4() {
+        val ipv4 = address("192.168.49.1")
+        val routableIpv6 = address("fd00::1")
+
+        assertEquals(
+            routableIpv6,
+            HotspotAddressPolicy.select(listOf(ipv4, routableIpv6), HotspotAddressPolicy.FAMILY_IPV6),
+        )
+    }
+
+    @Test
+    fun preferredIpv6NeverPublishesALinkLocalAddressTheIphoneCannotDial() {
         val ipv4 = address("192.168.49.1")
         val linkLocal = address("fe80::e0dc:ffff:fe5b:c6d1")
 
         assertEquals(
-            linkLocal,
-            HotspotAddressPolicy.select(listOf(ipv4, linkLocal), HotspotAddressPolicy.FAMILY_IPV6),
+            ipv4,
+            HotspotAddressPolicy.select(listOf(linkLocal, ipv4), HotspotAddressPolicy.FAMILY_IPV6),
         )
     }
 
@@ -99,19 +110,27 @@ class HotspotAddressPolicyTest {
     }
 
     @Test
-    fun theAlternateCandidateIsTheFirstUsableAddressOfTheOtherFamily() {
+    fun theAlternateCandidateIsTheFirstRoutableAddressOfTheOtherFamily() {
         val ipv4 = address("192.168.49.1")
-        val secondIpv4 = address("192.168.49.9")
+        val routableIpv6 = address("fd00::1")
         val linkLocal = address("fe80::e0dc:ffff:fe5b:c6d1")
 
         assertEquals(
-            linkLocal,
-            HotspotAddressPolicy.alternateFamilyCandidate(listOf(ipv4, secondIpv4, linkLocal), ipv4),
+            routableIpv6,
+            HotspotAddressPolicy.alternateFamilyCandidate(listOf(ipv4, linkLocal, routableIpv6), ipv4),
         )
         assertEquals(
             ipv4,
-            HotspotAddressPolicy.alternateFamilyCandidate(listOf(linkLocal, ipv4), linkLocal),
+            HotspotAddressPolicy.alternateFamilyCandidate(listOf(linkLocal, routableIpv6, ipv4), routableIpv6),
         )
+    }
+
+    @Test
+    fun aLinkLocalOnlyIpv6IsNotAnAlternateForAPublishedIpv4() {
+        val ipv4 = address("192.168.49.1")
+        val linkLocal = address("fe80::e0dc:ffff:fe5b:c6d1")
+
+        assertNull(HotspotAddressPolicy.alternateFamilyCandidate(listOf(ipv4, linkLocal), ipv4))
     }
 
     @Test

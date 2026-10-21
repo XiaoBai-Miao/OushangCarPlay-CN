@@ -21,15 +21,17 @@ internal class HotspotAddressRecovery(
         val started = nowMillis()
         val deadline = started + timeoutMillis
         var candidates = initial
-        if (preferredFamily == HotspotAddressPolicy.FAMILY_IPV6 && !candidates.any(::scopedLinkLocal)) {
+        if (preferredFamily == HotspotAddressPolicy.FAMILY_IPV6 &&
+            !candidates.any(HotspotAddressPolicy::routableIpv6)
+        ) {
             log("wireless address waiting preference=IPv6 timeoutMs=$timeoutMillis")
         }
         while (true) {
             checkActive()
             if (preferredFamily != HotspotAddressPolicy.FAMILY_IPV6) return candidates
-            if (candidates.any(::scopedLinkLocal)) {
+            if (candidates.any(HotspotAddressPolicy::routableIpv6)) {
                 log("wireless address preference=IPv6 ready elapsedMs=${nowMillis() - started}")
-                return candidates.filter { it !is Inet6Address || !it.isLinkLocalAddress || scopedLinkLocal(it) }
+                return candidates.filter { it !is Inet6Address || HotspotAddressPolicy.routableIpv6(it) }
             }
             val remaining = deadline - nowMillis()
             if (remaining <= 0) {
@@ -46,7 +48,7 @@ internal class HotspotAddressRecovery(
     /** Re-sample at timeout; a missing alternate at group creation is not a single-family AP. */
     fun nextFamily(published: InetAddress): String? {
         if (cancelled()) return null
-        val candidates = sample().filter { it !is Inet6Address || scopedLinkLocal(it) }
+        val candidates = sample().filter { it !is Inet6Address || HotspotAddressPolicy.routableIpv6(it) }
         if (cancelled()) return null
         if (HotspotAddressPolicy.alternateFamilyCandidate(candidates, published) == null) return null
         return HotspotAddressPolicy.flipFamily(
@@ -57,7 +59,4 @@ internal class HotspotAddressRecovery(
     private fun checkActive() {
         if (cancelled()) throw InterruptedIOException("Hotspot address recovery cancelled")
     }
-
-    private fun scopedLinkLocal(address: InetAddress): Boolean =
-        address is Inet6Address && address.isLinkLocalAddress && address.scopeId != 0
 }

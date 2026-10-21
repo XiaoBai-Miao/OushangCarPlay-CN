@@ -9,7 +9,7 @@ import org.junit.Test
 class HotspotAddressRecoveryTest {
     private val ipv4 = InetAddress.getByName("192.168.49.1")
     private val unscoped = InetAddress.getByName("fe80::1234") as Inet6Address
-    private val ipv6 = Inet6Address.getByAddress(null, unscoped.address, 7)
+    private val ipv6 = InetAddress.getByName("fd00::1")
     private var now = 0L
     private var generation = 1
     private var live = listOf(ipv4)

@@ -1263,6 +1263,18 @@ class CarPlayController(
                 log = { if (!isStaleWirelessRun(generation)) debugLog(it) },
             )
             val candidates = addressRecovery.awaitCandidates(hotspotCandidates(hotspotInfo), preferredFamily)
+            if (
+                preferredFamily == HotspotAddressPolicy.FAMILY_IPV6 &&
+                candidates.none(HotspotAddressPolicy::routableIpv6)
+            ) {
+                // A stored IPv6 preference this interface cannot satisfy (link-local only):
+                // drop it so later cold starts stop waiting for a routable IPv6.
+                appContext.getSharedPreferences(WIRELESS_PREFS, Context.MODE_PRIVATE)
+                    .edit()
+                    .remove(HOTSPOT_FAMILY_PREFERENCE_KEY)
+                    .apply()
+                debugLog("wireless address preference=IPv6 dropped; no routable IPv6 available")
+            }
             val hostAddress = HotspotAddressPolicy.select(candidates, preferredFamily)
                 ?: hotspotInfo.hostAddress
                 ?: throw IOException(
@@ -2701,9 +2713,16 @@ class CarPlayController(
         }
         if (isStaleWirelessRun(generation)) return@synchronized
         if (next == null || from == null) {
+            // No routable alternate family exists on this interface (the P2P group only has a
+            // link-local IPv6). Drop any stored preference so the next attempt uses the default
+            // order instead of waiting for an IPv6 address that will never appear.
+            appContext.getSharedPreferences(WIRELESS_PREFS, Context.MODE_PRIVATE)
+                .edit()
+                .remove(HOTSPOT_FAMILY_PREFERENCE_KEY)
+                .apply()
             debugLog(
                 "wireless address family flip skipped published=${from ?: "none"} " +
-                    "alternate=${next != null}",
+                    "alternate=${next != null}; preference cleared",
             )
             return@synchronized
         }
