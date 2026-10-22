@@ -21,6 +21,9 @@ import java.util.concurrent.ConcurrentHashMap
  *    (要允许对方往结果 extras 里填东西),所以按 SDK 分支给 flag。
  *  - **不能用** `FLAG_ONE_SHOT`:open 会先回 `opening` 再回 `active`,
  *    一次性 PendingIntent 只能收到第一条,`active` 就丢了。
+ *  - **回调路由同理**:`opening`/`active` 两条回调共用同一个 requestId,
+ *    所以 `opening` 是**中间态** —— 交付它时不能把 handler 摘掉,
+ *    否则 `active` 无人接收(见 [dispatch])。
  *  - 每条请求用**不同的 Intent data**(`castgate://reply/<requestId>`)区分,
  *    否则 extras 不参与 PendingIntent 身份匹配,不同请求会复用同一个 PI。
  *  - `sendBroadcast()` 返回**不代表成功**,一切以回调 `status` 为准。
@@ -184,17 +187,48 @@ object CastGateClient {
 
     // ------------------------------------------------------------ 回调路由
 
+    /**
+     * 非终态状态集合 —— 只有这些**不摘** handler。
+     *
+     * `open` 的完整生命周期是 `opening` → `active` 两段回调,而且**共用同一个
+     * requestId**(规范如此,`replyTo` 的 PendingIntent 也不是 ONE_SHOT)。
+     * 改之前这里无条件 `handlers.remove(requestId)`,于是第一条 `opening`
+     * 就把 handler 摘掉了,`active` 回来时 `remove()` 返回 null ——
+     * activity 的 `createClusterPresentation()` 永不被调用:
+     * 物理仪表通道被 SuperUni 占着,我们自己却不出图,仪表全黑
+     * (v115/v116 引入 CAST_GATE 后的首次实车验证即此故障)。
+     */
+    private val NON_TERMINAL_STATUSES = setOf(CastGateProtocol.STATUS_OPENING)
+
     /** 由 [CastGateResultReceiver] 调用。 */
     internal fun dispatch(result: CastGateProtocol.Result) {
-        if (result.status == CastGateProtocol.STATUS_ACTIVE) {
-            isActive = true
-            if (result.hasDisplay) displayId = result.displayId
+        when (result.status) {
+            CastGateProtocol.STATUS_ACTIVE -> {
+                isActive = true
+                if (result.hasDisplay) displayId = result.displayId
+            }
+            CastGateProtocol.STATUS_CLOSED, CastGateProtocol.STATUS_ERROR -> {
+                isActive = false
+            }
+            else -> Unit
         }
-        if (result.status == CastGateProtocol.STATUS_CLOSED ||
-            result.status == CastGateProtocol.STATUS_ERROR
-        ) {
-            isActive = false
+        // 终态(active/closed/error/busy/idle)交付后摘除 handler,防止 map 无限增长;
+        // 中间态(opening)必须留着,否则下一段回调找不到接收方。
+        if (result.status in NON_TERMINAL_STATUSES) {
+            handlers[result.requestId]?.invoke(result)
+        } else {
+            handlers.remove(result.requestId)?.invoke(result)
         }
-        handlers.remove(result.requestId)?.invoke(result)
+    }
+
+    /**
+     * 丢弃所有尚未交付的 handler。
+     *
+     * 给 open 超时兜底用:对方进程没起来时一条回调都不会来,handler 会一直
+     * 留在 map 里(还攥着 activity 的 lambda)。超时已经走了回退路径,
+     * 这些悬空的 handler 没有存在意义。
+     */
+    internal fun clearHandlers() {
+        handlers.clear()
     }
 }

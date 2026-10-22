@@ -1257,6 +1257,9 @@ class CarPlayHostActivity : ComponentActivity() {
         Log.w(CastGateClient.TAG, "gate open timed out")
         // 超时说明对方没响应,这个会话多半没成立 —— 把本地会话状态清掉,
         // 否则 CastGateClient 里会一直挂着一个 sessionId,close 也会白发一条。
+        // handler 一起清:一条回调都不会来的请求,它的 handler 只会一直
+        // 攥着 activity 的 lambda 挂在 map 里。
+        CastGateClient.clearHandlers()
         releaseCastGateChannel()
         createClusterPresentation()
         // 超时也意味着"申请中"结束了,把推迟的会话启动放行。
