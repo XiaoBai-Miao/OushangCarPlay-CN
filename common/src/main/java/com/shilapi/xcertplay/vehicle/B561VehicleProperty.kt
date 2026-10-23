@@ -71,9 +71,16 @@ object B561VehicleProperty {
      *
      * `0x2140f636` 是实车实测值；其余三个是历史实现留下的候选，
      * 在别的固件变体上可能是主属性。逐个试，取第一个有值的。
+     *
+     * ★ v120 新增首项之外的 [BATTERY_PERCENT_AOSP]：
+     * AOSP 权威定义 `android.car.VehiclePropertyIds.EV_BATTERY_LEVEL = 0x11600309`
+     * （291504905），是**跨厂商标准**的电池电量百分比属性。
+     * 厂商扩展 `0x2140f636` 只在这台车上有效，标准属性则可能在别的固件/车型上
+     * 才是主属性 —— 两者互为备份，逐个试取第一个有值的即可。
      */
     val BATTERY_PERCENT_CANDIDATES = intArrayOf(
         BATTERY_PERCENT,
+        BATTERY_PERCENT_AOSP,
         0x2140f47b,
         0x2140f480,
         0x2140f4a0,
@@ -81,18 +88,58 @@ object B561VehicleProperty {
     )
 
     /**
+     * AOSP 标准电池电量百分比，`android.car.VehiclePropertyIds.EV_BATTERY_LEVEL`。
+     *
+     * 值 = 291504905 = `0x11600309`，取自
+     * `android.car.jar` → `android/car/VehiclePropertyIds.class`（javap 实测）。
+     *
+     * ★ 注意与反编译 APK 里的 `TIRE_PRESSURE = 0x11610309` **不是同一个值**
+     * （多一位，厂商自定义区，AOSP 无定义），别被那个命名误导。
+     */
+    const val BATTERY_PERCENT_AOSP = 0x11600309
+
+    /**
      * 续航（km）候选列表。
      *
-     * 实车日志里没有观测到直接的续航属性 —— 原厂桌面的「续航」是算出来的
-     * （电量百分比 × 满电续航）。所以这里只保留历史候选，
-     * **读不到就报 null**，绝不拿电量反推续航充数。
+     * ★ v120 新增首选 [RANGE_ELECTRIC_KM]（`0x2140f635`）：这个值不是猜的，
+     * 来自反编译 `VehicleHvacControl-282.apk`（UNIZ车机控制）的硬编码常量：
+     * ```smali
+     * .field private static final VEHICLE_ELECTRIC_RANGE:I = 0x2140f635
+     * .field private static final VEHICLE_FUEL_RANGE:I = 0x2140f633
+     * ```
+     * 那个APK 是实车在用的第三方车机控制，属性 ID 与仪表同源，可信度高。
+     * 之前这里只有历史候选，是因为**实车 logcat 里没观测到 0x2140f635 上报**
+     * —— 纯电续航可能只在仪表/桌面刷新时才被拉取；那是 logcat 源的固有盲区。
+     *
+     * 其余四个是历史实现留下的候选，在别的固件变体上可能是主属性。
+     * **读不到就报 null**，绝不拿电量反推续航充数
+     * —— iAP2 的 `vehicleStatusEnabled` 需要电量+续航双条件，
+     * 报假续航会让Apple 地图给出错误的充电站推荐。
      */
     val RANGE_KM_CANDIDATES = intArrayOf(
+        RANGE_ELECTRIC_KM,
+        RANGE_FUEL_KM,
         0x2140f47c,
         0x2140f481,
         0x2140f4a1,
         0x2140f487,
     )
+
+    /**
+     * 纯电续航（km），`VEHICLE_ELECTRIC_RANGE`。
+     *
+     * 来源：反编译 `VehicleHvacControl-282.apk` 的
+     * `HvacController.VEHICLE_ELECTRIC_RANGE = 0x2140f635`。
+     */
+    const val RANGE_ELECTRIC_KM = 0x2140f635
+
+    /**
+     * 燃油续航（km），`VEHICLE_FUEL_RANGE`。
+     *
+     * 来源：同一常量表。B561 是纯电，但保留作为对照——
+     * 若实车上 `0x2140f635` 恒为 0 而它有值，说明这台车的续航走的不是纯电属性。
+     */
+    const val RANGE_FUEL_KM = 0x2140f633
 
     /** 车速上限（km/h），用于剔除 VHAL 的无效值（熄火/倒车时可能给 −1）。 */
     const val MAX_SPEED_KPH = 300f

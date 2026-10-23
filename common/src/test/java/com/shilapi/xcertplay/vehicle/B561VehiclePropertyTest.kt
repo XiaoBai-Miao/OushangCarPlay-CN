@@ -2,6 +2,7 @@ package com.shilapi.xcertplay.vehicle
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -89,5 +90,36 @@ class B561VehiclePropertyTest {
         assertNull(B561VehicleProperty.powerKw(372.5f, null))
         assertNull(B561VehicleProperty.powerKw(0f, 1.1f))
         assertNull(B561VehicleProperty.powerKw(372.5f, -1f))
+    }
+
+    @Test
+    fun `续航候选表首项是反编译坐实的纯电续航属性`() {
+        // 来源：反编译 VehicleHvacControl-282.apk（UNIZ车机控制，实车在用）
+        //   .field private static final VEHICLE_ELECTRIC_RANGE:I = 0x2140f635
+        //   .field private static final VEHICLE_FUEL_RANGE:I = 0x2140f633
+        // 这两个值不是我方推测的，必须留在候选表里 —— iAP2 的 vehicleStatusEnabled
+        // 需要「电量 + 续航」双条件，缺续航就只能报 false。
+        assertEquals(0x2140f635, B561VehicleProperty.RANGE_ELECTRIC_KM)
+        assertEquals(0x2140f633, B561VehicleProperty.RANGE_FUEL_KM)
+        assertTrue(
+            "纯电续航必须是第一候选",
+            B561VehicleProperty.RANGE_KM_CANDIDATES.first() ==
+                B561VehicleProperty.RANGE_ELECTRIC_KM,
+        )
+    }
+
+    @Test
+    fun `属性 ID 与实车在用的 UNIZ 车机控制一致`() {
+        // 交叉验证：那个 APK 硬编码了同一组 ID，两条独立证据链互相印证。
+        //   VEHICLE_SPEED = 0x11600207
+        //   VEHICLE_BATTERY_SOC = 0x2140f636
+        //   INSTRUMENT_BATTERY_VOLTAGE = 0x2160f503
+        //   INSTRUMENT_BATTERY_CURRENT = 0x2160f502
+        //   挡位 = 0x11400400
+        assertEquals(0x11600207, B561VehicleProperty.SPEED)
+        assertEquals(0x2140f636, B561VehicleProperty.BATTERY_PERCENT)
+        assertEquals(0x2160f503, B561VehicleProperty.VOLTAGE)
+        assertEquals(0x2160f502, B561VehicleProperty.CURRENT)
+        assertEquals(0x11400400, B561VehicleProperty.GEAR_SELECTION)
     }
 }

@@ -182,4 +182,40 @@ class B561VehicleLogParserTest {
         assertNull(B561VehicleProperty.gearLabel(1))
         assertNull(B561VehicleProperty.gearLabel(27))
     }
+
+    @Test
+    fun `parses electric range and AOSP battery level from the real log shapes`() {
+        // 0x2140f635 = VEHICLE_ELECTRIC_RANGE，来源：反编译
+        // VehicleHvacControl-282.apk 的 VEHICLE_ELECTRIC_RANGE 常量。
+        // 这是 iAP2 vehicleStatusEnabled 需要的「电量 + 续航」双条件里缺的那一半。
+        val range = B561VehicleLogParser.parseLine(
+            "10-22 11:49:30.500  1250  1376 D Property.service: property:0x2140f635 on change, values=312",
+        )
+        assertEquals(312, range!![B561VehicleLogParser.KEY_RANGE])
+
+        // 0x11600309 = AOSP EV_BATTERY_LEVEL（291504905），
+        // 取自 android.car.jar 的 android/car/VehiclePropertyIds.class。
+        val aosp = B561VehicleLogParser.parseLine(
+            "10-22 11:49:30.600  1250  1376 D Property.service: property:0x11600309 on change, values=49",
+        )
+        assertEquals(49, aosp!![B561VehicleLogParser.KEY_BATTERY])
+    }
+
+    @Test
+    fun `AOSP battery level candidate is in the battery candidate list`() {
+        // 候选表驱动：新增的属性必须真的能被日志解析器认出来，
+        // 否则改了 B561VehicleProperty 却忘了同步解析器，候选就是死的。
+        assertTrue(
+            "AOSP EV_BATTERY_LEVEL 必须在电量候选表里",
+            B561VehicleProperty.BATTERY_PERCENT_CANDIDATES.contains(
+                B561VehicleProperty.BATTERY_PERCENT_AOSP,
+            ),
+        )
+        assertTrue(
+            "纯电续航必须在续航候选表里",
+            B561VehicleProperty.RANGE_KM_CANDIDATES.contains(
+                B561VehicleProperty.RANGE_ELECTRIC_KM,
+            ),
+        )
+    }
 }
