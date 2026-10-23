@@ -45,21 +45,93 @@ class B561VehicleDataSource(
     @Volatile
     var onReadingChanged: ((CabinReading?) -> Unit)? = null
 
+    // ---- v127: 车辆数据模拟器（测试专用，默认关闭）----
+
+    /** 模拟器实例；null = 使用真实数据源（logcat/VHAL）。 */
+    @Volatile
+    private var simulator: B561VehicleSimulator? = null
+
+    /** 模拟器最近一次推进的仪表快照（推进线程写，回调线程读）。 */
+    @Volatile
+    private var simGauges: B561UltraGauges? = null
+
+    /** 模拟器最近一次推进的读数（与 [simGauges] 同一次推进产出）。 */
+    @Volatile
+    private var simReading: CabinReading? = null
+
+    /** 模拟推进线程。 */
+    private var simThread: Thread? = null
+
+    private val simLock = Any()
+
+    /**
+     * 开关车辆数据模拟（**测试专用**）。
+     *
+     * 开启后：一个 1Hz 线程推进 [B561VehicleSimulator] 并走
+     * [pushReading] 同一条路径，所有下游（自绘仪表、CAF 推送、
+     * iAP2 snapshot）一起激活；所有 `current*()` 也改为返回模拟值。
+     * 关闭后恢复真实数据源。
+     */
+    fun setSimulationEnabled(enabled: Boolean) {
+        synchronized(simLock) {
+            if (enabled) {
+                if (simulator == null) {
+                    simulator = B561VehicleSimulator()
+                    Log.i(tag, "vehicle simulation ENABLED (test only)")
+                }
+                if (simThread == null) {
+                    simThread = Thread(::simulateLoop, "b561-vehicle-sim").apply {
+                        isDaemon = true
+                        start()
+                    }
+                }
+            } else {
+                simulator = null
+                simGauges = null
+                simReading = null
+                simThread?.let {
+                    runCatching { it.interrupt() }
+                }
+                simThread = null
+                Log.i(tag, "vehicle simulation disabled; back to real sources")
+            }
+        }
+    }
+
+    /** 模拟器是否在跑。 */
+    val simulationEnabled: Boolean get() = simulator != null
+
+    private fun simulateLoop() {
+        Log.i(tag, "vehicle simulation loop started (${SIM_INTERVAL_MS}ms)")
+        while (!Thread.currentThread().isInterrupted) {
+            val sim = simulator ?: break
+            runCatching { simGauges = sim.advance(SIM_INTERVAL_SECONDS) }
+            simReading = sim.lastReading()
+            runCatching { pushReading() }
+            try {
+                Thread.sleep(SIM_INTERVAL_MS)
+            } catch (e: InterruptedException) {
+                break
+            }
+        }
+        Log.i(tag, "vehicle simulation loop stopped")
+    }
+
     /**
      * 最近一次读数；两条源都没读到时返回 null。
      *
      * 车速为 null 时整体返回 null —— 调用方靠这个判断"该不该显示"。
      */
     fun currentReading(): CabinReading? =
-        logcat.currentReading() ?: vhal.currentReading()
+        simReading ?: (logcat.currentReading() ?: vhal.currentReading())
 
     /** 最近一次车速（km/h）；读不到返回 null。 */
     fun currentSpeedKph(): Float? =
-        logcat.currentSpeedKph() ?: vhal.currentSpeedKph()
+        simGauges?.speedKph ?: (logcat.currentSpeedKph() ?: vhal.currentSpeedKph())
 
     /** 最近一次挡位原始值；读不到返回 null。 */
     fun currentGearRaw(): Int? =
-        logcat.currentGearRaw() ?: vhal.currentGearRaw()
+        simGauges?.gear ?: (logcat.currentGearRaw() ?: vhal.currentGearRaw())
 
     /**
      * 最近一次电机转速（rpm）；读不到返回 null。
@@ -68,20 +140,21 @@ class B561VehicleDataSource(
      * 这条只有 logcat 源有（VHAL 的 `CarCabinManager` 不报电机转速）。
      */
     fun currentMotorRpm(): Float? =
-        logcat.currentMotorRpm() ?: vhal.currentMotorRpm()
+        simGauges?.motorRpm ?: (logcat.currentMotorRpm() ?: vhal.currentMotorRpm())
 
     /** 最近一次电池电量百分比；读不到返回 null。 */
     fun currentBatteryPercent(): Int? =
-        logcat.currentBatteryPercent() ?: vhal.currentBatteryPercent()
+        simGauges?.batteryPercent ?: (logcat.currentBatteryPercent() ?: vhal.currentBatteryPercent())
 
     /** 最近一次电压（V）；读不到返回 null。 */
-    fun currentVoltage(): Float? = logcat.currentVoltage() ?: vhal.currentVoltage()
+    fun currentVoltage(): Float? = simReading?.voltage ?: (logcat.currentVoltage() ?: vhal.currentVoltage())
 
     /** 最近一次电流（A）；读不到返回 null。实测放电时为负。 */
-    fun currentCurrent(): Float? = logcat.currentCurrent() ?: vhal.currentCurrent()
+    fun currentCurrent(): Float? = simReading?.current ?: (logcat.currentCurrent() ?: vhal.currentCurrent())
 
     /** 最近一次续航（km）；读不到返回 null。 */
-    fun currentRangeKm(): Int? = logcat.currentRangeKm() ?: vhal.currentRangeKm()
+    fun currentRangeKm(): Int? =
+        simGauges?.rangeKm ?: (logcat.currentRangeKm() ?: vhal.currentRangeKm())
 
     /**
      * 构造一份 **Ultra 仪表数据**（转速/功率/续航/里程/胎压…）。
@@ -90,10 +163,13 @@ class B561VehicleDataSource(
      * 读不到的字段就是 null —— 仪表会少画那几块，而不是画假数字。
      */
     fun currentUltraGauges(): B561UltraGauges {
+        // v127: 模拟开启时直接返回模拟器推进的快照（它自带全套字段，
+        // 不需要再从 logcat/VHAL 拼）。
+        simGauges?.let { return it }
         val speed = currentSpeedKph()
         val rpm = currentMotorRpm()
-        val voltage = logcat.currentVoltage() ?: vhal.currentVoltage()
-        val current = logcat.currentCurrent() ?: vhal.currentCurrent()
+        val voltage = currentVoltage()
+        val current = currentCurrent()
         val battery = currentBatteryPercent()
         return B561UltraGauges(
             speedKph = speed,
@@ -138,6 +214,7 @@ class B561VehicleDataSource(
     }
 
     fun stop() {
+        setSimulationEnabled(false)
         logcat.onFieldsChanged = null
         logcat.stop()
         vhal.onReadingChanged = null
@@ -153,6 +230,12 @@ class B561VehicleDataSource(
     private companion object {
         /** 低电量告警阈值（%），与原厂一致。 */
         const val DEFAULT_LOW_CHARGE_PERCENT = 15
+
+        /** 模拟推进间隔（毫秒）—— 1Hz，与实车 VHAL 读数刷新率一致。 */
+        const val SIM_INTERVAL_MS = 1000L
+
+        /** 模拟推进间隔（秒）。 */
+        const val SIM_INTERVAL_SECONDS = 1f
     }
 }
 

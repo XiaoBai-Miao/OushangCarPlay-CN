@@ -2142,6 +2142,18 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                 AirPlayPersistence.saveCarPlayUltraEnabled(this, it)
                 markReconnectNeeded()
             }
+            // ★ v127 B561: 车辆数据模拟（测试专用）。
+            //   脱离原车车机时 logcat/VHAL 两条源都是空的，CAF 一条数据都推不出去。
+            //   打开后由 B561VehicleSimulator 生成 60 秒驾驶工况（怠速→加速→
+            //   匀速→减速），走同一条 onReadingChanged 链路喂给 Ultra 协议。
+            //   即时生效（不需要重连），但**真车上必须关闭**——模拟值会
+            //   同时混进 iAP2 snapshot，iPhone 地图会显示假的续航/电量。
+            toggle(card, getString(R.string.settings_vehicle_simulation),
+                getString(R.string.settings_vehicle_simulation_description),
+                AirPlayPersistence.loadVehicleSimulationEnabled(this)) {
+                AirPlayPersistence.saveVehicleSimulationEnabled(this, it)
+                applyVehicleSimulation(it)
+            }
         }
         filteredSection(content, SettingsSection.WHEEL_KEYS,
             getString(R.string.settings_wheel_keys), R.drawable.ic_dp_controls, ::wheelKeysSettings)
@@ -4755,6 +4767,22 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     private fun markReconnectNeeded() {
         CarPlayBackgroundSession.snapshot()?.controller?.let(PendingReconnect::mark)
         refreshReconnectBar()
+    }
+
+    /**
+     * v127: 把车辆数据模拟开关同步给 CarPlay 宿主（**测试专用**）。
+     *
+     * 走广播而不是直接找 Activity 实例：宿主可能已经被切走或还没起来。
+     * 宿主不在时开关已由 [AirPlayPersistence] 记住，下次
+     * [CarPlayHostActivity.onCreate] 会恢复。
+     */
+    private fun applyVehicleSimulation(enabled: Boolean) {
+        sendBroadcast(
+            Intent(VehicleSimulationCommand.ACTION).apply {
+                setPackage(packageName)
+                putExtra(VehicleSimulationCommand.EXTRA_ENABLED, enabled)
+            },
+        )
     }
 
     private fun refreshReconnectBar() {

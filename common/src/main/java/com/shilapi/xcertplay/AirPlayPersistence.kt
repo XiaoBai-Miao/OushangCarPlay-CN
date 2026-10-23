@@ -873,6 +873,22 @@ object AirPlayPersistence {
     }
 
     /**
+     * v127: 车辆数据模拟开关（**测试专用**，默认关）。
+     *
+     * 开启后 [B561VehicleDataSource] 用 [B561VehicleSimulator] 的 60 秒
+     * 驾驶工况替代真实数据源（logcat/VHAL），让脱离原车车机时
+     * CAF/自绘仪表/iAP2 全链路也能跑起来。**真车上必须关闭。**
+     */
+    fun loadVehicleSimulationEnabled(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getBoolean("vehicle_simulation_enabled", false)
+
+    fun saveVehicleSimulationEnabled(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putBoolean("vehicle_simulation_enabled", enabled).apply()
+    }
+
+    /**
      * v123: CarPlay Ultra 风格仪表盘是否启用。
      *
      * 默认 **关** —— 它是新增功能，先让用户自己开；

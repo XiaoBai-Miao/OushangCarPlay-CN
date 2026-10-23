@@ -5,8 +5,10 @@ import android.Manifest
 import android.content.ActivityNotFoundException
 import android.animation.ObjectAnimator
 import android.animation.ValueAnimator
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.content.res.Resources
@@ -412,6 +414,44 @@ class CarPlayHostActivity : ComponentActivity() {
         gearProvider = { vehicleStatus.currentGearRaw() },
         elapsedMillis = { android.os.SystemClock.elapsedRealtime() },
     )
+
+    /**
+     * v127: 车辆数据模拟开关的 adb 后门。
+     *
+     * ```
+     * adb shell am broadcast -a com.oushang.carplay.SET_VEHICLE_SIM --ez enabled true
+     * ```
+     * 不带 `--ez` 时取反当前状态（方便快速开关）。shell 发的广播可以到达
+     * NOT_EXPORTED 的 receiver，其他应用不行。
+     */
+    private val vehicleSimulationReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action != VehicleSimulationCommand.ACTION) return
+            val enabled = intent.getBooleanExtra(
+                VehicleSimulationCommand.EXTRA_ENABLED,
+                !vehicleStatus.simulationEnabled,
+            )
+            vehicleStatus.setSimulationEnabled(enabled)
+            AirPlayPersistence.saveVehicleSimulationEnabled(this@CarPlayHostActivity, enabled)
+            Log.i(TAG, "vehicle simulation set via broadcast: $enabled")
+        }
+    }
+
+    /** v127: 恢复持久化的模拟开关（测试专用，默认关）。 */
+    private fun restoreVehicleSimulation() {
+        val enabled = AirPlayPersistence.loadVehicleSimulationEnabled(this)
+        vehicleStatus.setSimulationEnabled(enabled)
+    }
+
+    /** v127: 注册模拟开关广播后门（Android 13+ 需显式 exported 标志）。 */
+    private fun registerVehicleSimulationReceiver() {
+        val filter = IntentFilter(VehicleSimulationCommand.ACTION)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(vehicleSimulationReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(vehicleSimulationReceiver, filter)
+        }
+    }
     private val videoSurfaceOwner = CarPlayVideoSurfaceOwner<Surface>(
         detach = { surface ->
             sink?.clearSurface(SCREEN_TYPE_MAIN, surface)
@@ -812,6 +852,11 @@ class CarPlayHostActivity : ComponentActivity() {
             resources.getBoolean(R.bool.config_advanced_audio_channel_mapping)
         airPlayIdentity = AirPlayPersistence.loadIdentity(this)
         loadPersistedSettings()
+        // v127: 车辆数据模拟（测试专用）。恢复持久化开关，并注册 adb 后门 ——
+        // `adb shell am broadcast -a com.oushang.carplay.SET_VEHICLE_SIM --ez enabled true`
+        // 不用点设置页就能切数据源，方便脱离 UI 抓日志时操作。
+        restoreVehicleSimulation()
+        registerVehicleSimulationReceiver()
         locationPermissionAvailable = hasFineLocationPermission()
         setContentView(buildContentView())
         applyFullscreenMode()
@@ -2005,6 +2050,8 @@ class CarPlayHostActivity : ComponentActivity() {
         // v117: 车辆数据源随 Activity 一起结束，避免 Car Service 侧留着客户端。
         vehicleSpeedSource.stop()
         vehicleStatus.stop()
+        // v127: 反注册模拟开关广播后门。
+        runCatching { unregisterReceiver(vehicleSimulationReceiver) }
         if (pictureCopyThreadStarted) pictureCopyThread.quitSafely()
         resetSidePanel()
         releaseSidePanelEffects()

@@ -892,6 +892,8 @@
     <string name="settings_cluster_speedometer">メーター内速度表示（実験的機能）</string>
     <string name="settings_carplay_ultra">CarPlay Ultra 車両状態</string>
     <string name="settings_carplay_ultra_description">オフ（既定）：iPhone に CarPlay Ultra 車両状態プロトコルを提示しません。オン：車両が車両状態プロトコルを提示し、iPhone が回転数・出力・航続距離・走行距離・タイヤ空気圧を読み取れます。再接続が必要です。</string>
+    <string name="settings_vehicle_simulation">車両データシミュレーション（テスト）</string>
+    <string name="settings_vehicle_simulation_description">オフ（既定）：実際の車両データを使用します。オン：純正車載機から切り離した状態で、60 秒間の模擬運転サイクル（アイドル／加速／少庶／減速）を生成して Ultra プロトコルに供給します。即時反映されます。実際の車両では必ずオフにしてください。</string>
     <string name="settings_cluster_ultra_gauge">CarPlay Ultra ゲージ</string>
     <string name="settings_cluster_ultra_gauge_description">車機画面に CarPlay Ultra 風の計器盤を表示します：回転数、パワー、航続距離または燃料、バッテリー、走行距離、タイヤ空気圧。車両が実際に提供する値だけを表示します。変更はすぐに反映されます。</string>
     <string name="settings_cluster_ultra_gauge_opacity">Ultra ゲージの不透明度</string>
