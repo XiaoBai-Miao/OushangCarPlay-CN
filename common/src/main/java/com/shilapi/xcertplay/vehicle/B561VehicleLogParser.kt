@@ -64,6 +64,9 @@ object B561VehicleLogParser {
     /** 挡位 `0x11400400` 的日志键。 */
     const val KEY_GEAR = "gear"
 
+    /** 电机转速 `0x2160f315` 的日志键。 */
+    const val KEY_MOTOR_RPM = "motorRpm"
+
     /** 续航 `0x2140f47c` 的日志键（实车未见上报，读不到就报 null）。 */
     const val KEY_RANGE = "range"
 
@@ -96,6 +99,33 @@ object B561VehicleLogParser {
     )
 
     /**
+     * `CmdSmdManager` 的 MCU 原始报文行。
+     *
+     * ```
+     * 10-22 11:41:31.903   417   479 D CmdSmdManager: ----commFloatData----prop=0x2160f315,value=500.000000
+     * ```
+     *
+     * ★ **电机转速只走这条路，不走 `Property.service`** ——
+     * `Property.service` 是 VHAL 变化回调，而 `0x2160f315` 由 pid 417 的
+     * `CmdSmdManager`（MCU 报文层）直接打点，实测 `Property.service` 里
+     * 一次都没有它。所以要抓转速，logcat 订阅里**必须**加 `CmdSmdManager` 这个 tag。
+     *
+     * 该tag 有五种报文形态（实测计数）：
+     * ```
+     * 23517  commInt32Data----prop=<ID>,value=N
+     * 15545  commFloatData----prop=<ID>,value=F
+     *  4559  commFloatVectData----prop=<ID>,size=N,vec=[...]
+     *  4012  commInt32VecData----prop=<ID>,size=N,vec=[...]
+     *    32  commBytesData----prop=<ID>,value=<bytes>
+     * ```
+     * 只有 `commFloatData` / `commInt32Data` 是标量，够用了；
+     * 向量与字节形态不解析（我们不关心多维数组）。
+     */
+    private val CMD_SMD_SCALAR = Regex(
+        """----comm(?:Float|Int32)Data----prop=(0x[0-9a-fA-F]+),value=(-?[0-9]+(?:\.[0-9]+)?)""",
+    )
+
+    /**
      * 原厂 `FastControlManager` 的挡位行。
      *
      * ```
@@ -124,6 +154,7 @@ object B561VehicleLogParser {
         B561VehicleProperty.BATTERY_PERCENT to KEY_BATTERY,
         B561VehicleProperty.VOLTAGE to KEY_VOLTAGE,
         B561VehicleProperty.CURRENT to KEY_CURRENT,
+        B561VehicleProperty.MOTOR_RPM to KEY_MOTOR_RPM,
     )
 
     /** 电量候选属性 → [KEY_BATTERY]。 */
@@ -145,12 +176,30 @@ object B561VehicleLogParser {
         // 但两种正则都要试（有的行只匹配其一）。
         parsePropertyLine(line)?.let { return it }
         parseGearLine(line)?.let { return it }
+        // MCU 报文行（电机转速只走这条路）。
+        parseCmdSmdLine(line)?.let { return it }
         return null
     }
 
     /** 解析 `Property.service` / `CarCabinManager.get*Property` 两类行。 */
     private fun parsePropertyLine(line: String): Map<String, Number>? {
         val match = PROPERTY_CHANGE.find(line) ?: CAR_CABIN_GET.find(line) ?: return null
+        val propertyId = parseHexId(match.groupValues[1]) ?: return null
+        val raw = match.groupValues[2].toDoubleOrNull() ?: return null
+        return fieldsFor(propertyId, raw)
+    }
+
+    /**
+     * 解析 `CmdSmdManager` 的 MCU 报文行。
+     *
+     * 电机转速 `0x2160f315` **只**在这里出现（`Property.service` 里没有），
+     * 所以这条路径是转速的唯一来源。
+     */
+    private fun parseCmdSmdLine(line: String): Map<String, Number>? {
+        // 先用 contains 过滤：这个 tag 在实车里每秒能出十几行，
+        // 无条件对每行跑正则太浪费。
+        if (!line.contains("CmdSmdManager")) return null
+        val match = CMD_SMD_SCALAR.find(line) ?: return null
         val propertyId = parseHexId(match.groupValues[1]) ?: return null
         val raw = match.groupValues[2].toDoubleOrNull() ?: return null
         return fieldsFor(propertyId, raw)
@@ -181,6 +230,9 @@ object B561VehicleLogParser {
                 KEY_VOLTAGE -> if (raw > 0f) mapOf(KEY_VOLTAGE to raw.toFloat()) else null
                 // 电流实测为负（-0.4..-2.4，放电），所以这里**不**做正负过滤。
                 KEY_CURRENT -> mapOf(KEY_CURRENT to raw.toFloat())
+                // 电机转速：负值与超上限都判为无效（理由同车速）。
+                KEY_MOTOR_RPM -> B561VehicleProperty.motorRpm(raw.toFloat())
+                    ?.let { mapOf(KEY_MOTOR_RPM to it) }
                 else -> null
             }
         }

@@ -52,6 +52,55 @@ object B561VehicleProperty {
     const val CURRENT = 0x2160f502
 
     /**
+     * **驱动电机转速**，Float，单位 rpm。
+     *
+     * ★ 厂商自定义属性（AOSP 无对应 `ELECTRIC_MOTOR_RPM`；
+     * AOSP 的 `ENGINE_RPM = 0x11600305` 是发动机转速，电动车用不上，
+     * 且实车日志里 `0x11600305` **一次都没出现**）。
+     *
+     * ## 证据链（实车 logcat，`日志_10月22日11时40分14秒718.log`）
+     *
+     * ```
+     * 11:41:31.903 CmdSmdManager: ----commFloatData----prop=0x2160f315,value=500.0
+     * 11:41:31.925 ... value=1000.0
+     * 11:41:32.024 ... value=1200.0
+     * 11:41:32.187 ... value=1300.0
+     * 11:41:33.147 ... value=1400.0
+     * 11:41:33.392 ... value=1500.0
+     * 11:41:33.697 ... value=1600.0
+     * 11:41:34.495 ... value=1700.0
+     * 11:41:35.391 ... value=1800.0
+     * 11:41:36.132 ... value=1900.0   ← 峰值
+     * 11:41:38.917 ... value=1800.0
+     * 11:41:39.008 ... value=1600.0
+     * 11:41:39.107 ... value=1300.0
+     * 11:41:39.251 ... value=900.0
+     * 11:41:39.308 ... value=600.0
+     * 11:41:39.410 ... value=300.0
+     * 11:41:39.603 ... value=200.0
+     * 11:41:40.113 ... value=0.0      ← 停转
+     * ```
+     *
+     * **踏板踩下 → 转速 8 秒内爬到 1900 峰值 → 松开 → 6 秒内回落到 0**，
+     * 是电机控制器扭矩爬升/回落的教科书形态；量程 0..1900 rpm 也是电机转速的典型值。
+     * 同期车速 `0x11600207` 是 134→135.5 km/h（高速巡航），
+     * 说明这是**电机实际转速**而非其它量。
+     *
+     * ★ **它不走 `Property.service`**，只由 `CmdSmdManager`（pid 417，MCU 原始报文）
+     * 打点，所以 [B561VehicleLogParser] 必须额外解析 `commFloatData` 行、
+     * 且 logcat 订阅里必须加上 `CmdSmdManager` 这个 tag，否则抓不到。
+     */
+    const val MOTOR_RPM = 0x2160f315
+
+    /**
+     * 电机转速上限（rpm），用于剔除无效值。
+     *
+     * 实车观测峰值 1900；留 20% 余量取 2400。
+     * 超过上限的多半是别的量或脏数据，宁可丢弃也不要画错的转速。
+     */
+    const val MAX_MOTOR_RPM = 2400f
+
+    /**
      * 挡位，`ID_GEAR_SELECTION`，Int。
      *
      * ★ 证据链（同一毫秒内闭合）：
@@ -197,6 +246,21 @@ object B561VehicleProperty {
     fun batteryPercent(raw: Int?): Int? {
         if (raw == null) return null
         if (raw !in 1..99) return null
+        return raw
+    }
+
+    /**
+     * 原始电机转速 → 有效转速（rpm）。
+     *
+     * 负值与超上限的值都判为无效（返回 null），理由同 [speedKph]：
+     * 报一个假的 0 会让驾驶员以为电机坏了，比空白更糟。
+     *
+     * 0 转速是**合法值**（电机停转，见证据链末尾那条 `value=0.0`），
+     * 所以这里**允许 0** —— 与电量那个「0 视为读不到」的规则不同。
+     */
+    fun motorRpm(raw: Float?): Float? {
+        if (raw == null) return null
+        if (raw < 0f || raw > MAX_MOTOR_RPM) return null
         return raw
     }
 }

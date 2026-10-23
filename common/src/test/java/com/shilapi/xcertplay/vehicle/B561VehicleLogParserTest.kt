@@ -218,4 +218,96 @@ class B561VehicleLogParserTest {
             ),
         )
     }
+
+    // ── 电机转速：只走 CmdSmdManager（MCU 原始报文）这条路 ──────────────────
+
+    @Test
+    fun `parses motor rpm from the real CmdSmdManager line`() {
+        // 实车日志原文（日志_10月22日11时40分14秒718.log）：
+        //   10-22 11:41:31.903   417   479 D CmdSmdManager: ----commFloatData----prop=0x2160f315,value=500.000000
+        val fields = B561VehicleLogParser.parseLine(
+            "10-22 11:41:31.903   417   479 D CmdSmdManager: ----commFloatData----prop=0x2160f315,value=500.000000",
+        )
+        assertNotNull(fields)
+        assertEquals(500f, fields!![B561VehicleLogParser.KEY_MOTOR_RPM] as Float, 0.01f)
+    }
+
+    @Test
+    fun `motor rpm reaches us only through the CmdSmdManager tag`() {
+        // 实车事实：0x2160f315 在**所有日志**的 `Property.service` 变化行里
+        // 一次都没出现过（grep 21 份日志为 0），只由 pid 417 的 CmdSmdManager 打点。
+        //
+        // 所以「能不能读到转速」取决于 logcat 订阅里有没有 CmdSmdManager 这个 tag。
+        // 解析器本身对两种行格式都能认（下面的 Property.service 行走的是同一条
+        // fieldsFor 映射），但实车上只有 CmdSmdManager 会真的发出这个属性。
+        assertNotNull(
+            B561VehicleLogParser.parseLine(
+                "10-22 11:41:31.903  1250  1376 D Property.service: property:0x2160f315 on change, values=500.0",
+            ),
+        )
+        // 而 CmdSmdManager 这条路必须真的能解析出来 —— 这是实车唯一的来源。
+        assertNotNull(
+            B561VehicleLogParser.parseLine(
+                "10-22 11:41:31.903   417   479 D CmdSmdManager: ----commFloatData----prop=0x2160f315,value=500.000000",
+            ),
+        )
+    }
+
+    @Test
+    fun `zero motor rpm is a valid reading`() {
+        // 电机停转是合法状态（实车证据链最后一条就是 value=0.0），
+        // 与「电量 0 视为读不到」的规则不同 —— 这里必须接受 0。
+        val fields = B561VehicleLogParser.parseLine(
+            "10-22 11:41:40.113   417   479 D CmdSmdManager: ----commFloatData----prop=0x2160f315,value=0.000000",
+        )
+        assertEquals(0f, fields!![B561VehicleLogParser.KEY_MOTOR_RPM] as Float, 0.01f)
+    }
+
+    @Test
+    fun `rejects impossible motor rpm values`() {
+        // 负值与超上限（>2400）都判为无效。
+        assertNull(
+            B561VehicleLogParser.parseLine(
+                "10-22 11:41:39.410   417   479 D CmdSmdManager: ----commFloatData----prop=0x2160f315,value=-100.000000",
+            ),
+        )
+        assertNull(
+            B561VehicleLogParser.parseLine(
+                "10-22 11:41:36.132   417   479 D CmdSmdManager: ----commFloatData----prop=0x2160f315,value=9999.000000",
+            ),
+        )
+    }
+
+    @Test
+    fun `folds the real motor rpm ramp sequence`() {
+        // 实车证据链：踩下踏板 8 秒爬到 1900 峰值，松开后 6 秒回落到 0。
+        val fields = B561VehicleLogParser.fold(
+            listOf(
+                "10-22 11:41:31.903   417   479 D CmdSmdManager: ----commFloatData----prop=0x2160f315,value=500.000000",
+                "10-22 11:41:31.925   417   479 D CmdSmdManager: ----commFloatData----prop=0x2160f315,value=1000.000000",
+                "10-22 11:41:32.024   417   479 D CmdSmdManager: ----commFloatData----prop=0x2160f315,value=1200.000000",
+                "10-22 11:41:32.187   417   479 D CmdSmdManager: ----commFloatData----prop=0x2160f315,value=1300.000000",
+                "10-22 11:41:36.132   417   479 D CmdSmdManager: ----commFloatData----prop=0x2160f315,value=1900.000000",
+                "10-22 11:41:39.410   417   479 D CmdSmdManager: ----commFloatData----prop=0x2160f315,value=300.000000",
+                "10-22 11:41:40.113   417   479 D CmdSmdManager: ----commFloatData----prop=0x2160f315,value=0.000000",
+            ),
+        )
+        // 后到的覆盖先到的：最终应是最后的 0。
+        assertEquals(0f, fields[B561VehicleLogParser.KEY_MOTOR_RPM] as Float, 0.01f)
+    }
+
+    @Test
+    fun `CmdSmdManager vector and bytes lines are ignored`() {
+        // 这两种是数组/字节形态，不是标量，不该产出字段。
+        assertNull(
+            B561VehicleLogParser.parseLine(
+                "10-22 11:41:30.008   417   479 D CmdSmdManager: ----commFloatVectData----prop=0x2161f28b,size=9,vec=[80.97,136,201]",
+            ),
+        )
+        assertNull(
+            B561VehicleLogParser.parseLine(
+                "10-22 11:41:30.008   417   479 D CmdSmdManager: ----commBytesData----prop=0x2140f343,value=0",
+            ),
+        )
+    }
 }

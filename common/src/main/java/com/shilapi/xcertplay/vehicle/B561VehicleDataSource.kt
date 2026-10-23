@@ -62,6 +62,15 @@ class B561VehicleDataSource(
         logcat.currentGearRaw() ?: vhal.currentGearRaw()
 
     /**
+     * 最近一次电机转速（rpm）；读不到返回 null。
+     *
+     * 0 = 电机停转，是**合法值**（实车证据链末尾就有 `value=0.0`）。
+     * 这条只有 logcat 源有（VHAL 的 `CarCabinManager` 不报电机转速）。
+     */
+    fun currentMotorRpm(): Float? =
+        logcat.currentMotorRpm() ?: vhal.currentMotorRpm()
+
+    /**
      * iAP2 车辆状态快照；读不到返回 null。
      *
      * 走 [VehicleStatusProvider] 接口，[Iap2VehicleStatus] 会在返回 null 时

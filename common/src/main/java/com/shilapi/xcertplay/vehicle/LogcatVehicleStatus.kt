@@ -120,6 +120,9 @@ class LogcatVehicleStatus(
     /** 最近一次读到的电流（A）；读不到返回 null。实测放电时为负。 */
     fun currentCurrent(): Float? = (fields[B561VehicleLogParser.KEY_CURRENT] as? Number)?.toFloat()
 
+    /** 最近一次读到的电机转速（rpm）；读不到返回 null。0 = 电机停转，是合法值。 */
+    fun currentMotorRpm(): Float? = (fields[B561VehicleLogParser.KEY_MOTOR_RPM] as? Number)?.toFloat()
+
     /**
      * 把当前读数转成 [CarCabinVehicleStatus.CabinReading]，
      * 供仪表车速表 / iAP2 车辆状态复用。
@@ -165,7 +168,8 @@ class LogcatVehicleStatus(
                             "gear=${after[B561VehicleLogParser.KEY_GEAR]} " +
                             "battery=${after[B561VehicleLogParser.KEY_BATTERY]}% " +
                             "voltage=${after[B561VehicleLogParser.KEY_VOLTAGE]} " +
-                            "current=${after[B561VehicleLogParser.KEY_CURRENT]}",
+                            "current=${after[B561VehicleLogParser.KEY_CURRENT]} " +
+                            "motorRpm=${after[B561VehicleLogParser.KEY_MOTOR_RPM]}",
                     )
                     runCatching { onFieldsChanged?.invoke(after) }
                         .onFailure { Log.w(tag, "onFieldsChanged failed: ${it.message}") }
@@ -182,9 +186,11 @@ class LogcatVehicleStatus(
     /**
      * 保证有一个活着的 `logcat` 子进程。
      *
-     * 只订阅两个 tag：
+     * 只订阅三个 tag：
      * - `Property.service` —— VHAL 变化回调，车速/电量/电压/电流都从这里出来；
-     * - `FastControlManager` —— 原厂快控，挡位行从这里出来。
+     * - `FastControlManager` —— 原厂快控，挡位行从这里出来；
+     * - `CmdSmdManager` —— **MCU 原始报文层**，电机转速 `0x2160f315` 只从这里出来
+     *   （实测 `Property.service` 里一次都没有它，漏了这个 tag 就抓不到转速）。
      *
      * `*:F` 是 filter-spec 语法（`tag:priority`），只收 priority ≤ F 的行。
      */
@@ -196,6 +202,7 @@ class LogcatVehicleStatus(
                 "-v", "brief",
                 "Property.service:D",
                 "FastControlManager:D",
+                "CmdSmdManager:D",
             )
                 // 不重定向 stderr：logcat 的权限拒绝信息会打到 stderr，
                 // 让它继承本进程的 fd 才能在 logcat 里看到我们自己的失败原因。

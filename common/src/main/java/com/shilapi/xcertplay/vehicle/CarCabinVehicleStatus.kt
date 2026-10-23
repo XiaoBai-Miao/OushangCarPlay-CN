@@ -150,6 +150,17 @@ class CarCabinVehicleStatus(
     fun currentGearRaw(): Int? = latestReading?.gear
 
     /**
+     * 电机转速（rpm）；读不到时返回 null。
+     *
+     * ★ 这一路**永远返回 null**：`CarCabinManager` 不提供电机转速
+     * （AOSP 也没有 `ELECTRIC_MOTOR_RPM`，电动车用的是厂商自定义属性
+     * `0x2160f315`）。保留这个方法只是为了满足门面
+     * 「logcat 主源 + VHAL 兜底」的对称结构，
+     * 真正能读到转速的只有 logcat 那一路。
+     */
+    fun currentMotorRpm(): Float? = null
+
+    /**
      * 原始读数，供仪表 HUD 用；读不到时返回 null。
      *
      * 车速为 null 时整体返回 null —— 调用方靠这个判断「该不该显示」，
