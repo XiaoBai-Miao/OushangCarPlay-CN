@@ -69,6 +69,9 @@ internal class ClusterMapPresentation(
 
     /** v117: 车速表。默认 GONE，读到 VHAL 车速才显示，见 [setSpeedometerReading]。 */
     private var speedometerView: ClusterSpeedometerView? = null
+
+    /** v123: CarPlay Ultra 风格仪表盘（转速/功率/续航/里程/胎压）。 */
+    private var ultraGaugeView: ClusterUltraGaugeView? = null
     private var videoView: View? = null
     private var streamActive = false
 
@@ -212,6 +215,11 @@ internal class ClusterMapPresentation(
         //   挂在最上层：它是驾驶员最需要随时看到的信息。
         speedometerView = ClusterSpeedometerView(context).apply { visibility = View.GONE }
         root.addView(speedometerView, FrameLayout.LayoutParams(-1, -1))
+        // ★ v123 CarPlay Ultra 风格仪表盘（转速/功率/续航/里程/胎压）。
+        //   与上面的**单个**车速表是两回事：那个只画速度，这个画整套 Ultra 表。
+        //   挂在最上层（同车速表）—— 仪表信息是驾驶员随时要看的。
+        ultraGaugeView = ClusterUltraGaugeView(context).apply { visibility = View.GONE }
+        root.addView(ultraGaugeView, FrameLayout.LayoutParams(-1, -1))
         // Start with the placeholder visible; SurfaceView would otherwise cover the light
         // backdrop with an empty black surface before the first stream notification.
         // SurfaceView ignores fractional alpha before API 34. Keep its decoder surface
@@ -472,6 +480,26 @@ internal class ClusterMapPresentation(
     /** v117: 车速表的深浅色。 */
     fun setSpeedometerNightMode(night: Boolean) {
         speedometerView?.setNightMode(night)
+    }
+
+    /**
+     * v123: 推 Ultra 仪表盘数据。
+     *
+     * [gauges] 为 null 或全空 → 整块隐藏。**绝不画空的表盘** ——
+     * 驾驶员会以为车坏了。
+     */
+    fun setUltraGauges(gauges: com.shilapi.xcertplay.vehicle.B561UltraGauges?) {
+        ultraGaugeView?.setGauges(gauges)
+    }
+
+    /** v123: Ultra 仪表盘透明度。 */
+    fun setUltraGaugeOpacity(opacityPercent: Int) {
+        ultraGaugeView?.setOpacity(opacityPercent)
+    }
+
+    /** v123: Ultra 仪表盘深浅色。 */
+    fun setUltraGaugeNightMode(night: Boolean) {
+        ultraGaugeView?.setNightMode(night)
     }
 
     fun setCardOpacity(turnPercent: Int, mediaPercent: Int, callPercent: Int) {

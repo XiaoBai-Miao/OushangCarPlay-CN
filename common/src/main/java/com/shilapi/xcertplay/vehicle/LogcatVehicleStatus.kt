@@ -64,7 +64,7 @@ class LogcatVehicleStatus(
 
     /** 最近一次读到的字段；空表示还没读到任何东西。 */
     @Volatile
-    private var fields: Map<String, Number> = emptyMap()
+    private var fields: Map<String, Any> = emptyMap()
 
     /**
      * 字段变化回调（**在读取线程上回调**，不是主线程）。
@@ -72,7 +72,7 @@ class LogcatVehicleStatus(
      * 只在值真的变了时触发，静止时不会重复通知。
      */
     @Volatile
-    var onFieldsChanged: ((Map<String, Number>) -> Unit)? = null
+    var onFieldsChanged: ((Map<String, Any>) -> Unit)? = null
 
     /** 读数是否已经成功抓到过（用来区分"没数据"与"还没读到"）。 */
     @Volatile
@@ -120,8 +120,26 @@ class LogcatVehicleStatus(
     /** 最近一次读到的电流（A）；读不到返回 null。实测放电时为负。 */
     fun currentCurrent(): Float? = (fields[B561VehicleLogParser.KEY_CURRENT] as? Number)?.toFloat()
 
+    /** 最近一次读到的续航（km）；读不到返回 null。 */
+    fun currentRangeKm(): Int? = (fields[B561VehicleLogParser.KEY_RANGE] as? Number)?.toInt()
+
     /** 最近一次读到的电机转速（rpm）；读不到返回 null。0 = 电机停转，是合法值。 */
     fun currentMotorRpm(): Float? = (fields[B561VehicleLogParser.KEY_MOTOR_RPM] as? Number)?.toFloat()
+
+    /**
+     * 最近一次读到的四轮胎压（bar，顺序：左前/右前/左后/右后）；读不到返回 null。
+     *
+     * 走 `commFloatVectData`（size=4），所以只能从 logcat 拿 ——
+     * `CarCabinManager` 不提供向量属性。
+     */
+    fun currentTirePressureBar(): FloatArray? =
+        (fields[B561VehicleLogParser.KEY_TIRE_PRESSURE] as? FloatArray)?.copyOf()
+
+    /** 最近一次读到的总里程（km）；读不到返回 null。 */
+    fun currentOdometerKm(): Float? = (fields[B561VehicleLogParser.KEY_ODOMETER] as? Number)?.toFloat()
+
+    /** 最近一次读到的油量百分比；读不到返回 null。纯电车上没有这个值。 */
+    fun currentFuelPercent(): Int? = (fields[B561VehicleLogParser.KEY_FUEL_PERCENT] as? Number)?.toInt()
 
     /**
      * 把当前读数转成 [CarCabinVehicleStatus.CabinReading]，

@@ -70,6 +70,45 @@ class B561VehicleDataSource(
     fun currentMotorRpm(): Float? =
         logcat.currentMotorRpm() ?: vhal.currentMotorRpm()
 
+    /** 最近一次电池电量百分比；读不到返回 null。 */
+    fun currentBatteryPercent(): Int? =
+        logcat.currentBatteryPercent() ?: vhal.currentBatteryPercent()
+
+    /** 最近一次电压（V）；读不到返回 null。 */
+    fun currentVoltage(): Float? = logcat.currentVoltage() ?: vhal.currentVoltage()
+
+    /** 最近一次电流（A）；读不到返回 null。实测放电时为负。 */
+    fun currentCurrent(): Float? = logcat.currentCurrent() ?: vhal.currentCurrent()
+
+    /** 最近一次续航（km）；读不到返回 null。 */
+    fun currentRangeKm(): Int? = logcat.currentRangeKm() ?: vhal.currentRangeKm()
+
+    /**
+     * 构造一份 **Ultra 仪表数据**（转速/功率/续航/里程/胎压…）。
+     *
+     * 供自绘仪表盘 [com.shilapi.xcertplay.ClusterUltraGaugeView] 使用。
+     * 读不到的字段就是 null —— 仪表会少画那几块，而不是画假数字。
+     */
+    fun currentUltraGauges(): B561UltraGauges {
+        val speed = currentSpeedKph()
+        val rpm = currentMotorRpm()
+        val voltage = logcat.currentVoltage() ?: vhal.currentVoltage()
+        val current = logcat.currentCurrent() ?: vhal.currentCurrent()
+        val battery = currentBatteryPercent()
+        return B561UltraGauges(
+            speedKph = speed,
+            gear = currentGearRaw(),
+            motorRpm = rpm,
+            engineRpm = null,
+            powerKw = B561VehicleProperty.powerKw(voltage, current),
+            batteryPercent = battery,
+            fuelPercent = logcat.currentFuelPercent(),
+            rangeKm = logcat.currentRangeKm(),
+            odometerKm = logcat.currentOdometerKm(),
+            tirePressureBar = logcat.currentTirePressureBar(),
+        )
+    }
+
     /**
      * iAP2 车辆状态快照；读不到返回 null。
      *

@@ -1504,6 +1504,8 @@ class CarPlayHostActivity : ComponentActivity() {
         pushClusterCall(presentations)
         // v117: 车速表。设置项改动要立刻反映到仪表上。
         pushClusterSpeedometer(presentations)
+        // v123: Ultra 仪表盘（转速/功率/续航/里程/胎压）。
+        pushClusterUltraGauge(presentations)
     }
 
     /**
@@ -1541,6 +1543,25 @@ class CarPlayHostActivity : ComponentActivity() {
         }
         for (presentation in targets) {
             presentation.setSpeedometerReading(reading)
+        }
+    }
+
+    /**
+     * v123: 把 Ultra 仪表盘数据（转速/功率/续航/里程/胎压）推给仪表。
+     *
+     * 开关关掉或一个数据都读不到时推 null —— 仪表整块隐藏，
+     * 绝不画一圈空表盘（驾驶员会以为车坏了）。
+     */
+    private fun pushClusterUltraGauge(presentations: List<ClusterMapPresentation>? = null) {
+        val targets = presentations
+            ?: (clusterLayers.values + listOfNotNull(clusterPresentation)).distinct()
+        if (targets.isEmpty()) return
+        val enabled = AirPlayPersistence.loadClusterUltraGaugeEnabled(this)
+        val gauges = if (enabled) vehicleStatus.currentUltraGauges() else null
+        for (presentation in targets) {
+            presentation.setUltraGauges(gauges)
+            presentation.setUltraGaugeOpacity(AirPlayPersistence.loadClusterUltraGaugeOpacity(this))
+            presentation.setUltraGaugeNightMode(darkMode)
         }
     }
 
@@ -5750,7 +5771,11 @@ class CarPlayHostActivity : ComponentActivity() {
         //   同一个回调也把车速推给仪表上的车速表（1 Hz 刷新）。
         vehicleStatus.onReadingChanged = { reading ->
             vehicleSpeedSource.sample()
-            runOnUiThread { pushClusterSpeedometer() }
+            runOnUiThread {
+                pushClusterSpeedometer()
+                // v123: Ultra 仪表盘的数据也来自同一份车辆读数，一起刷。
+                pushClusterUltraGauge()
+            }
         }
         val locationProvider: Iap2LocationProvider? =
             if (config.locationReportingEnabled) {

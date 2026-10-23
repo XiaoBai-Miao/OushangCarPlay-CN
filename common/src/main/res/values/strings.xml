@@ -930,6 +930,9 @@
     <string name="settings_ambient_album">Follow album cover</string>
     <string name="settings_ambient_album_description">Use the cover’s color or nearby available car colors. Grey, black or missing covers use all 31 colors; mostly white covers can use white or cold white.</string>
     <string name="settings_cluster_speedometer">Cluster speedometer (experimental)</string>
+    <string name="settings_cluster_ultra_gauge">CarPlay Ultra gauges</string>
+    <string name="settings_cluster_ultra_gauge_description">Shows a CarPlay Ultra style instrument cluster on the car display: rev counter, power, range or fuel, battery, mileage and tyre pressure. Only the readings the car actually provides are shown. Changes apply immediately.</string>
+    <string name="settings_cluster_ultra_gauge_opacity">Ultra gauges opacity</string>
     <string name="settings_cluster_speedometer_description">Shows vehicle speed read from the car\'s own vehicle data. Hidden when a reading is unavailable. Changes apply immediately.</string>
     <string name="settings_cluster_speedometer_horizontal">Speedometer horizontal position</string>
     <string name="settings_cluster_speedometer_vertical">Speedometer vertical position</string>

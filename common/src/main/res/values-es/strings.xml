@@ -829,6 +829,9 @@
     <string name="settings_ambient_album">Seguir la portada del álbum</string>
     <string name="settings_ambient_album_description">Usa el color de la portada o colores cercanos disponibles del vehículo. Las portadas grises, negras o ausentes usan los 31 colores; las mayormente blancas pueden usar blanco o blanco frío.</string>
     <string name="settings_cluster_speedometer">Velocímetro del cluster (experimental)</string>
+    <string name="settings_cluster_ultra_gauge">Indicadores CarPlay Ultra</string>
+    <string name="settings_cluster_ultra_gauge_description">Muestra un cuadro de instrumentos de estilo CarPlay Ultra en la pantalla del coche: tacómetro, potencia, autonomía o combustible, batería, kilometraje y presión de neumáticos. Solo se muestran las lecturas que el coche proporciona realmente. Los cambios se aplican al momento.</string>
+    <string name="settings_cluster_ultra_gauge_opacity">Opacidad de los indicadores Ultra</string>
     <string name="settings_cluster_speedometer_description">Muestra la velocidad real leída de los datos de vehículo del propio coche. Se oculta si el dato no está disponible. Los cambios se aplican al momento.</string>
     <string name="settings_cluster_speedometer_horizontal">Posición horizontal del velocímetro</string>
     <string name="settings_cluster_speedometer_vertical">Posición vertical del velocímetro</string>

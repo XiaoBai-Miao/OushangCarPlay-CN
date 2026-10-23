@@ -160,6 +160,18 @@ class CarCabinVehicleStatus(
      */
     fun currentMotorRpm(): Float? = null
 
+    /** 电池电量百分比；读不到时返回 null。 */
+    fun currentBatteryPercent(): Int? = latestReading?.batteryPercent
+
+    /** 电压（V）；读不到时返回 null。 */
+    fun currentVoltage(): Float? = latestReading?.voltage
+
+    /** 电流（A）；读不到时返回 null。实测放电时为负。 */
+    fun currentCurrent(): Float? = latestReading?.current
+
+    /** 续航（km）；读不到时返回 null。 */
+    fun currentRangeKm(): Int? = latestReading?.rangeKm
+
     /**
      * 原始读数，供仪表 HUD 用；读不到时返回 null。
      *

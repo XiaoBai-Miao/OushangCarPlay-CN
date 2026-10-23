@@ -889,6 +889,9 @@
     <string name="settings_ambient_album">跟隨專輯封面</string>
     <string name="settings_ambient_album_description">按封面取色並近似對應原車可用色號。灰黑或無封面時使用全部31色；大面積白色封面可使用白色或冷白。</string>
     <string name="settings_cluster_speedometer">儀表板速度計（實驗性）</string>
+    <string name="settings_cluster_ultra_gauge">CarPlay Ultra 儀表盤</string>
+    <string name="settings_cluster_ultra_gauge_description">在車機螢幕上顯示 CarPlay Ultra 風格儀表盤：轉速表、功率、續航或油量、電量、里程與胎壓。只顯示車輛實際提供的讀數。變更立即生效。</string>
+    <string name="settings_cluster_ultra_gauge_opacity">Ultra 儀表盤透明度</string>
     <string name="settings_cluster_speedometer_description">從車機自身的車輛資料讀取並顯示車速。讀數無法取得時隱藏。變更立即生效。</string>
     <string name="settings_cluster_speedometer_horizontal">速度計水平位置</string>
     <string name="settings_cluster_speedometer_vertical">速度計垂直位置</string>

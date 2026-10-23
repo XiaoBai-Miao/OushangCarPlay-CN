@@ -2585,6 +2585,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                     render()
                 }
                 clusterSpeedometerControls(card)
+                clusterUltraGaugeControls(card)
                 toggle(card, getString(R.string.center_map_card),
                     if (clusterDisplay != null || adbCluster) getString(R.string.center_map_card_description)
                     else getString(R.string.center_map_card_virtual_description),
@@ -3925,8 +3926,35 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     // 仪表)随 BYD 集成删除 —— B561 的仪表媒体卡由 [ClusterGuidanceFeed] 直接喂数据
     // (见「音频路由」分区的媒体卡设置),不走 DiLink 导航广播。
 
-    private fun clusterSpeedometerControls(card: LinearLayout) {
-        toggle(card, getString(R.string.settings_cluster_speedometer),
+    /**
+     * v123: CarPlay Ultra 风格仪表盘的开关。
+     *
+     * 与「仪表车速表」是**两件独立的事**：那个只画速度，这个画整套
+     * （转速表/功率/续航或油量/电量/里程/胎压），对应 CarPlay Ultra 的
+     * 车辆状态仪表（参考 LIVI 的 `GAUGE_KEYS`）。
+     *
+     * 缺哪个数据就少画哪个 —— 纯电车没有油量、燃油车没有电量，
+     * 都不画，**绝不编造**。
+     */
+    private fun clusterUltraGaugeControls(card: LinearLayout) {
+        toggle(card, getString(R.string.settings_cluster_ultra_gauge),
+            getString(R.string.settings_cluster_ultra_gauge_description),
+            AirPlayPersistence.loadClusterUltraGaugeEnabled(this)) {
+            AirPlayPersistence.saveClusterUltraGaugeEnabled(this, it)
+            render()
+        }
+        if (AirPlayPersistence.loadClusterUltraGaugeEnabled(this)) {
+            card.addView(overlaySliderRow(
+                getString(R.string.settings_cluster_ultra_gauge_opacity),
+                listOf(10, 20, 30, 40, 50, 60, 70, 80, 90, 100),
+                AirPlayPersistence.loadClusterUltraGaugeOpacity(this),
+            ) { value -> "$value %" }.also { row ->
+                row.onSave = { value -> AirPlayPersistence.saveClusterUltraGaugeOpacity(this, value) }
+            })
+        }
+    }
+
+    private fun clusterSpeedometerControls(card: LinearLayout) {        toggle(card, getString(R.string.settings_cluster_speedometer),
             getString(R.string.settings_cluster_speedometer_description), AirPlayPersistence.loadClusterSpeedometerEnabled(this)) {
             AirPlayPersistence.saveClusterSpeedometerEnabled(this, it)
             render()

@@ -852,10 +852,45 @@ object AirPlayPersistence {
 
     fun loadClusterSpeedometerEnabled(context: Context): Boolean =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("cluster_speedometer_enabled", false)
-
     fun saveClusterSpeedometerEnabled(context: Context, enabled: Boolean) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putBoolean("cluster_speedometer_enabled", enabled).apply()
+    }
+
+    /**
+     * v123: CarPlay Ultra 风格仪表盘是否启用。
+     *
+     * 默认 **关** —— 它是新增功能，先让用户自己开；
+     * 且它与「仪表车速表」可以同时开（两者位置独立）。
+     */
+    fun loadClusterUltraGaugeEnabled(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getBoolean("cluster_ultra_gauge_enabled", false)
+
+    fun saveClusterUltraGaugeEnabled(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putBoolean("cluster_ultra_gauge_enabled", enabled).apply()
+    }
+
+    /** v123: Ultra 仪表盘透明度（%）。默认 100（完全不透明）。 */
+    fun loadClusterUltraGaugeOpacity(context: Context): Int =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getInt("cluster_ultra_gauge_opacity", 100)
+
+    fun saveClusterUltraGaugeOpacity(context: Context, percent: Int) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putInt("cluster_ultra_gauge_opacity", percent.coerceIn(10, 100)).apply()
+    }
+
+    internal fun observeClusterUltraGauge(context: Context, changed: () -> Unit): () -> Unit {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == "cluster_ultra_gauge_enabled" || key == "cluster_ultra_gauge_opacity") {
+                changed()
+            }
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        return { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
     }
 
     internal fun observeClusterSpeedometer(context: Context, changed: () -> Unit): () -> Unit {

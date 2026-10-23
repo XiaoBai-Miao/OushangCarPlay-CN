@@ -310,4 +310,55 @@ class B561VehicleLogParserTest {
             ),
         )
     }
+
+    // ── 胎压（0x11610309，走 commFloatVectData 向量形态）─────────────────
+
+    @Test
+    fun `parses four tyre pressures from the real CmdSmdManager vector line`() {
+        // 实车日志原文：
+        //   10-09 19:01:54.232 D CmdSmdManager: ----commFloatVectData----prop=0x11610309,size=4,vec=[2.59497,2.52632,2.56751,2.49886]
+        //   10-09 19:01:54.234 D BindCarService: handleCarCallBack:leftFrontPressure:2.59497
+        //        rightFrontPressure:2.52632 leftBackPressure:2.56751 rightBackPressure:2.49886
+        val fields = B561VehicleLogParser.parseLine(
+            "10-09 19:01:54.232   420   447 D CmdSmdManager: ----commFloatVectData----prop=0x11610309,size=4,vec=[2.59497,2.52632,2.56751,2.49886]",
+        )
+        assertNotNull(fields)
+        val tires = fields!![B561VehicleLogParser.KEY_TIRE_PRESSURE] as FloatArray
+        assertEquals(4, tires.size)
+        // 顺序：左前、右前、左后、右后（与原厂 handleCarCallBack 打印顺序一致）
+        assertEquals(2.59497f, tires[0], 0.0001f)
+        assertEquals(2.52632f, tires[1], 0.0001f)
+        assertEquals(2.56751f, tires[2], 0.0001f)
+        assertEquals(2.49886f, tires[3], 0.0001f)
+    }
+
+    @Test
+    fun `rejects tyre pressure vector with an impossible wheel`() {
+        // 混进 0（TPMS 未连接）就整组丢弃 —— 免得仪表上出现
+        // 「三个轮有压一个轮 0」的怪相。
+        val fields = B561VehicleLogParser.parseLine(
+            "10-09 19:01:54.232   420   447 D CmdSmdManager: ----commFloatVectData----prop=0x11610309,size=4,vec=[2.59497,0.0,2.56751,2.49886]",
+        )
+        assertNull(fields)
+    }
+
+    @Test
+    fun `ignores other vector properties`() {
+        // 车上有 4559 条 commFloatVectData，我们只关心胎压。
+        assertNull(
+            B561VehicleLogParser.parseLine(
+                "10-22 11:41:30.008   417   479 D CmdSmdManager: ----commFloatVectData----prop=0x2161f28b,size=9,vec=[80.97,136,201]",
+            ),
+        )
+    }
+
+    @Test
+    fun `parses odometer from the real line`() {
+        // 实车日志：0x21600309 取值 53818 → 54268 单调递增（疑似总里程，单位待确认）
+        val fields = B561VehicleLogParser.parseLine(
+            "10-22 11:49:30.500   417   479 D CmdSmdManager: ----commFloatData----prop=0x21600309,value=54266.000000",
+        )
+        assertNotNull(fields)
+        assertEquals(54266f, fields!![B561VehicleLogParser.KEY_ODOMETER] as Float, 0.01f)
+    }
 }

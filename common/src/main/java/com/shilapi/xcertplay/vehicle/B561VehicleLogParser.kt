@@ -67,6 +67,15 @@ object B561VehicleLogParser {
     /** 电机转速 `0x2160f315` 的日志键。 */
     const val KEY_MOTOR_RPM = "motorRpm"
 
+    /** 四轮胎压 `0x11610309` 的日志键（Float 数组，bar，左前/右前/左后/右后）。 */
+    const val KEY_TIRE_PRESSURE = "tirePressure"
+
+    /** 总里程 `0x21600309` 的日志键。 */
+    const val KEY_ODOMETER = "odometer"
+
+    /** 油量百分比（燃油版）的日志键。 */
+    const val KEY_FUEL_PERCENT = "fuelPercent"
+
     /** 续航 `0x2140f47c` 的日志键（实车未见上报，读不到就报 null）。 */
     const val KEY_RANGE = "range"
 
@@ -126,6 +135,20 @@ object B561VehicleLogParser {
     )
 
     /**
+     * `CmdSmdManager` 的**向量**报文行（胎压走这条）。
+     *
+     * ```
+     * 19:01:54.232 D CmdSmdManager: ----commFloatVectData----prop=0x11610309,size=4,vec=[2.48513,2.41648,2.48513,2.38902]
+     * ```
+     *
+     * ★ 胎压是四轮数组，只能走向量形态，所以必须单独一条正则
+     * —— 标量的 [CMD_SMD_SCALAR] 匹配不到它。
+     */
+    private val CMD_SMD_VECTOR = Regex(
+        """----comm(?:Float|Int32)VectData----prop=(0x[0-9a-fA-F]+),size=(\d+),vec=\[([^\]]*)\]""",
+    )
+
+    /**
      * 原厂 `FastControlManager` 的挡位行。
      *
      * ```
@@ -155,6 +178,7 @@ object B561VehicleLogParser {
         B561VehicleProperty.VOLTAGE to KEY_VOLTAGE,
         B561VehicleProperty.CURRENT to KEY_CURRENT,
         B561VehicleProperty.MOTOR_RPM to KEY_MOTOR_RPM,
+        B561VehicleProperty.ODOMETER to KEY_ODOMETER,
     )
 
     /** 电量候选属性 → [KEY_BATTERY]。 */
@@ -165,12 +189,16 @@ object B561VehicleLogParser {
     private val RANGE_PROPERTY_IDS: Set<Int> =
         B561VehicleProperty.RANGE_KM_CANDIDATES.toSet()
 
+    /** 油量百分比候选属性 → [KEY_FUEL_PERCENT]。 */
+    private val FUEL_PROPERTY_IDS: Set<Int> =
+        B561VehicleProperty.FUEL_PERCENT_CANDIDATES.toSet()
+
     /**
      * 解析一行日志。
      *
      * @return 该行携带的字段增量；不是车辆数据行时返回 null。
      */
-    fun parseLine(line: String): Map<String, Number>? {
+    fun parseLine(line: String): Map<String, Any>? {
         // 挡位优先：FastControlManager 的挡位行不携带 property ID，
         // 若先跑 PROPERTY_CHANGE 会因为这行里没有 0x 而直接落空，所以顺序无讲究，
         // 但两种正则都要试（有的行只匹配其一）。
@@ -182,7 +210,7 @@ object B561VehicleLogParser {
     }
 
     /** 解析 `Property.service` / `CarCabinManager.get*Property` 两类行。 */
-    private fun parsePropertyLine(line: String): Map<String, Number>? {
+    private fun parsePropertyLine(line: String): Map<String, Any>? {
         val match = PROPERTY_CHANGE.find(line) ?: CAR_CABIN_GET.find(line) ?: return null
         val propertyId = parseHexId(match.groupValues[1]) ?: return null
         val raw = match.groupValues[2].toDoubleOrNull() ?: return null
@@ -195,18 +223,51 @@ object B561VehicleLogParser {
      * 电机转速 `0x2160f315` **只**在这里出现（`Property.service` 里没有），
      * 所以这条路径是转速的唯一来源。
      */
-    private fun parseCmdSmdLine(line: String): Map<String, Number>? {
+    private fun parseCmdSmdLine(line: String): Map<String, Any>? {
         // 先用 contains 过滤：这个 tag 在实车里每秒能出十几行，
         // 无条件对每行跑正则太浪费。
         if (!line.contains("CmdSmdManager")) return null
+        // 向量优先：标量正则匹配不到 commFloatVectData 那行。
+        parseCmdSmdVector(line)?.let { return it }
         val match = CMD_SMD_SCALAR.find(line) ?: return null
         val propertyId = parseHexId(match.groupValues[1]) ?: return null
         val raw = match.groupValues[2].toDoubleOrNull() ?: return null
         return fieldsFor(propertyId, raw)
     }
 
+    /**
+     * 解析 `CmdSmdManager` 的向量报文行（目前只有四轮胎压用得上）。
+     *
+     * 只认长度正好等于 [B561VehicleProperty.TIRE_PRESSURE_COUNT] 的胎压向量；
+     * 其它向量属性（车上有 4559 条 commFloatVectData）一律不解析 ——
+     * 我们不关心多维数组，乱认反而会画错东西。
+     */
+    private fun parseCmdSmdVector(line: String): Map<String, Any>? {
+        val match = CMD_SMD_VECTOR.find(line) ?: return null
+        val propertyId = parseHexId(match.groupValues[1]) ?: return null
+        if (propertyId != B561VehicleProperty.TIRE_PRESSURE) return null
+        val size = match.groupValues[2].toIntOrNull() ?: return null
+        if (size != B561VehicleProperty.TIRE_PRESSURE_COUNT) return null
+        val values = match.groupValues[3]
+            .split(',')
+            .mapNotNull { it.trim().toFloatOrNull() }
+        if (values.size != B561VehicleProperty.TIRE_PRESSURE_COUNT) return null
+        // 四个值都要在合理区间才算有效 —— 混进 0（TPMS 未连接）就整组丢弃，
+        // 免得仪表上出现"三个轮有压一个轮 0"的怪相。
+        if (values.any {
+                it < B561VehicleProperty.MIN_TIRE_PRESSURE_BAR ||
+                    it > B561VehicleProperty.MAX_TIRE_PRESSURE_BAR
+            }
+        ) {
+            return null
+        }
+        // 用 FloatArray 而不是 toTypedArray() —— 后者得到的是 Array<Float>（装箱），
+        // 取值处还得再转一遍，而且 equals 是引用比较。
+        return mapOf(KEY_TIRE_PRESSURE to FloatArray(values.size) { values[it] })
+    }
+
     /** 解析 `FastControlManager` 的挡位行。 */
-    private fun parseGearLine(line: String): Map<String, Number>? {
+    private fun parseGearLine(line: String): Map<String, Any>? {
         // 只在真的出现这个 tag 时才去跑正则：实车 logcat 流量很大，
         // 无条件对每行跑多个正则是白烧 CPU。
         if (!line.contains("FastControlManager")) return null
@@ -218,7 +279,7 @@ object B561VehicleLogParser {
     }
 
     /** 属性 ID + 原始值 → 日志键。值无效时返回 null（不产出垃圾字段）。 */
-    private fun fieldsFor(propertyId: Int, raw: Double): Map<String, Number>? = when {
+    private fun fieldsFor(propertyId: Int, raw: Double): Map<String, Any>? = when {
         KEY_BY_PROPERTY.containsKey(propertyId) -> {
             // 车速/电压/电流是 Float；电量是 Int。按目标键的类型转换，
             // 免得 0x2140f636 的 49 被当成 49.0 交给 batteryPercent 做整型比较。
@@ -233,6 +294,8 @@ object B561VehicleLogParser {
                 // 电机转速：负值与超上限都判为无效（理由同车速）。
                 KEY_MOTOR_RPM -> B561VehicleProperty.motorRpm(raw.toFloat())
                     ?.let { mapOf(KEY_MOTOR_RPM to it) }
+                // 总里程：只接受正数（0 视为未上报）。
+                KEY_ODOMETER -> if (raw > 0f) mapOf(KEY_ODOMETER to raw.toFloat()) else null
                 else -> null
             }
         }
@@ -242,6 +305,11 @@ object B561VehicleLogParser {
 
         propertyId in RANGE_PROPERTY_IDS ->
             if (raw > 0) mapOf(KEY_RANGE to raw.toInt()) else null
+
+        propertyId in FUEL_PROPERTY_IDS ->
+            // 油量百分比：0 视为未加注，读不到就报 null ——
+            // 绝不能拿电量冒充油量，那会让燃油版仪表显示一个假数字。
+            if (raw in 1.0..100.0) mapOf(KEY_FUEL_PERCENT to raw.toInt()) else null
 
         else -> null
     }
@@ -256,8 +324,8 @@ object B561VehicleLogParser {
      * 后出现的行覆盖先出现的（logcat 是时序流，后到的更新）。
      * 字段用 [LinkedHashMap] 保留插入顺序，方便单测断言与日志输出。
      */
-    fun fold(lines: Iterable<String>): Map<String, Number> {
-        val fields = LinkedHashMap<String, Number>()
+    fun fold(lines: Iterable<String>): Map<String, Any> {
+        val fields = LinkedHashMap<String, Any>()
         for (line in lines) {
             val parsed = parseLine(line) ?: continue
             fields.putAll(parsed)

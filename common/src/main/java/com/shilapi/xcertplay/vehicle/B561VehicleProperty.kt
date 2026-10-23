@@ -148,6 +148,76 @@ object B561VehicleProperty {
     const val BATTERY_PERCENT_AOSP = 0x11600309
 
     /**
+     * **四轮胎压**，Float 数组（长度 4），单位 **bar**。
+     *
+     * 顺序：**左前、右前、左后、右后**（原厂 `BindCarService.handleCarCallBack`
+     * 的打印顺序：`leftFrontPressure, rightFrontPressure, leftBackPressure,
+     * rightBackPressure`，逐条与下面的实测值对应）。
+     *
+     * ★ 决定性证据（实车 logcat）：
+     * ```
+     * 19:01:54.232 D Property.service: property:0x11610309 on change,
+     *      values=[2.59497, 2.52632, 2.56751, 2.49886]
+     * 19:01:54.234 D BindCarService: ID_TIRE_PRESSURE[2.59497, 2.52632, 2.56751, 2.49886]
+     * 19:01:54.234 D BindCarService: handleCarCallBack:leftFrontPressure:2.59497
+     *      rightFrontPressure:2.52632 leftBackPressure:2.56751 rightBackPressure:2.49886
+     * ```
+     * 原厂自己把这个属性的名字就叫 `ID_TIRE_PRESSURE` / `mPropertyId=TIRE_PRESSURE`，
+     * 而且**同时**给出了一个语义完全冲突的 `mPropertyId=TIRE_PRESSURE_SIGNAL`
+     * （值恒为 0，是"胎压告警信号"不是胎压值）。别搞混。
+     *
+     * ★ v121 我把它误判成"厂商自定义、无定义"——AOSP 里确实没有
+     * `0x11610309` 这个值（多一位，在厂商区），但**它有明确的厂商语义**，
+     * 就是四轮胎压。反编译 APK 把它命名成 `TIRE_PRESSURE` 其实是**对的**。
+     *
+     * 走 `commFloatVectData`（size=4）上报，所以 [B561VehicleLogParser]
+     * 需要额外解析向量形态。
+     */
+    const val TIRE_PRESSURE = 0x11610309
+
+    /** 胎压数组长度（四轮）。 */
+    const val TIRE_PRESSURE_COUNT = 4
+
+    /**
+     * 胎压有效下限（bar）。低于此值视为无效/未上报。
+     *
+     * 实测值域 2.38..2.60 bar（约 238..260 kPa，正常胎压），
+     * 另有 0（未连接 TPMS 时）。下限取 1.0 bar —— 低于此基本是传感器缺失。
+     */
+    const val MIN_TIRE_PRESSURE_BAR = 1.0f
+
+    /**
+     * 胎压有效上限（bar）。高于此值视为脏数据。
+     *
+     * 量产车胎压上限约 3.5 bar（≈350 kPa），留余量取 5.0。
+     */
+    const val MAX_TIRE_PRESSURE_BAR = 5.0f
+
+    /**
+     * 总里程（km），Float。
+     *
+     * 实车日志里取值 53818 → 54268 **单调递增、每次恰好 +1**，
+     * 且是唯一超过 10000 的连续量 —— 量级与单位都指向总里程。
+     *
+     * AOSP 标准是 `PERF_ODOMETER = 0x11600204`，但这台车用的是厂商扩展
+     * `0x21600309`。**单位待实车确认**（也可能是 0.1 km 精度）。
+     */
+    const val ODOMETER = 0x21600309
+
+    /**
+     * 油量百分比，Int 0..100。
+     *
+     * B561/UNI-Z 有燃油与混动两种动力形式，燃油版需要油量。
+     * 候选 `0x2140f629`（原厂桌面主动读，实测恒为 0 —— 纯电车上没油），
+     * `0x2140f633` 是反编译坐实的燃油续航（km），`0x2140f667` 是燃油百分比。
+     * **读不到就报 null**，绝不拿电量冒充油量。
+     */
+    val FUEL_PERCENT_CANDIDATES = intArrayOf(
+        0x2140f667,
+        0x2140f629,
+    )
+
+    /**
      * 续航（km）候选列表。
      *
      * ★ v120 新增首选 [RANGE_ELECTRIC_KM]（`0x2140f635`）：这个值不是猜的，

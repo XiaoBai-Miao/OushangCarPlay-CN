@@ -829,6 +829,9 @@
     <string name="settings_ambient_album">Цвет обложки альбома</string>
     <string name="settings_ambient_album_description">Цвет обложки приближённо сопоставляется с доступными цветами автомобиля. Для серой, чёрной или отсутствующей обложки используются все 31 цвет; для преимущественно белой — белый или холодный белый.</string>
     <string name="settings_cluster_speedometer">Спидометр приборной панели (экспериментально)</string>
+    <string name="settings_cluster_ultra_gauge">Приборы CarPlay Ultra</string>
+    <string name="settings_cluster_ultra_gauge_description">Показывает приборную панель в стиле CarPlay Ultra на экране автомобиля: тахометр, мощность, запас хода или топливо, заряд аккумулятора, пробег и давление в шинах. Показываются только те показания, которые реально предоставляет автомобиль. Изменения применяются сразу.</string>
+    <string name="settings_cluster_ultra_gauge_opacity">Непрозрачность приборов Ultra</string>
     <string name="settings_cluster_speedometer_description">Показывает скорость автомобиля, считанную из собственных данных автомобиля. Скрывается, если данные недоступны. Изменения применяются сразу.</string>
     <string name="settings_cluster_speedometer_horizontal">Положение спидометра по горизонтали</string>
     <string name="settings_cluster_speedometer_vertical">Положение спидометра по вертикали</string>
