@@ -933,6 +933,10 @@
     <string name="settings_cluster_speedometer">Cluster speedometer (experimental)</string>
     <string name="settings_carplay_ultra">CarPlay Ultra vehicle state</string>
     <string name="settings_carplay_ultra_description">Off (default): the phone is not offered the CarPlay Ultra vehicle state protocol. On: the car offers the vehicle state protocol so the phone can read the car\'s rev counter, power, range, mileage and tyre pressure. Needs a reconnect to take effect.</string>
+    <string name="settings_address_family">Preferred address family</string>
+    <string name="settings_address_family_automatic">Automatic (default)</string>
+    <string name="settings_address_family_ipv4">Prefer IPv4</string>
+    <string name="settings_address_family_ipv6">Prefer IPv6</string>
     <string name="settings_vehicle_simulation">Vehicle data simulation (test)</string>
     <string name="settings_vehicle_simulation_description">Off (default): uses real vehicle data. On: away from the original car head unit, generates a 60-second simulated driving cycle (idle / accelerate / cruise / brake) and feeds it to the Ultra protocol; takes effect immediately. Must stay off on the real car \u2014 the phone\'s map would show simulated range and battery.</string>
     <string name="settings_cluster_ultra_gauge">CarPlay Ultra gauges</string>

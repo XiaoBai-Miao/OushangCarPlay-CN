@@ -106,6 +106,7 @@ import com.shilapi.xcertplay.orchestration.CarPlayController
 import com.shilapi.xcertplay.orchestration.CarPlayRuntimeConfig
 import com.shilapi.xcertplay.network.WirelessStartupFailure
 import com.shilapi.xcertplay.network.WirelessStartupPolicy
+import com.shilapi.xcertplay.network.WirelessAddressFamilyPrefs
 import com.shilapi.xcertplay.orchestration.CarPlayStatus
 import com.shilapi.xcertplay.orchestration.CarPlayTransport
 import com.shilapi.xcertplay.orchestration.ManualHotspotBand
@@ -441,6 +442,37 @@ class CarPlayHostActivity : ComponentActivity() {
     private fun restoreVehicleSimulation() {
         val enabled = AirPlayPersistence.loadVehicleSimulationEnabled(this)
         vehicleStatus.setSimulationEnabled(enabled)
+    }
+
+    /**
+     * v128: 无线热点地址族偏好的 adb 后门。
+     *
+     * ```
+     * adb shell am broadcast -a com.oushang.carplay.SET_ADDRESS_FAMILY --es family IPv6
+     * ```
+     * 取值 `AUTOMATIC` / `IPV4` / `IPV6`；缺省 `AUTOMATIC`。
+     * 真正的生效点是下一次无线连接（`runWireless` 重新读取偏好），
+     * 这里只落盘 + 记日志。
+     */
+    private val addressFamilyReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action != AddressFamilyCommand.ACTION) return
+            val preference = WirelessAddressFamilyPrefs.parse(
+                intent.getStringExtra(AddressFamilyCommand.EXTRA_FAMILY),
+            )
+            WirelessAddressFamilyPrefs.save(this@CarPlayHostActivity, preference)
+            Log.i(TAG, "address family preference set via broadcast: ${preference.name}")
+        }
+    }
+
+    /** v128: 注册地址族广播后门（Android 13+ 需显式 exported 标志）。 */
+    private fun registerAddressFamilyReceiver() {
+        val filter = IntentFilter(AddressFamilyCommand.ACTION)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(addressFamilyReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(addressFamilyReceiver, filter)
+        }
     }
 
     /** v127: 注册模拟开关广播后门（Android 13+ 需显式 exported 标志）。 */
@@ -857,6 +889,8 @@ class CarPlayHostActivity : ComponentActivity() {
         // 不用点设置页就能切数据源，方便脱离 UI 抓日志时操作。
         restoreVehicleSimulation()
         registerVehicleSimulationReceiver()
+        // v128: 地址族偏好广播后门（持久化已由设置页/adb 写入，这里只收日志）。
+        registerAddressFamilyReceiver()
         locationPermissionAvailable = hasFineLocationPermission()
         setContentView(buildContentView())
         applyFullscreenMode()
@@ -2052,6 +2086,8 @@ class CarPlayHostActivity : ComponentActivity() {
         vehicleStatus.stop()
         // v127: 反注册模拟开关广播后门。
         runCatching { unregisterReceiver(vehicleSimulationReceiver) }
+        // v128: 反注册地址族广播后门。
+        runCatching { unregisterReceiver(addressFamilyReceiver) }
         if (pictureCopyThreadStarted) pictureCopyThread.quitSafely()
         resetSidePanel()
         releaseSidePanelEffects()

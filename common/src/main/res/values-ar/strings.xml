@@ -832,6 +832,10 @@
     <string name="settings_cluster_speedometer">عداد سرعة لوحة العدادات (تجريبي)</string>
     <string name="settings_carplay_ultra">حالة مركبة CarPlay Ultra</string>
     <string name="settings_carplay_ultra_description">معطّل (افتراضي): لا يُقدَّم للهاتف بروتوكول حالة مركبة CarPlay Ultra. مُفعّل: تقدّم السيارة البروتوكول ليقرأ الهاتف دوران المحرك والقدرة والمدى والمسافة وضغط الإطارات. يتطلب إعادة الاتصال.</string>
+    <string name="settings_address_family">أفضلية عائلة العناوين</string>
+    <string name="settings_address_family_automatic">تلقائي (افتراضي)</string>
+    <string name="settings_address_family_ipv4">أفضل IPv4</string>
+    <string name="settings_address_family_ipv6">أفضل IPv6</string>
     <string name="settings_vehicle_simulation">محاكاة بيانات المركبة (اختبار)</string>
     <string name="settings_vehicle_simulation_description">معطّل (افتراضي): يستخدم بيانات المركبة الحقيقية. مُفعّل: بعيدًا عن وحدة التحكم الأصلية، يولّد دورة قيادة محاكاة مدتها 60 ثانية ويغذّي بروتوكول Ultra؛ يسري فورًا. يجب إبقاؤه معطّلًا في السيارة الحقيقية.</string>
     <string name="settings_cluster_ultra_gauge">مؤشرات CarPlay Ultra</string>

@@ -49,6 +49,8 @@ import com.shilapi.xcertplay.network.HotspotAddressPolicy
 import com.shilapi.xcertplay.network.HotspotAddressRecovery
 import com.shilapi.xcertplay.network.WifiP2pGroupManager
 import com.shilapi.xcertplay.network.WifiScanPause
+import com.shilapi.xcertplay.network.AddressFamilyPreference
+import com.shilapi.xcertplay.network.WirelessAddressFamilyPrefs
 import com.shilapi.xcertplay.network.WirelessHotspotInfo
 import com.shilapi.xcertplay.network.WirelessHotspotBackend
 import com.shilapi.xcertplay.network.WirelessHotspotManager
@@ -1252,10 +1254,13 @@ class CarPlayController(
             wirelessConnectionProof.begin(generation) {
                 if (!isStaleWirelessRun(generation)) startedHotspot?.onCarPlayConfirmed()
             }
-            val preferredFamily = HotspotAddressPolicy.parseFamily(
-                appContext.getSharedPreferences(WIRELESS_PREFS, Context.MODE_PRIVATE)
-                    .getString(HOTSPOT_FAMILY_PREFERENCE_KEY, null),
-            )
+            // v128: 用户显式选的族（设置→连接）优先于自动 flip 管理的偏好键；
+            // 选「自动」时才回落后者的历史记录。
+            val preferredFamily = WirelessAddressFamilyPrefs.load(appContext).family
+                ?: HotspotAddressPolicy.parseFamily(
+                    appContext.getSharedPreferences(WIRELESS_PREFS, Context.MODE_PRIVATE)
+                        .getString(HOTSPOT_FAMILY_PREFERENCE_KEY, null),
+                )
             val addressRecovery = HotspotAddressRecovery(
                 sample = { hotspotCandidates(hotspotInfo, fallbackToSnapshot = false) },
                 cancelled = { isStaleWirelessRun(generation) },
@@ -2706,6 +2711,12 @@ class CarPlayController(
 
     private fun flipWirelessAddressFamily(generation: Int) = synchronized(wirelessResourceLock) {
         if (isStaleWirelessRun(generation)) return@synchronized
+        // v128: 用户在设置里显式锁了族时，失败重试不得改写偏好——
+        // 否则「就爱用 IPv6」会被一次翻不动的重试悄悄吞掉。
+        if (WirelessAddressFamilyPrefs.load(appContext) != AddressFamilyPreference.AUTOMATIC) {
+            debugLog("wireless address family flip skipped; user override active")
+            return@synchronized
+        }
         val published = wirelessPublishedAddress
         val next = published?.let { wirelessAddressRecovery?.nextFamily(it) }
         val from = published?.let {

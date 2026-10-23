@@ -53,6 +53,8 @@ import com.shilapi.xcertplay.airplay.ClusterTurnCardOverlay
 import com.shilapi.xcertplay.backup.SettingsBackupCodec
 import com.shilapi.xcertplay.backup.SettingsBackupEndpoint
 import com.shilapi.xcertplay.backup.SettingsBackupServer
+import com.shilapi.xcertplay.network.AddressFamilyPreference
+import com.shilapi.xcertplay.network.WirelessAddressFamilyPrefs
 import com.shilapi.xcertplay.backup.SettingsQrCode
 import com.shilapi.xcertplay.compat.closeCompat
 import com.shilapi.xcertplay.cluster.CastGateClient
@@ -2199,6 +2201,18 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                 getString(R.string.default_connection_usb)
             ), connectionModes.indexOf(DiPlayPreferences.defaultConnectionMode(this)), reconnects = false) {
                 DiPlayPreferences.saveDefaultConnectionMode(this, connectionModes[it])
+            }
+            // v128: 无线热点发布地址族。显式锁定后，连接失败的自动翻族
+            // （flipWirelessAddressFamily）不再改写偏好——「就爱用 IPv6」
+            // 不会被一次翻不动的重试悄悄吞掉。改动在下次无线连接时生效。
+            val familyOptions = AddressFamilyPreference.entries
+            choice(card, getString(R.string.settings_address_family), listOf(
+                getString(R.string.settings_address_family_automatic),
+                getString(R.string.settings_address_family_ipv4),
+                getString(R.string.settings_address_family_ipv6),
+            ), familyOptions.indexOf(WirelessAddressFamilyPrefs.load(this))) {
+                WirelessAddressFamilyPrefs.save(this, familyOptions[it])
+                applyAddressFamilyOverride(familyOptions[it])
             }
             toggle(card, getString(R.string.connect_when_iphone_bluetooth_connects),
                 getString(R.string.connect_when_iphone_bluetooth_connects_description),
@@ -4781,6 +4795,21 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             Intent(VehicleSimulationCommand.ACTION).apply {
                 setPackage(packageName)
                 putExtra(VehicleSimulationCommand.EXTRA_ENABLED, enabled)
+            },
+        )
+    }
+
+    /**
+     * v128: 把地址族偏好变更通告给运行中的宿主。
+     *
+     * 持久化已由调用方写入，这里只发广播让 [CarPlayHostActivity] 记日志——
+     * 真正的生效点是下一次无线连接的 `runWireless`（届时重新读取偏好）。
+     */
+    private fun applyAddressFamilyOverride(preference: AddressFamilyPreference) {
+        sendBroadcast(
+            Intent(AddressFamilyCommand.ACTION).apply {
+                setPackage(packageName)
+                putExtra(AddressFamilyCommand.EXTRA_FAMILY, preference.name)
             },
         )
     }

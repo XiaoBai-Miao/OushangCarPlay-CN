@@ -892,6 +892,10 @@
     <string name="settings_cluster_speedometer">儀表板速度計（實驗性）</string>
     <string name="settings_carplay_ultra">CarPlay Ultra 車輛狀態</string>
     <string name="settings_carplay_ultra_description">關閉（預設）：不向手機提供 CarPlay Ultra 車輛狀態協議。開啟：車機提供車輛狀態協議，手機可讀取轉速、功率、續航、里程與胎壓。需要重連後生效。</string>
+    <string name="settings_address_family">無線位址族優先</string>
+    <string name="settings_address_family_automatic">自動（預設）</string>
+    <string name="settings_address_family_ipv4">優先 IPv4</string>
+    <string name="settings_address_family_ipv6">優先 IPv6</string>
     <string name="settings_vehicle_simulation">車輛資料模擬（測試）</string>
     <string name="settings_vehicle_simulation_description">關閉（預設）：使用真實車輛資料。開啟：脫離原車車機時產生一段 60 秒模擬駕駕工況（息速／加速／均速／減速）饉給 Ultra 協定，立即生效。真車上必須關閉——手機地圖會顯示模擬的續航與電量。</string>
     <string name="settings_cluster_ultra_gauge">CarPlay Ultra 儀表盤</string>

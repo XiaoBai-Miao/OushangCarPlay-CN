@@ -832,6 +832,10 @@
     <string name="settings_cluster_speedometer">Спидометр приборной панели (экспериментально)</string>
     <string name="settings_carplay_ultra">Состояние автомобиля CarPlay Ultra</string>
     <string name="settings_carplay_ultra_description">Выключено (по умолчанию): протокол состояния автомобиля CarPlay Ultra телефону не предлагается. Включено: автомобиль предлагает этот протокол, и телефон может читать обороты двигателя, мощность, запас хода, пробег и давление в шинах. Требуется переподключение.</string>
+    <string name="settings_address_family">Предпочтительное семейство адресов</string>
+    <string name="settings_address_family_automatic">Автоматически (по умолчанию)</string>
+    <string name="settings_address_family_ipv4">Предпочитать IPv4</string>
+    <string name="settings_address_family_ipv6">Предпочитать IPv6</string>
     <string name="settings_vehicle_simulation">Симуляция данных автомобиля (тест)</string>
     <string name="settings_vehicle_simulation_description">Выключено (по умолчанию): используются реальные данные автомобиля. Включено: вне штатной головы генерируется 60-секундный смоделированный ездовой цикл и подаётся в протокол Ultra; применяется сразу. На реальном автомобиле должно быть выключено.</string>
     <string name="settings_cluster_ultra_gauge">Приборы CarPlay Ultra</string>

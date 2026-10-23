@@ -832,6 +832,10 @@
     <string name="settings_cluster_speedometer">Velocímetro del cluster (experimental)</string>
     <string name="settings_carplay_ultra">Estado del vehículo CarPlay Ultra</string>
     <string name="settings_carplay_ultra_description">Desactivado (predeterminado): no se ofrece al teléfono el protocolo de estado del vehículo de CarPlay Ultra. Activado: el coche ofrece ese protocolo para que el teléfono pueda leer el régimen, la potencia, la autonomía, el kilometraje y la presión de los neumáticos. Necesita reconectar para aplicarse.</string>
+    <string name="settings_address_family">Familia de direcciones preferida</string>
+    <string name="settings_address_family_automatic">Automática (predeterminada)</string>
+    <string name="settings_address_family_ipv4">Preferir IPv4</string>
+    <string name="settings_address_family_ipv6">Preferir IPv6</string>
     <string name="settings_vehicle_simulation">Simulación de datos del vehículo (prueba)</string>
     <string name="settings_vehicle_simulation_description">Desactivado (predeterminado): usa los datos reales del vehículo. Activado: lejos de la unidad principal original, genera un ciclo de conducción simulado de 60 segundos (ralentí / aceleración / crucero / frenado) y lo envía al protocolo Ultra; surte efecto de inmediato. Debe permanecer desactivado en el coche real.</string>
     <string name="settings_cluster_ultra_gauge">Indicadores CarPlay Ultra</string>
