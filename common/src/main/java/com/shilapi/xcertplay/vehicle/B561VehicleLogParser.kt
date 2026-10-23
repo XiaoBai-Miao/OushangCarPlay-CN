@@ -1,0 +1,215 @@
+package com.shilapi.xcertplay.vehicle
+
+/**
+ * 长安欧尚 B561 车辆数据的**logcat 解析器**（纯逻辑，无 Android 依赖，可单测）。
+ *
+ * ## 为什么走日志而不是 VHAL
+ *
+ * v117 按官方范式实现了 VHAL 读取（`Car.createCar` + `getCarManager("cabin")`），
+ * 实车日志里明确失败：
+ * ```
+ * 11:35:46.389 W B561-VehicleStatus: Car service connect failed: InvocationTargetException: null
+ * 11:35:46.414 D CAR.L: onServiceConnected mService=android.car.ICar$Stub$Proxy@f4d72c6
+ * ```
+ * —— **`car.connect()` 是异步的**，`onServiceConnected` 在 25ms 后才回调，
+ * 而 v117 在 `connect()` 返回后立刻 `getCarManager("cabin")`，此时 service 还没连上，
+ * 于是每 1Hz 抛一次 `InvocationTargetException`，`cabin` 永远是 null。
+ *
+ * 但**数据本身是好的**——同一份日志里原厂 app（pid 2202 `NewEnergyDeskView2CtrManager`）
+ * 读得好好的：
+ * ```
+ * 11:35:40.818 D CarCabinManager: getIntProperty 0x2140f4a9 data=4
+ * 11:35:46.389 D CarCabinManager: getIntProperty 0x2140f636 data=49
+ * ```
+ * 说明 VHAL 侧没问题，纯粹是**连接时序**问题。
+ *
+ * 与其跟异步时序死磕，不如换一条**已经验证在跑的路**：原厂组件本来就在
+ * 每次 VHAL 变化时打 logcat，我们把这些行解析出来即可。相对 VHAL 的优势：
+ * - 绕开 Car Service 的异步连接与 `InvocationTargetException`；
+ * - 不需要 `android.car` 权限与 AIDL 绑定；
+ * - **同源** —— 打日志的就是读 VHAL 的原厂组件，值与仪表一致。
+ *
+ * ## 三类日志行（全部来自实车日志实测，非推测）
+ *
+ * | 数据 | 行形态 | 实测样例 |
+ * |---|---|---|
+ * | 车速/电量/电压/电流 | `Property.service: property:0x... on change, values=...` | `property:0x11600207 on change, values=16.70625` |
+ * | 挡位 | `FastControlManager: _ID_GEAR_SELECTION  gearValue: 8` | 同左 |
+ * | （备用）任意属性 | `CarCabinManager: getIntProperty 0x... data=N` | `getIntProperty 0x2140f636 data=49` |
+ *
+ * `Property.service` 那条是**变化即打点**，车速 1Hz 级、电量只在变化时出现，
+ * 所以读数新鲜度足够；`FastControlManager` 的挡位行与车速行**成对出现**
+ * （实测 330 vs 331、2 vs 2），说明同一原厂组件在刷，两个字段天然同步。
+ *
+ * ## ★ 解析器是纯函数
+ *
+ * [parseLine] 输入一行文本、输出增量字段，不碰 logcat、不碰 Android。
+ * 真正的读取在 [LogcatVehicleStatus]（需要 shell/日志权限）。
+ * 这样单测可以直接喂实车日志行，无需设备。
+ */
+object B561VehicleLogParser {
+
+    /** 车速 `0x11600207` 的日志键。 */
+    const val KEY_SPEED = "speed"
+
+    /** 电量 `0x2140f636` 的日志键。 */
+    const val KEY_BATTERY = "battery"
+
+    /** 电压 `0x2160f503` 的日志键。 */
+    const val KEY_VOLTAGE = "voltage"
+
+    /** 电流 `0x2160f502` 的日志键。 */
+    const val KEY_CURRENT = "current"
+
+    /** 挡位 `0x11400400` 的日志键。 */
+    const val KEY_GEAR = "gear"
+
+    /** 续航 `0x2140f47c` 的日志键（实车未见上报，读不到就报 null）。 */
+    const val KEY_RANGE = "range"
+
+    /**
+     * `Property.service` 的一行。
+     *
+     * ```
+     * 10-22 11:49:34.141  1250  1376 D Property.service: property:0x2140f4a9 on change, values=-103
+     * ```
+     *
+     * 用「`property:0x` + 6 位十六进制 + … `values=` + 数值」做锚点，
+     * 不锚定行首时间戳与 pid —— 那部分格式随 ROM 变化，最不稳。
+     */
+    private val PROPERTY_CHANGE = Regex(
+        """property:(0x[0-9a-fA-F]+)\s+on change,\s*values=(-?[0-9]+(?:\.[0-9]+)?)""",
+    )
+
+    /**
+     * `CarCabinManager.getIntProperty` / `getFloatProperty` 的一行（备用源）。
+     *
+     * ```
+     * 10-22 11:49:30.210  2202  2202 D CarCabinManager: getIntProperty 0x2140f636 data=49
+     * ```
+     *
+     * 这类是**原厂主动拉取值**时打的，只在原厂界面刷新时出现，
+     * 所以只作 `Property.service` 之外的补漏，不作主源。
+     */
+    private val CAR_CABIN_GET = Regex(
+        """get(?:Int|Float)Property\s+(0x[0-9a-fA-F]+)\s+data=(-?[0-9]+(?:\.[0-9]+)?)""",
+    )
+
+    /**
+     * 原厂 `FastControlManager` 的挡位行。
+     *
+     * ```
+     * 10-22 11:35:40.819 I FastControlManager: _ID_GEAR_SELECTION  gearValue: 8
+     * 10-22 11:35:40.819 D FastControlManager: getGearStatus: 8
+     * 10-22 11:35:40.819 D FastControlManager: _getSensorGearPosition === event.getGearData(null).gear: 8
+     * 10-22 11:35:40.819 D FastControlManager: _getCarCabinProperty success. property:GEAR_SELECTION , areaId:0 , value:8
+     * ```
+     *
+     * **四种形态在实车里都出现过**，取值都是同一个
+     * [B561VehicleProperty.GEAR_SELECTION]。四个分支全列上而不是挑一个短的：
+     * 实车日志里 `FastControlManager` 的这四行是**同一次刷里连续打出**的，
+     * 哪个分支没覆盖到都会在固件调整日志级别时静默丢挡位。
+     *
+     * 第 4 条的 `property:GEAR_SELECTION` 后面跟的是**名字**不是 `0x` 十六进制，
+     * 所以不能复用 [PROPERTY_CHANGE]（那里锚的是 `property:0x...`）。
+     */
+    private val GEAR_STATUS = Regex(
+        """(?:_ID_GEAR_SELECTION\s+gearValue|getGearStatus|getGearData\(null\)\.gear)\s*[:=]\s*(-?\d+)""" +
+            """|property:GEAR_SELECTION\s*,.*?\bvalue\s*[:=]\s*(-?\d+)""",
+    )
+
+    /** 属性 ID → 日志键。挡位走 [GEAR_STATUS]，不在这张表里。 */
+    private val KEY_BY_PROPERTY: Map<Int, String> = mapOf(
+        B561VehicleProperty.SPEED to KEY_SPEED,
+        B561VehicleProperty.BATTERY_PERCENT to KEY_BATTERY,
+        B561VehicleProperty.VOLTAGE to KEY_VOLTAGE,
+        B561VehicleProperty.CURRENT to KEY_CURRENT,
+    )
+
+    /** 电量候选属性 → [KEY_BATTERY]。 */
+    private val BATTERY_PROPERTY_IDS: Set<Int> =
+        B561VehicleProperty.BATTERY_PERCENT_CANDIDATES.toSet()
+
+    /** 续航候选属性 → [KEY_RANGE]。 */
+    private val RANGE_PROPERTY_IDS: Set<Int> =
+        B561VehicleProperty.RANGE_KM_CANDIDATES.toSet()
+
+    /**
+     * 解析一行日志。
+     *
+     * @return 该行携带的字段增量；不是车辆数据行时返回 null。
+     */
+    fun parseLine(line: String): Map<String, Number>? {
+        // 挡位优先：FastControlManager 的挡位行不携带 property ID，
+        // 若先跑 PROPERTY_CHANGE 会因为这行里没有 0x 而直接落空，所以顺序无讲究，
+        // 但两种正则都要试（有的行只匹配其一）。
+        parsePropertyLine(line)?.let { return it }
+        parseGearLine(line)?.let { return it }
+        return null
+    }
+
+    /** 解析 `Property.service` / `CarCabinManager.get*Property` 两类行。 */
+    private fun parsePropertyLine(line: String): Map<String, Number>? {
+        val match = PROPERTY_CHANGE.find(line) ?: CAR_CABIN_GET.find(line) ?: return null
+        val propertyId = parseHexId(match.groupValues[1]) ?: return null
+        val raw = match.groupValues[2].toDoubleOrNull() ?: return null
+        return fieldsFor(propertyId, raw)
+    }
+
+    /** 解析 `FastControlManager` 的挡位行。 */
+    private fun parseGearLine(line: String): Map<String, Number>? {
+        // 只在真的出现这个 tag 时才去跑正则：实车 logcat 流量很大，
+        // 无条件对每行跑多个正则是白烧 CPU。
+        if (!line.contains("FastControlManager")) return null
+        val match = GEAR_STATUS.find(line) ?: return null
+        // 两个分支各有一个捕获组，哪个先匹配上就用哪个；
+        // 未参与匹配的组是 null，`orEmpty()` 兜住。
+        val raw = (match.groupValues[1].ifEmpty { match.groupValues[2] }).toIntOrNull() ?: return null
+        return mapOf(KEY_GEAR to raw)
+    }
+
+    /** 属性 ID + 原始值 → 日志键。值无效时返回 null（不产出垃圾字段）。 */
+    private fun fieldsFor(propertyId: Int, raw: Double): Map<String, Number>? = when {
+        KEY_BY_PROPERTY.containsKey(propertyId) -> {
+            // 车速/电压/电流是 Float；电量是 Int。按目标键的类型转换，
+            // 免得 0x2140f636 的 49 被当成 49.0 交给 batteryPercent 做整型比较。
+            when (KEY_BY_PROPERTY[propertyId]) {
+                KEY_BATTERY -> B561VehicleProperty.batteryPercent(raw.toInt())
+                    ?.let { mapOf(KEY_BATTERY to it) }
+                KEY_SPEED -> B561VehicleProperty.speedKph(raw.toFloat())
+                    ?.let { mapOf(KEY_SPEED to it) }
+                KEY_VOLTAGE -> if (raw > 0f) mapOf(KEY_VOLTAGE to raw.toFloat()) else null
+                // 电流实测为负（-0.4..-2.4，放电），所以这里**不**做正负过滤。
+                KEY_CURRENT -> mapOf(KEY_CURRENT to raw.toFloat())
+                else -> null
+            }
+        }
+
+        propertyId in BATTERY_PROPERTY_IDS ->
+            B561VehicleProperty.batteryPercent(raw.toInt())?.let { mapOf(KEY_BATTERY to it) }
+
+        propertyId in RANGE_PROPERTY_IDS ->
+            if (raw > 0) mapOf(KEY_RANGE to raw.toInt()) else null
+
+        else -> null
+    }
+
+    /** `0x` 前缀的十六进制属性 ID → Int。 */
+    private fun parseHexId(text: String): Int? =
+        runCatching { text.substring(2).toLong(16).toInt() }.getOrNull()
+
+    /**
+     * 把一个日志行数组折叠成完整读数。
+     *
+     * 后出现的行覆盖先出现的（logcat 是时序流，后到的更新）。
+     * 字段用 [LinkedHashMap] 保留插入顺序，方便单测断言与日志输出。
+     */
+    fun fold(lines: Iterable<String>): Map<String, Number> {
+        val fields = LinkedHashMap<String, Number>()
+        for (line in lines) {
+            val parsed = parseLine(line) ?: continue
+            fields.putAll(parsed)
+        }
+        return fields
+    }
+}

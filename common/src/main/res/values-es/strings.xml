@@ -829,7 +829,7 @@
     <string name="settings_ambient_album">Seguir la portada del álbum</string>
     <string name="settings_ambient_album_description">Usa el color de la portada o colores cercanos disponibles del vehículo. Las portadas grises, negras o ausentes usan los 31 colores; las mayormente blancas pueden usar blanco o blanco frío.</string>
     <string name="settings_cluster_speedometer">Velocímetro del cluster (experimental)</string>
-    <string name="settings_cluster_speedometer_description">Muestra la velocidad real leída del bus de vehículos del propio coche (VHAL). Se oculta si el dato no está disponible. Los cambios se aplican al momento.</string>
+    <string name="settings_cluster_speedometer_description">Muestra la velocidad real leída de los datos de vehículo del propio coche. Se oculta si el dato no está disponible. Los cambios se aplican al momento.</string>
     <string name="settings_cluster_speedometer_horizontal">Posición horizontal del velocímetro</string>
     <string name="settings_cluster_speedometer_vertical">Posición vertical del velocímetro</string>
     <string name="settings_cluster_speedometer_size">Tamaño del velocímetro</string>

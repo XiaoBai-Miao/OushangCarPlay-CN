@@ -81,6 +81,15 @@ class CarCabinVehicleStatus(
     @Volatile
     private var cabin: CabinAccess? = null
 
+    /**
+     * 已发起连接、等待 `onServiceConnected` 回调的 `Car` 实例。
+     *
+     * v120 新增：`connect()` 是异步的，回调晚到，期间 [cabin] 必须为空、
+     * 这里非空 —— 两个字段合起来表达"在连 / 已连上 / 断了"。
+     */
+    @Volatile
+    private var pendingCar: Any? = null
+
     /** 最近一次读数（原始形态，保留挡位/车速等 snapshot 里丢掉的字段）。 */
     @Volatile
     private var latestReading: CabinReading? = null
@@ -124,6 +133,7 @@ class CarCabinVehicleStatus(
         // 断开 Car 连接，避免 Car Service 侧一直留着我们的客户端。
         cabin?.disconnect()
         cabin = null
+        pendingCar = null
     }
 
     /**
@@ -149,6 +159,9 @@ class CarCabinVehicleStatus(
 
     private fun poll() {
         val app = context ?: return
+        // 在连（pendingCar 非空、cabin 还空）时 connect() 返回 null，
+        // 这是**正常中间态**，不是失败 —— 不打警告，等回调。
+        if (cabin == null && pendingCar != null) return
         val access = cabin ?: connect(app) ?: return
         val read = runCatching { access.read() }.getOrNull()
         if (read == null) {
@@ -185,8 +198,26 @@ class CarCabinVehicleStatus(
      * 走原厂 `CarConnectManager` 的官方范式：`Car.createCar(context, listener)`
      * + `car.connect()`，连接回调里 `getCarManager("cabin")`。
      * 全程反射，编译期不依赖 `android.car` 类库 —— 普通 AOSP 环境也能编译。
+     *
+     * ## ★ v120 修正：connect() 是异步的，必须等 onServiceConnected
+     *
+     * v117 在 `connect()` 返回后**立刻** `getCarManager("cabin")`，但
+     * `connect()` 只是发起绑定，实车上回调要晚 25ms 才到：
+     * ```
+     * 11:35:46.389 W B561-VehicleStatus: Car service connect failed: InvocationTargetException: null
+     * 11:35:46.414 D CAR.L: onServiceConnected mService=android.car.ICar$Stub$Proxy@f4d72c6
+     * ```
+     * 所以那一路**从来没连上过**。现在改成：把 `Car` 实例挂到 [pendingCar]，
+     * 由 `onServiceConnected` 回调去取 manager 并置 [cabin]，
+     * [poll] 自然会等到它就绪。
      */
     private fun connect(app: Context): CabinAccess? {
+        // 已经有可用的 manager 就不用重连。
+        cabin?.let { return it }
+        // 已发起过连接、等回调中，就不要再 createCar —— 每次 createCar 都会
+        // 向 Car Service 注册一个新客户端，重复注册会泄漏且可能顶掉上一个。
+        if (pendingCar != null) return null
+
         val carClass = runCatching { Class.forName("android.car.Car") }.getOrNull()
         if (carClass == null) {
             Log.w(tag, "android.car.Car not on this framework; vehicle data unavailable")
@@ -194,8 +225,31 @@ class CarCabinVehicleStatus(
         }
         return runCatching {
             val listener = object : ServiceConnection {
-                override fun onServiceConnected(name: ComponentName?, service: IBinder?) = Unit
-                override fun onServiceDisconnected(name: ComponentName?) = Unit
+                override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+                    // ★ 这里才是能取 manager 的时刻。回调在主线程，
+                    //   所以只做反射取值，不做阻塞操作。
+                    val car = pendingCar ?: return
+                    runCatching {
+                        val manager = carClass.methods.firstOrNull {
+                            it.name == "getCarManager" && it.parameterCount == 1 &&
+                                it.parameterTypes[0] == String::class.java
+                        }?.invoke(car, "cabin")
+                    }.getOrElse {
+                        Log.w(tag, "getCarManager(cabin) failed: ${it.javaClass.simpleName}: ${it.message}")
+                        null
+                    }?.let { manager ->
+                        cabin = CabinAccess(manager, car)
+                        Log.i(tag, "car service connected; cabin manager acquired")
+                    }
+                }
+
+                override fun onServiceDisconnected(name: ComponentName?) {
+                    // Car Service 挂了就重新走一遍 connect，poll 会再拉起。
+                    Log.w(tag, "car service disconnected")
+                    cabin?.disconnect()
+                    cabin = null
+                    pendingCar = null
+                }
             }
             // Car.createCar(Context, ServiceConnection) —— 同步连接版本。
             val createCar = carClass.methods.firstOrNull {
@@ -214,16 +268,15 @@ class CarCabinVehicleStatus(
                 }
             } ?: return null
 
-            // connect() 必须在 getCarManager 之前调，否则 manager 拿不到。
+            pendingCar = car
+            // connect() 只是发起绑定；manager 要等 onServiceConnected 回调。
             runCatching { carClass.methods.firstOrNull { it.name == "connect" }?.invoke(car) }
-            val manager = carClass.methods.firstOrNull {
-                it.name == "getCarManager" && it.parameterCount == 1 &&
-                    it.parameterTypes[0] == String::class.java
-            }?.invoke(car, "cabin") ?: return null
-
-            CabinAccess(manager, car).also { cabin = it }
+            Log.i(tag, "car service connect requested; waiting for onServiceConnected")
+            // 此刻 manager 还没到，返回 null 让 poll 下个周期再试。
+            null
         }.getOrElse {
             Log.w(tag, "Car service connect failed: ${it.javaClass.simpleName}: ${it.message}")
+            pendingCar = null
             null
         }
     }

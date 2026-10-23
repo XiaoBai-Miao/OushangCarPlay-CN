@@ -889,7 +889,7 @@
     <string name="settings_ambient_album">跟随专辑封面</string>
     <string name="settings_ambient_album_description">按封面取色并近似匹配原车可用色号。灰黑或无封面时使用全部31色；大面积白色封面可使用白色或冷白。</string>
     <string name="settings_cluster_speedometer">仪表盘速度计（实验性）</string>
-    <string name="settings_cluster_speedometer_description">通过车机自身的车辆总线（VHAL）读取并显示车速。读数不可用时隐藏。更改立即生效。</string>
+    <string name="settings_cluster_speedometer_description">从车机自身的车辆数据读取并显示车速。读数不可用时隐藏。更改立即生效。</string>
     <string name="settings_cluster_speedometer_horizontal">速度计水平位置</string>
     <string name="settings_cluster_speedometer_vertical">速度计垂直位置</string>
     <string name="settings_cluster_speedometer_size">速度计大小</string>

@@ -829,7 +829,7 @@
     <string name="settings_ambient_album">اتباع غلاف الألبوم</string>
     <string name="settings_ambient_album_description">يُطابق لون الغلاف تقريبياً مع ألوان السيارة المتاحة. تستخدم الأغلفة الرمادية أو السوداء أو المفقودة جميع الألوان الـ31؛ وقد تستخدم الأغلفة البيضاء غالباً الأبيض أو الأبيض البارد.</string>
     <string name="settings_cluster_speedometer">عداد سرعة لوحة العدادات (تجريبي)</string>
-    <string name="settings_cluster_speedometer_description">يعرض سرعة السيارة المقروءة من ناقل المركبات الخاص بالسيارة (VHAL). يختفي إذا كانت القراءة غير متاحة. تُطبّق التغييرات فورًا.</string>
+    <string name="settings_cluster_speedometer_description">يعرض سرعة السيارة المقروءة من بيانات المركبات الخاصة بالسيارة. يختفي إذا كانت القراءة غير متاحة. تُطبّق التغييرات فورًا.</string>
     <string name="settings_cluster_speedometer_horizontal">الموضع الأفقي لعداد السرعة</string>
     <string name="settings_cluster_speedometer_vertical">الموضع العمودي لعداد السرعة</string>
     <string name="settings_cluster_speedometer_size">حجم عداد السرعة</string>

@@ -22,6 +22,12 @@
     <!-- 仪表投屏通道广播接口(com.thunder.tbxt CastGate v1)。
          normal 级别权限,不同签名的开发者 App 也可接入,无需运行时权限弹窗。 -->
     <uses-permission android:name="com.thunder.tbxt.permission.CONTROL_CAST_GATE" />
+    <!-- v120: 车辆数据主源改走 logcat —— 解析原厂组件打的 VHAL 变化行
+         (Property.service / FastControlManager),与原厂仪表同源。
+         READ_LOGS 在 AOSP 里是 signature|privileged,B561 交付件是**平台签名**
+         (证书 c8a2e9bc…92ab8),所以能静态拿到,不需要运行时权限弹窗。
+         VHAL 那一路仍保留为兜底,拿不到也不影响主流程。 -->
+    <uses-permission android:name="android.permission.READ_LOGS" tools:ignore="ProtectedPermissions" />
     <!-- The centre card also follows whichever launcher is the default home. -->
     <queries>
         <package android:name="com.byd.carsettings" />

@@ -123,7 +123,7 @@ import com.shilapi.xcertplay.transport.IphoneUsbMatcher
 import com.shilapi.xcertplay.transport.UsbDeviceId
 import com.shilapi.xcertplay.transport.VehicleSpeedLocationProvider
 import com.shilapi.xcertplay.vehicle.B561VehicleSpeedSource
-import com.shilapi.xcertplay.vehicle.CarCabinVehicleStatus
+import com.shilapi.xcertplay.vehicle.B561VehicleDataSource
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.ArrayDeque
@@ -389,13 +389,23 @@ class CarPlayHostActivity : ComponentActivity() {
     private var sink: AndroidMediaSink? = null
     private var controller: CarPlayController? = null
     /**
-     * v117: B561 车辆数据源（VHAL）。
+     * v120 B561: 车辆数据门面（**logcat 主源 + VHAL 兜底**）。
      *
-     * 与原厂仪表同源，读的是 `android.car.hardware.cabin.CarCabinManager`。
-     * v100 重做时这一层被整个删掉了（旧实现的方法名与属性 ID 都是错的，
-     * 从来没读到过值），v117 按原厂 `CarConnectManager` 的官方范式重建。
+     * v117 只挂了 VHAL，实车一次都没读到：
+     * ```
+     * 11:35:46.389 W B561-VehicleStatus: Car service connect failed: InvocationTargetException: null
+     * 11:35:46.414 D CAR.L: onServiceConnected mService=android.car.ICar$Stub$Proxy@f4d72c6
+     * ```
+     * `car.connect()` 是异步的，`onServiceConnected` 晚 25ms 回调，
+     * 我们提前 `getCarManager("cabin")` 于是每秒抛一次异常。
+     * 但**数据本身没问题** —— 同一份日志里原厂 app 读得好好的
+     * （`getIntProperty 0x2140f636 data=49`）。
+     *
+     * 所以 v120 改走**原厂组件本来就在打的 logcat**（`Property.service` 的
+     * VHAL 变化回调 + `FastControlManager` 的挡位行），同源、免权限绑定、
+     * 绕开异步连接；VHAL 那一路降为兜底。
      */
-    private val vehicleStatus = CarCabinVehicleStatus()
+    private val vehicleStatus = B561VehicleDataSource()
     /** v117: 把 VHAL 车速接到 iAP2 的 `$PASCD` 轮速句。 */
     private val vehicleSpeedSource = B561VehicleSpeedSource(
         speedProvider = { vehicleStatus.currentSpeedKph() },
