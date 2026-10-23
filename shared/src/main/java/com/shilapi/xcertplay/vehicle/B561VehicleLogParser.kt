@@ -209,12 +209,28 @@ object B561VehicleLogParser {
         return null
     }
 
-    /** 解析 `Property.service` / `CarCabinManager.get*Property` 两类行。 */
+    /**
+     * 解析 `Property.service` / `CarCabinManager.get*Property` 两类行。
+     *
+     * 按 tag 分流而不是无条件跑两个正则：`CarCabinManager` 在实车里每秒
+     * 上百行（原厂桌面轮询整个车舱属性），逐行跑两遍正则是白烧 CPU。
+     */
     private fun parsePropertyLine(line: String): Map<String, Any>? {
-        val match = PROPERTY_CHANGE.find(line) ?: CAR_CABIN_GET.find(line) ?: return null
-        val propertyId = parseHexId(match.groupValues[1]) ?: return null
-        val raw = match.groupValues[2].toDoubleOrNull() ?: return null
-        return fieldsFor(propertyId, raw)
+        if (line.contains("Property.service")) {
+            val match = PROPERTY_CHANGE.find(line) ?: return null
+            return fieldsFor(
+                parseHexId(match.groupValues[1]) ?: return null,
+                match.groupValues[2].toDoubleOrNull() ?: return null,
+            )
+        }
+        if (line.contains("CarCabinManager")) {
+            val match = CAR_CABIN_GET.find(line) ?: return null
+            return fieldsFor(
+                parseHexId(match.groupValues[1]) ?: return null,
+                match.groupValues[2].toDoubleOrNull() ?: return null,
+            )
+        }
+        return null
     }
 
     /**

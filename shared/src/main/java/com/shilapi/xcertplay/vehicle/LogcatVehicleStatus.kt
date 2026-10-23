@@ -24,7 +24,8 @@ import java.util.concurrent.TimeUnit
  * ## 读取方式
  *
  * 起一条常驻的 `logcat` 子进程，**只订阅需要的 tag**
- * （`Property.service:F`、`FastControlManager:F`），把 stdout 逐行喂给
+ * （`Property.service:D`、`FastControlManager:D`、`CmdSmdManager:D`、
+ * `CarCabinManager:D`，见 [LOG_TAGS]），把 stdout 逐行喂给
  * [B561VehicleLogParser]。
  *
  * 为什么不用 `logcat -d`（dump 一次）：`-d` 是快照，读完就没了，
@@ -204,13 +205,19 @@ class LogcatVehicleStatus(
     /**
      * 保证有一个活着的 `logcat` 子进程。
      *
-     * 只订阅三个 tag：
+     * 订阅四个 tag：
      * - `Property.service` —— VHAL 变化回调，车速/电量/电压/电流都从这里出来；
      * - `FastControlManager` —— 原厂快控，挡位行从这里出来；
      * - `CmdSmdManager` —— **MCU 原始报文层**，电机转速 `0x2160f315` 只从这里出来
-     *   （实测 `Property.service` 里一次都没有它，漏了这个 tag 就抓不到转速）。
+     *   （实测 `Property.service` 里一次都没有它，漏了这个 tag 就抓不到转速）；
+     * - `CarCabinManager` —— **原厂车舱 API 的拉取痕迹**。电量 `0x2140f636`
+     *   在真车上只以 `getIntProperty ... data=68` 的形态出现在这个 tag 里
+     *   （原厂桌面轮询时打），`Property.service` 与 `CmdSmdManager` 都没有它。
+     *   v128 真车日志实测：漏订这个 tag 时 `VEHICLE battery=null`，而
+     *   `power`（电压×电流）正常——就是 SOC 单独走了这条路。
      *
-     * `*:F` 是 filter-spec 语法（`tag:priority`），只收 priority ≤ F 的行。
+     * `*:D` 是 filter-spec 语法（`tag:priority`），只收 priority ≤ D 的行。
+     * 列表提成 [LOG_TAGS] 常量供测试守住，避免再漏。
      */
     private fun ensureLogcat(): Process? {
         logcat?.let { if (it.isAlive) return it }
@@ -218,9 +225,7 @@ class LogcatVehicleStatus(
             ProcessBuilder(
                 "logcat",
                 "-v", "brief",
-                "Property.service:D",
-                "FastControlManager:D",
-                "CmdSmdManager:D",
+                *LOG_TAGS,
             )
                 // 不重定向 stderr：logcat 的权限拒绝信息会打到 stderr，
                 // 让它继承本进程的 fd 才能在 logcat 里看到我们自己的失败原因。
@@ -248,7 +253,22 @@ class LogcatVehicleStatus(
         return "pid=$pid"
     }
 
-    private companion object {
+    internal companion object {
+        /**
+         * logcat 订阅的 tag 列表（filter-spec 语法）。
+         *
+         * ★ 漏 tag 是静默失败：正则会等一个永远不来的输入行。
+         * v128 真车日志就漏了 `CarCabinManager`——SOC 只走它，
+         * 结果 `VEHICLE battery=null` 而电压/电流正常，极难排查。
+         * 测试 [LogcatVehicleStatusTagTest] 逐项守住这四个。
+         */
+        val LOG_TAGS = arrayOf(
+            "Property.service:D",
+            "FastControlManager:D",
+            "CmdSmdManager:D",
+            "CarCabinManager:D",
+        )
+
         /**
          * 重启周期。
          *
