@@ -916,7 +916,9 @@
         <string name="bluetooth_cut_all">Cortar todos los enlaces</string>
 
     <!-- v105 B561: 导航声道焦点 -->
-        <string name="navigation_audio_focus">Los avisos de navegación solicitan el foco de audio</string>
+        <string name="navigation_ducking_media">Los avisos de navegación bajan el volumen de los medios</string>
+    <string name="navigation_ducking_media_description">Desactivado (predeterminado): los avisos de navegación suenan junto con la música a volumen normal. Activado: la música se baja mientras habla la navegación y se restaura unos segundos después del último aviso. No se cambia el volumen que tú has configurado, solo cuánto suena junto con la navegación.</string>
+    <string name="navigation_audio_focus">Los avisos de navegación solicitan el foco de audio</string>
         <string name="navigation_audio_focus_description">Desactivado (predeterminado): los avisos de navegación se superponen al otro audio sin interrumpirlo — eso permite que el mapa del coche y una app de terceros hablen a la vez. Activado: la navegación toma el foco de audio, por lo que el equipo puede atenuar o pausar el otro audio mientras habla. Actívalo si los avisos suenan demasiado bajos o quedan tapados.</string>
 
     <!-- v106 B561: 音频增强开关 -->

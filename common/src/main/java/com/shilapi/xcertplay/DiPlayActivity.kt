@@ -2519,6 +2519,17 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                 com.shilapi.xcertplay.media.NavigationAudioFocus
                     .saveRequestsFocus(this, it)
             }
+            // ★ v124 B561: 导航播报时压低媒体声音。
+            //   与上面那个开关不同：那个把决定权交给车机音频策略（不可控），
+            //   这个是我们自己压低媒体轨道（所有车机行为一致）。
+            toggle(card, getString(R.string.navigation_ducking_media),
+                getString(R.string.navigation_ducking_media_description),
+                com.shilapi.xcertplay.media.NavigationDuckingSetting.isEnabled(this)) {
+                com.shilapi.xcertplay.media.NavigationDuckingSetting
+                    .setEnabled(this, it)
+                // 立刻生效，不必断开 CarPlay 重连。
+                CarPlayBackgroundSession.snapshot()?.sink?.setNavigationDuckingEnabled(it)
+            }
             // ===== v106 B561: 音频增强（每项独立、默认全关，互不影响）=====
             com.shilapi.xcertplay.media.AudioEnhancements.let { ae ->
                 toggle(card, getString(R.string.audio_enforced_audibility),

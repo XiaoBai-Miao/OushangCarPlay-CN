@@ -5487,6 +5487,9 @@ class CarPlayHostActivity : ComponentActivity() {
             mediaChannel = AirPlayPersistence.loadMediaAudioChannel(this),
             navigationChannel = AirPlayPersistence.loadNavigationAudioChannel(this),
             navigationAttenuationDb = AirPlayPersistence.loadNavigationAudioAttenuationDb(this),
+            // ★ v124 B561: 导航播报时压低媒体声音（默认关）。
+            navigationDuckingEnabled = com.shilapi.xcertplay.media.NavigationDuckingSetting
+                .isEnabled(this),
             context = this,
             navigationStreamType = navigationStreamType,
             onScreenStreamActiveChanged = { type, active ->

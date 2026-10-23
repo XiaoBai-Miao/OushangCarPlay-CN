@@ -976,7 +976,9 @@
         <string name="bluetooth_cut_all">斷開所有鏈路</string>
 
     <!-- v105 B561: 导航声道焦点 -->
-        <string name="navigation_audio_focus">導航播報申請音訊焦點</string>
+        <string name="navigation_ducking_media">導航播報壓低媒體聲音</string>
+    <string name="navigation_ducking_media_description">關閉（預設）：導航播報與音樂同時以正常音量播放。開啟：導航播報時音樂自動壓低，最後一次播報後幾秒恢復。不會改變你設定的音樂音量，只是在播放時壓低。</string>
+    <string name="navigation_audio_focus">導航播報申請音訊焦點</string>
         <string name="navigation_audio_focus_description">關閉（預設）：導航播報疊加在其他音訊上而不打斷它——這正是原車地圖與後裝地圖能同時發聲的原因。開啟：導航搶占音訊焦點，車機可在播報時壓低或暫停其他音訊。若播報聲音太輕或被蓋過，請開啟。</string>
 
     <!-- v106 B561: 音频增强开关 -->

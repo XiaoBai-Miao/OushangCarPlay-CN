@@ -11,6 +11,7 @@ import android.media.MediaFormat
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.util.Log
 import android.view.Surface
 import com.shilapi.xcertplay.airplay.AudioCodecKind
@@ -56,6 +57,21 @@ internal class AudioFocusCoordinator(
     private var mediaVolume = FULL_VOLUME
     private var closed = false
     private var focusGeneration = 0L
+
+    /**
+     * ★ v124 B561: 是否启用「导航播报压低媒体声音」。
+     *
+     * 由 [NavigationDucking] 的设置项控制。**默认关** ——
+     * 现有行为是导航叠加在媒体上不打断（"overlays media without ducking it"），
+     * 这是三路导航声音能共存的原因，不能默认改掉。
+     */
+    @Volatile var navigationDuckingEnabled: Boolean = false
+
+    /** 最近一次收到**有声音的**导航音频的时刻（elapsedRealtime 毫秒）；0 = 从未收到。 */
+    @Volatile private var lastNavigationVoiceAtMillis: Long = 0L
+
+    /** 当前媒体是否处于「因导航播报而压低」的状态。 */
+    @Volatile private var navigationDucking: Boolean = false
     private var currentListener = listenerFor(focusGeneration)
     internal val listener: AudioManager.OnAudioFocusChangeListener get() = currentListener
 
@@ -96,6 +112,58 @@ internal class AudioFocusCoordinator(
         active[track] = Entry(channel, attributes)
         refreshRequest()
         applyMediaVolume(track, active.getValue(track))
+    }
+
+    /**
+     * ★ v124 B561: 导航播报开始/继续有**声音**在流入。
+     *
+     * 由导航 renderer 在真正写入 PCM 时调用，且只在**有非零采样**时才调 ——
+     * 导航的音频流是长驻的（整个导航会话都在发包，间歇期发静音包），
+     * 按「收到包」判会导致「导航流一开就一直压低媒体，播报早结束了音乐还是小的」。
+     */
+    @Synchronized
+    fun onNavigationVoiceFlowing(nowMillis: Long) {
+        if (closed) return
+        lastNavigationVoiceAtMillis = nowMillis
+        refreshDuckState(nowMillis)
+    }
+
+    /**
+     * ★ v124 B561: 导航播报结束（渲染器关闭/停止）。
+     *
+     * 立刻恢复音量 —— 不等保持时间，因为这是**明确**的结束信号，
+     * 而 [NavigationDucking.HOLD_MILLIS] 是为了兜住「两段播报之间的空隙」。
+     */
+    @Synchronized
+    fun onNavigationAudioStopped() {
+        if (closed) return
+        lastNavigationVoiceAtMillis = 0L
+        navigationDucking = false
+        applyAllMediaVolumes()
+    }
+
+    /** 媒体音量是否因导航播报而被压低。诊断用。 */
+    @Synchronized
+    fun isMediaDuckedForNavigation(): Boolean = navigationDucking
+
+    /**
+     * 重新计算压低状态并应用。
+     *
+     * 必须在 [onNavigationAudioFlowing] 之后**定期**调用才能让保持时间到期后恢复 ——
+     * 调用方（媒体 renderer 的写入循环）会持续触发。
+     */
+    @Synchronized
+    fun refreshDuckState(nowMillis: Long = SystemClock.elapsedRealtime()) {
+        if (closed) return
+        val should = navigationDuckingEnabled &&
+            NavigationDucking.shouldDuck(false, lastNavigationVoiceAtMillis, nowMillis)
+        if (should == navigationDucking) return
+        navigationDucking = should
+        applyAllMediaVolumes()
+    }
+
+    private fun applyAllMediaVolumes() {
+        active.forEach { (track, entry) -> applyMediaVolume(track, entry) }
     }
 
     @Synchronized
@@ -155,15 +223,21 @@ internal class AudioFocusCoordinator(
 
     private fun setMediaVolume(volume: Float) {
         mediaVolume = volume
+        // 走 applyMediaVolume（而不是直接设 appliedVolume），
+        // 这样导航 duck 因子仍然叠加在上面 —— 系统恢复焦点时不该把导航压低冲掉。
         active.forEach { (track, entry) -> applyMediaVolume(track, entry) }
     }
 
     private fun applyMediaVolume(track: AudioTrack, entry: Entry) {
         // Telephony and assistant speech remain audible, and navigation never enters this map.
         // This changes only the renderer's relative gain, never Android's user stream volume.
-        if (entry.channel != AudioChannel.MEDIA || entry.appliedVolume == mediaVolume) return
-        val applied = runCatching { track.setStereoVolume(mediaVolume, mediaVolume) == AudioTrack.SUCCESS }.getOrDefault(false)
-        if (applied) entry.appliedVolume = mediaVolume
+        if (entry.channel != AudioChannel.MEDIA) return
+        // ★ v124 B561: 导航播报压低。因子叠加在系统给的媒体音量之上 ——
+        //   两者是独立的：系统 duck 是因为别的 App 抢焦点，我们 duck 是因为导航在说话。
+        val target = NavigationDucking.mediaVolume(navigationDucking, mediaVolume)
+        if (entry.appliedVolume == target) return
+        val applied = runCatching { track.setStereoVolume(target, target) == AudioTrack.SUCCESS }.getOrDefault(false)
+        if (applied) entry.appliedVolume = target
     }
 
     private fun AudioChannel.focusPriority(): Int = when (this) {
@@ -198,6 +272,12 @@ class AndroidMediaSink(
     private val mediaChannel: Int = 0,
     private val navigationChannel: Int = 0,
     navigationAttenuationDb: Int = 0,
+    /**
+     * ★ v124 B561: 导航播报时是否压低媒体声音。
+     *
+     * 默认 **false** —— 保持既有行为（导航叠加在媒体上不打断）。
+     */
+    navigationDuckingEnabled: Boolean = false,
     context: Context? = null,
     private val navigationStreamType: Int = AudioChannelMapper.DEFAULT_NAVIGATION_STREAM_TYPE,
     onScreenStreamActiveChanged: ((Int, Boolean) -> Unit)? = null,
@@ -235,6 +315,23 @@ class AndroidMediaSink(
         audioFocusAutoYield,
         onAudioDiagnostic,
     )
+
+    init {
+        // ★ v124 B561: 建 sink 时就应用「导航播报压低媒体」的开关状态。
+        audioFocusCoordinator.navigationDuckingEnabled = navigationDuckingEnabled
+    }
+
+    /**
+     * ★ v124 B561: 应用「导航播报压低媒体声音」开关。
+     *
+     * 由设置页与 [CarPlayHostActivity] 在建好 sink 后调用。
+     * 之所以不在协调器里自己读盘：协调器是 `internal` 且没有 Context 之外的
+     * 依赖，而开关的读取要能随设置变更**立刻生效**。
+     */
+    fun setNavigationDuckingEnabled(enabled: Boolean) {
+        audioFocusCoordinator.navigationDuckingEnabled = enabled
+        audioFocusCoordinator.refreshDuckState()
+    }
 
     /** The media-key session may own Android's current focus request for this same sink. */
     fun onMediaAudioFocusChanged(change: Int) {
@@ -1804,6 +1901,11 @@ private class AudioRenderer(
 
     override fun close() {
         running = false
+        // ★ v124 B561: 导航渲染器结束 → 明确告知协调器「播报已结束」，
+        //   立刻恢复媒体音量（不等保持时间）。
+        if (mappedChannel == AudioChannel.NAVIGATION) {
+            audioFocusCoordinator.onNavigationAudioStopped()
+        }
         NavigationPlayback.close(navigationPlaybackToken)
         thread.interrupt()
     }
@@ -1826,6 +1928,12 @@ private class AudioRenderer(
                 // Apply pending Settings changes on this worker, never on the UI thread.
                 // Also handles quiet navigation tracks with no incoming PCM.
                 applyNavigationAttenuation()
+                // ★ v124 B561: 推进导航压低的保持时间。
+                //   导航播报是分段的（播一段停几秒），这里负责让媒体音量在
+                //   两段之间保持压低、播报真正结束后自动恢复。
+                if (mappedChannel == AudioChannel.NAVIGATION) {
+                    audioFocusCoordinator.refreshDuckState()
+                }
                 diagnosticStage = "packet"
                 queue.poll(AUDIO_POLL_MILLIS, TimeUnit.MILLISECONDS)?.let(::handle)
                 // Output becomes ready asynchronously, including after the last packet of a burst.
@@ -2306,6 +2414,14 @@ private class AudioRenderer(
     private fun writePcm(data: ByteArray, offset: Int = 0, length: Int = data.size) {
         val track = track ?: return
         diagnosticStage = "track-write"
+        // ★ v124 B561: 导航音频正在**出声** → 通知协调器压低媒体。
+        //   判据是「有非零采样」而不是「收到包」—— 导航音频流是长驻的，
+        //   播报间歇期发的是静音包，按包判会一直压着不放。
+        if (mappedChannel == AudioChannel.NAVIGATION && length > 0 &&
+            NavigationDucking.hasVoice(data, offset, length)
+        ) {
+            audioFocusCoordinator.onNavigationVoiceFlowing(SystemClock.elapsedRealtime())
+        }
         if (!firstPcmLogged && length > 0) {
             firstPcmLogged = true
             Log.i(
@@ -2322,6 +2438,12 @@ private class AudioRenderer(
         while (written < length && running) {
             // Long-running PCM writes may span several slider adjustments.
             applyNavigationAttenuation()
+            // ★ v124 B561: 媒体声道的写入循环负责推进「导航压低」的保持时间 ——
+            //   导航播报结束后 [NavigationDucking.HOLD_MILLIS] 内媒体仍是小的，
+            //   到期后由这里恢复。媒体不播时没人调它，所以恢复也由导航侧兜底。
+            if (mappedChannel == AudioChannel.MEDIA) {
+                audioFocusCoordinator.refreshDuckState()
+            }
             val writeLength = if (playbackStarted) {
                 length - written
             } else {
