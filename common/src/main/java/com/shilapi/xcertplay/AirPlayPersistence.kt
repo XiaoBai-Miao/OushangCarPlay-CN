@@ -858,6 +858,21 @@ object AirPlayPersistence {
     }
 
     /**
+     * v125: 是否启用 **CarPlay Ultra 协议**（车辆状态协议 / VSP）。
+     *
+     * 默认 **关** —— 它会让 INFO 多出 `vehicleStateProtocolInfo`、SETUP 多协商一个
+     * feature、并开一条 RCS 数据流。实车验证前不默认开。
+     */
+    fun loadCarPlayUltraEnabled(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getBoolean("carplay_ultra_enabled", false)
+
+    fun saveCarPlayUltraEnabled(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putBoolean("carplay_ultra_enabled", enabled).apply()
+    }
+
+    /**
      * v123: CarPlay Ultra 风格仪表盘是否启用。
      *
      * 默认 **关** —— 它是新增功能，先让用户自己开；

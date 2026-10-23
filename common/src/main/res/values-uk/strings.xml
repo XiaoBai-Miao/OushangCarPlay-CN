@@ -841,6 +841,8 @@
     <string name="settings_ambient_album">Колір обкладинки альбому</string>
     <string name="settings_ambient_album_description">Колір обкладинки приблизно зіставляється з доступними кольорами автомобіля. Для сірої, чорної або відсутньої обкладинки використовуються всі 31 колір; для переважно білої — білий або холодний білий.</string>
     <string name="settings_cluster_speedometer">Спідометр панелі приладів (експериментально)</string>
+    <string name="settings_carplay_ultra">Стан автомобіля CarPlay Ultra</string>
+    <string name="settings_carplay_ultra_description">Вимкнено (типово): протокол стану автомобіля CarPlay Ultra не пропонується телефону. Увімкнено: автомобіль пропонує цей протокол, і телефон може читати обороти двигуна, потужність, запас ходу, пробіг і тиск у шинах. Потрібне перепідключення.</string>
     <string name="settings_cluster_ultra_gauge">Показники CarPlay Ultra</string>
     <string name="settings_cluster_ultra_gauge_description">Показує панель приладів у стилі CarPlay Ultra на екрані авто: тахометр, потужність, запас ходу або паливо, заряд акумулятора, пробіг і тиск у шинах. Показуються лише ті показники, які авто реально надає. Зміни застосовуються одразу.</string>
     <string name="settings_cluster_ultra_gauge_opacity">Прозорість показників Ultra</string>

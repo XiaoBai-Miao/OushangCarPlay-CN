@@ -5286,8 +5286,32 @@ class CarPlayHostActivity : ComponentActivity() {
             // 该开关关(音频走 CarPlay)→ 发键请 iPhone 关闭蓝牙会话控制,
             // 车机侧再叠加 BluetoothA2dpDisconnect 的机械切断。
             disableBluetooth = !carBluetoothAudio,
+            // ★ v125 B561: CarPlay Ultra 协议扩展（车辆状态协议）。
+            //   默认关 —— 它会让 INFO 多出 vehicleStateProtocolInfo、
+            //   SETUP 多协商一个 feature、并开一条 RCS 数据流。
+            //   实车验证前不默认开。
+            protocolExtension = ultraProtocol(),
         )
     }
+
+    /**
+     * v125: CarPlay Ultra 协议扩展实例；开关关闭时返回 null（行为与之前完全一致）。
+     *
+     * 扩展按会话创建（[B561UltraProtocol.forSession]），所以这里给的是**工厂**：
+     * 每个 CarPlay 会话拿一份独立的 RCS 通道与协商状态。
+     */
+    private fun ultraProtocol(): com.shilapi.xcertplay.airplay.AirPlayProtocolExtension? {
+        if (!AirPlayPersistence.loadCarPlayUltraEnabled(this)) return null
+        val protocol = com.shilapi.xcertplay.airplay.ultra.B561UltraProtocol(
+            sample = { vehicleStatus.currentUltraGauges() },
+            trace = { message -> appendLog(message) },
+        )
+        ultraProtocolInstance = protocol
+        return protocol
+    }
+
+    /** v125: 当前会话的 Ultra 协议实例（用于把车辆数据变化推给它）。 */
+    @Volatile private var ultraProtocolInstance: com.shilapi.xcertplay.airplay.ultra.B561UltraProtocol? = null
 
     /** Car Bluetooth audio: shows whether the iPhone keeps A2DP/HFP with the car now and once CarPlay runs. */
     private fun logCarBluetoothAudio() {
@@ -5779,6 +5803,9 @@ class CarPlayHostActivity : ComponentActivity() {
                 // v123: Ultra 仪表盘的数据也来自同一份车辆读数，一起刷。
                 pushClusterUltraGauge()
             }
+            // ★ v125: 把车辆数据推给 CarPlay Ultra 协议 ——
+            //   iPhone 订阅的 characteristic 靠这个更新。
+            ultraProtocolInstance?.onGaugesChanged(vehicleStatus.currentUltraGauges())
         }
         val locationProvider: Iap2LocationProvider? =
             if (config.locationReportingEnabled) {

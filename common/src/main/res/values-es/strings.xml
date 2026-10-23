@@ -829,6 +829,8 @@
     <string name="settings_ambient_album">Seguir la portada del álbum</string>
     <string name="settings_ambient_album_description">Usa el color de la portada o colores cercanos disponibles del vehículo. Las portadas grises, negras o ausentes usan los 31 colores; las mayormente blancas pueden usar blanco o blanco frío.</string>
     <string name="settings_cluster_speedometer">Velocímetro del cluster (experimental)</string>
+    <string name="settings_carplay_ultra">Estado del vehículo CarPlay Ultra</string>
+    <string name="settings_carplay_ultra_description">Desactivado (predeterminado): no se ofrece al teléfono el protocolo de estado del vehículo de CarPlay Ultra. Activado: el coche ofrece ese protocolo para que el teléfono pueda leer el régimen, la potencia, la autonomía, el kilometraje y la presión de los neumáticos. Necesita reconectar para aplicarse.</string>
     <string name="settings_cluster_ultra_gauge">Indicadores CarPlay Ultra</string>
     <string name="settings_cluster_ultra_gauge_description">Muestra un cuadro de instrumentos de estilo CarPlay Ultra en la pantalla del coche: tacómetro, potencia, autonomía o combustible, batería, kilometraje y presión de neumáticos. Solo se muestran las lecturas que el coche proporciona realmente. Los cambios se aplican al momento.</string>
     <string name="settings_cluster_ultra_gauge_opacity">Opacidad de los indicadores Ultra</string>

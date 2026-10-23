@@ -829,6 +829,8 @@
     <string name="settings_ambient_album">اتباع غلاف الألبوم</string>
     <string name="settings_ambient_album_description">يُطابق لون الغلاف تقريبياً مع ألوان السيارة المتاحة. تستخدم الأغلفة الرمادية أو السوداء أو المفقودة جميع الألوان الـ31؛ وقد تستخدم الأغلفة البيضاء غالباً الأبيض أو الأبيض البارد.</string>
     <string name="settings_cluster_speedometer">عداد سرعة لوحة العدادات (تجريبي)</string>
+    <string name="settings_carplay_ultra">حالة مركبة CarPlay Ultra</string>
+    <string name="settings_carplay_ultra_description">معطّل (افتراضي): لا يُقدَّم للهاتف بروتوكول حالة مركبة CarPlay Ultra. مُفعّل: تقدّم السيارة البروتوكول ليقرأ الهاتف دوران المحرك والقدرة والمدى والمسافة وضغط الإطارات. يتطلب إعادة الاتصال.</string>
     <string name="settings_cluster_ultra_gauge">مؤشرات CarPlay Ultra</string>
     <string name="settings_cluster_ultra_gauge_description">يعرض لوحة أجهزة على طراز CarPlay Ultra على شاشة السيارة: عدّاد الدورات، القدرة، المدى أو الوقود، البطارية، المسافة، وضغط الإطارات. تُعرض فقط القراءات التي توفرها السيارة فعليًا. تُطبّق التغييرات فورًا.</string>
     <string name="settings_cluster_ultra_gauge_opacity">شفافية مؤشرات Ultra</string>

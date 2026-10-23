@@ -2131,6 +2131,17 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                 AirPlayPersistence.saveLauncherReturnsToCarPlay(this, it)
             }
             toggle(card, getString(R.string.right_hand_drive), getString(R.string.place_carplay_s_controls_closer_to_the_driver), AirPlayPersistence.loadRightHandDrive(this)) { AirPlayPersistence.saveRightHandDrive(this, it); markReconnectNeeded() }
+            // ★ v125 B561: CarPlay Ultra 协议（车辆状态协议）。
+            //   开启后 INFO 会声明 vehicleStateProtocolInfo、SETUP 会协商
+            //   vehicleStateProtocol feature 并开一条 RCS 数据流，
+            //   iPhone 侧据此读取我们的车辆数据（转速/功率/续航/里程/胎压）。
+            //   需要**重连**才生效（协议在 SETUP 阶段协商）。
+            toggle(card, getString(R.string.settings_carplay_ultra),
+                getString(R.string.settings_carplay_ultra_description),
+                AirPlayPersistence.loadCarPlayUltraEnabled(this)) {
+                AirPlayPersistence.saveCarPlayUltraEnabled(this, it)
+                markReconnectNeeded()
+            }
         }
         filteredSection(content, SettingsSection.WHEEL_KEYS,
             getString(R.string.settings_wheel_keys), R.drawable.ic_dp_controls, ::wheelKeysSettings)

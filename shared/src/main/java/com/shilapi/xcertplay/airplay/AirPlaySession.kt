@@ -92,6 +92,16 @@ class AirPlaySession(
     internal var deviceBtMac = ""
     internal val activeStreams = linkedSetOf<Int>()
 
+    /**
+     * ★ v125 B561: 本会话的协议扩展（CarPlay Ultra）。
+     *
+     * 扩展是**按会话**创建的 —— [AirPlayProtocolExtension.forSession] 给每个会话
+     * 一份独立实例，因为 Ultra 的 RCS 通道与协商状态都是会话级的。
+     * 为 null 时所有挂钩点都跳过，行为与之前完全一致。
+     */
+    private val protocolExtension: AirPlayProtocolExtension? =
+        config.protocolExtension?.forSession()
+
     /** Counts the iPhone's cluster stream setups; 0 while no cluster stream is up. */
     @Volatile var clusterStream = 0
         private set
@@ -150,6 +160,9 @@ class AirPlaySession(
 
     override fun close() {
         if (!closed.compareAndSet(false, true)) return
+        // ★ v125 B561: 通知协议扩展会话结束（CarPlay Ultra 要关掉 RCS 通道）。
+        runCatching { protocolExtension?.onSessionClosed(this) }
+            .onFailure { debugLog("Protocol extension close failed: ${it.message}") }
         mainScreenToken = null
         clearClusterContent()
         safeClose(socket)
@@ -570,7 +583,12 @@ class AirPlaySession(
                 else RtspMessage.Response(headers = mapOf("Content-Type" to OCTET_CONTENT_TYPE), body = body)
             }
             path.endsWith("/info") -> {
-                val info = AirPlayInfoPlist.build(config)
+                // ★ v125 B561: 协议扩展（CarPlay Ultra）可以装饰 INFO 响应。
+                //   扩展在 config 里，由 AirPlayConfig.protocolExtension 提供。
+                //   build() 返回的是不可变 Map，所以拷一份再交给扩展改。
+                val info = AirPlayInfoPlist.build(config).toMutableMap()
+                protocolExtension?.onInfoRequest(request.body)
+                protocolExtension?.decorateInfo(info)
                 if (request.body.isNotEmpty()) {
                     val requestInfo = try {
                         BplistCodec.decode(request.body).toString()
@@ -612,6 +630,10 @@ class AirPlaySession(
     }
 
     private fun notifySetupResponseSent() {
+        // ★ v125 B561: 协议扩展在 SETUP 响应发出后被通知 ——
+        //   CarPlay Ultra 的 RCS 通道要在这时把已开的监听端口挂到流上。
+        runCatching { protocolExtension?.onSetupResponseSent(this) }
+            .onFailure { debugLog("Protocol extension SETUP failed: ${it.message}") }
         try {
             media.onSetupResponseSent(this)
         } catch (error: Exception) {
@@ -678,6 +700,18 @@ class AirPlaySession(
         val videoDelivery = videoPlaybackAvailability.setFeatureEnabled(videoPlaybackEnabled)
         debugLog("airplay video playback negotiated=$videoPlaybackEnabled availability=$videoDelivery")
         response["enabledFeatures"] = features
+        // ★ v125 B561: 扩展可以追加它自己的 feature（CarPlay Ultra 的
+        //   "vehicleStateProtocol"），并得知协商结果。
+        protocolExtension?.enabledFeatures(dict["features"] as? List<*>)?.let { extra ->
+            if (extra.isNotEmpty()) {
+                val merged = (features + extra).distinct()
+                response["enabledFeatures"] = merged
+                debugLog("airplay protocol extension features=$extra")
+            }
+        }
+        protocolExtension?.onFeaturesNegotiated(
+            (response["enabledFeatures"] as? List<*>)?.filterIsInstance<String>().orEmpty(),
+        )
         return RtspMessage.Response(
             headers = mapOf("Content-Type" to PLIST_CONTENT_TYPE),
             body = BplistCodec.encode(response),
@@ -723,10 +757,15 @@ class AirPlaySession(
                     }
                 }
                 STREAM_TYPE_DATA -> {
-                    val streamResponse = media.onDataStream(this, stream)
+                    // ★ v125 B561: 协议扩展优先接管数据流。
+                    //   CarPlay Ultra 的 RCS 通道就是走 type=100（data），
+                    //   由扩展自己开监听端口并回一个 type=130 的响应。
+                    val extensionResponse = protocolExtension?.openDataStream(this, stream)
+                    val streamResponse = extensionResponse ?: media.onDataStream(this, stream)
                     debugLog(
                         "airplay data stream type=$type accepted=${streamResponse != null} " +
-                            "dataPort=${streamResponse?.get("dataPort") ?: "none"}",
+                            "dataPort=${streamResponse?.get("dataPort") ?: "none"} " +
+                            "byExtension=${extensionResponse != null}",
                     )
                     if (streamResponse != null) {
                         activeStreams.add(type)
@@ -771,21 +810,26 @@ class AirPlaySession(
             null
         }
         val types = teardownStreamTypes(decodedBody)
+        // ★ v125 B561: 扩展可以调整要拆哪些流（CarPlay Ultra 的 RCS 通道
+        //   属于 type=130，TEARDOWN 时不能连带拆掉 iAP 隧道）。
+        val effectiveTypes = protocolExtension?.mediaTeardownTypes(asMap(decodedBody), types) ?: types
 
         debugLog(
-            "airplay TEARDOWN types=${types ?: "all"} activeBefore=$activeStreams " +
+            "airplay TEARDOWN types=${effectiveTypes ?: "all"} activeBefore=$activeStreams " +
                 "body=${request.body.size} bytes payload=$decodedBody",
         )
         trace("airplay TEARDOWN raw${request.body.size}Hex=${request.body.toHex()}")
 
         // Restore wheel input before releasing media resources, which may take time to close.
-        if (types == null || STREAM_TYPE_MAIN_SCREEN in types) mainScreenToken = null
-        if (types == null || STREAM_TYPE_ALT_SCREEN in types) clearClusterContent()
-        if (types == null) {
+        if (effectiveTypes == null || STREAM_TYPE_MAIN_SCREEN in effectiveTypes) mainScreenToken = null
+        if (effectiveTypes == null || STREAM_TYPE_ALT_SCREEN in effectiveTypes) clearClusterContent()
+        if (effectiveTypes == null) {
             activeStreams.toList().forEach { media.onTeardown(this, it) }
             activeStreams.clear()
         } else {
-            types.forEach { type -> if (activeStreams.remove(type)) media.onTeardown(this, type) }
+            effectiveTypes.forEach { type ->
+                if (activeStreams.remove(type)) media.onTeardown(this, type)
+            }
         }
         if (STREAM_TYPE_ALT_SCREEN !in activeStreams) clearClusterContent()
         return RtspMessage.Response(status = 200)

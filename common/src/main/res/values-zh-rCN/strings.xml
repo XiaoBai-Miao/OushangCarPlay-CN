@@ -889,6 +889,8 @@
     <string name="settings_ambient_album">跟随专辑封面</string>
     <string name="settings_ambient_album_description">按封面取色并近似匹配原车可用色号。灰黑或无封面时使用全部31色；大面积白色封面可使用白色或冷白。</string>
     <string name="settings_cluster_speedometer">仪表盘速度计（实验性）</string>
+    <string name="settings_carplay_ultra">CarPlay Ultra 车辆状态</string>
+    <string name="settings_carplay_ultra_description">关闭（默认）：不向手机提供 CarPlay Ultra 车辆状态协议。开启：车机提供车辆状态协议，手机可读取转速、功率、续航、里程与胎压。需要重连后生效。</string>
     <string name="settings_cluster_ultra_gauge">CarPlay Ultra 仪表盘</string>
     <string name="settings_cluster_ultra_gauge_description">在车机屏幕上显示 CarPlay Ultra 风格仪表盘：转速表、功率、续航或油量、电量、里程与胎压。只显示车辆实际提供的读数。更改立即生效。</string>
     <string name="settings_cluster_ultra_gauge_opacity">Ultra 仪表盘透明度</string>
