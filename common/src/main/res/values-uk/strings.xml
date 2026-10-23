@@ -534,6 +534,7 @@
     <string name="widget_minutes">%1$d хв</string>
     <string name="widget_no_route">Немає маршруту</string>
     <string name="widget_not_connected">CarPlay не підключено</string>
+    <string name="dashboard_content_instruments">Офіційна панель приладів (CarPlay Ultra)</string>
     <string name="dashboard_content_map_with_custom_turn_card">Карта з власною карткою маневру</string>
     <string name="turn_card_overlay_size">Розмір власної картки</string>
     <string name="turn_card_overlay_opacity">Прозорість власної картки</string>

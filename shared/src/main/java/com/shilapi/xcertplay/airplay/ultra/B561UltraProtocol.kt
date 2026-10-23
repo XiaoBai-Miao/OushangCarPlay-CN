@@ -91,17 +91,34 @@ class B561UltraProtocol(
                 B561VehicleStateAccessory.PLUGIN_NAME to B561VehicleStateAccessory.PLUGIN_ID,
             ),
         )
-        // Describe only the displays that already exist — no invented cluster screen.
-        info["displayPanels"] = (info["displays"] as? List<*>).orEmpty()
-            .filterIsInstance<Map<*, *>>().mapNotNull { display ->
-                val uuid = display["uuid"] as? String ?: return@mapNotNull null
-                linkedMapOf<String, Any?>(
+        // ★ v126: displayPanels —— 这段是 **iPhone 决定「Ultra 仪表画在哪」的唯一依据**。
+        //
+        // v125 这里只把每个 display 抄成一个 panel，properties 恒为空、
+        // 没有 displayPlugins、也没有虚拟 cluster panel —— 结果 iPhone 收到
+        // vehicleStateProtocol 声明后虽然开了 RCS/CAF 通道，却**不知道要把
+        // 仪表画到哪块屏**，于是官方仪表出不来。
+        //
+        // 正确形态（照 LIVI 的 info.rs:add_display_panels）：
+        // ① 每个真实 display 一个 panel，uid = "<uuid>-panel"；
+        // ② **仪表屏**（type=111）的 panel 带 properties=["showsInstruments"]，
+        //    但**不能**带 displayPlugins —— 插件会把该屏拉黑
+        //    （LIVI 注释原文："a plug-in would black out the cluster"）；
+        // ③ 额外追加一个**虚拟 cluster panel**：没有视频流、带 showsInstruments、
+        //    带 displayPlugins 指向我们的 CAF plugin —— iPhone 在这块虚拟 panel 上
+        //    用 CAF 数据画官方仪表。
+        val panels = mutableListOf<Map<String, Any?>>()
+        (info["displays"] as? List<*>).orEmpty()
+            .filterIsInstance<Map<*, *>>().forEach { display ->
+                val uuid = display["uuid"] as? String ?: return@forEach
+                // type 可能被 plist 解码成 Int 或 Long —— 按数值比，别按类型比。
+                val isCluster = (display["type"] as? Number)?.toInt() == CLUSTER_STREAM_TYPE
+                panels += linkedMapOf<String, Any?>(
                     "uid" to "$uuid-panel",
                     "widthPixels" to display["widthPixels"],
                     "heightPixels" to display["heightPixels"],
                     "widthPhysical" to display["widthPhysical"],
                     "heightPhysical" to display["heightPhysical"],
-                    "properties" to emptyList<String>(),
+                    "properties" to if (isCluster) listOf(SHOWS_INSTRUMENTS) else emptyList<String>(),
                     "initialVideoStreams" to listOf(
                         mapOf(
                             "uuid" to uuid,
@@ -112,6 +129,29 @@ class B561UltraProtocol(
                     ),
                 )
             }
+        // 虚拟 cluster panel：尺寸取仪表屏（没有就取第一块屏）。
+        val sized = panels.firstOrNull { panel ->
+            (panel["properties"] as? List<*>)?.any { it == SHOWS_INSTRUMENTS } == true
+        } ?: panels.firstOrNull()
+        if (sized != null) {
+            panels += linkedMapOf<String, Any?>(
+                "uid" to "$CLUSTER_PANEL_UID-panel",
+                "widthPixels" to sized["widthPixels"],
+                "heightPixels" to sized["heightPixels"],
+                "widthPhysical" to sized["widthPhysical"],
+                "heightPhysical" to sized["heightPhysical"],
+                "properties" to listOf(SHOWS_INSTRUMENTS),
+                // 虚拟 panel 没有视频流 —— 仪表是 CAF 数据画出来的，不是视频。
+                "initialVideoStreams" to emptyList<Any?>(),
+                "displayPlugins" to listOf(
+                    linkedMapOf<String, Any?>(
+                        "uid" to "$CLUSTER_PANEL_UID-plugin",
+                        "videoStreams" to emptyList<Any?>(),
+                    ),
+                ),
+            )
+        }
+        info["displayPanels"] = panels
         log(
             "INFO VSP=1 plugin=0 WIRE_REV=$WIRE_REV " +
                 "panels=${(info["displayPanels"] as? List<*>)?.size ?: 0} " +
@@ -297,8 +337,21 @@ class B561UltraProtocol(
 
     private fun newAccessory() = B561VehicleStateAccessory({ gauges })
 
+    /**
+     * ★ v126: 日志**同时**写 logcat 与 app 内部诊断日志。
+     *
+     * 上一版（v125）只走 [trace]，而 HostActivity 的 trace 回调只写
+     * `files/logs/diplay.log`（app 私有目录），**不写 logcat**。
+     * 结果：装车后用 logcat 抓日志，Ultra/CAF 层的痕迹一条都看不到，
+     * 只能看到 AirPlaySession 自己的 debugLog —— 相当于协议层是黑的。
+     *
+     * 现在多写一份 logcat，tag 用 `xcertplay-usb`（与 AirPlaySession 一致，
+     * 便于用同一个 grep 抓）。
+     */
     private fun log(text: String) {
-        runCatching { trace(text.take(3000)) }
+        val clipped = text.take(3000)
+        runCatching { Log.i(TAG, clipped) }
+        runCatching { trace(clipped) }
     }
 
     private inner class Channel(
@@ -396,10 +449,28 @@ class B561UltraProtocol(
     }
 
     companion object {
+        /** logcat 的 tag —— 与 AirPlaySession 一致，便于用同一个 grep 抓。 */
+        const val TAG = "xcertplay-usb"
+
         /** CarPlay Ultra 的 feature 名。 */
         const val FEATURE = "vehicleStateProtocol"
 
         /** 线协议版本标识（诊断用）。 */
         const val WIRE_REV = "b561-vsp-vehicle-state"
+
+        /**
+         * 虚拟 cluster panel 的 UUID 家族第三项。
+         *
+         * 与主屏 `...1111-...0001`、仪表屏 `...2222-...0002` 同族 ——
+         * 这是 Apple CarPlay Ultra 的约定（LIVI 的 `info.rs` 也用这一族）。
+         * iPhone 靠这个 panel 把 CAF 车辆状态画成官方仪表。
+         */
+        const val CLUSTER_PANEL_UID = "b7e6c5a0-3333-4000-8000-000000000003"
+
+        /** 仪表屏的 stream type（CarPlay 的 instrument cluster）。 */
+        const val CLUSTER_STREAM_TYPE = 111
+
+        /** panel 属性：这一块显示仪表。 */
+        const val SHOWS_INSTRUMENTS = "showsInstruments"
     }
 }

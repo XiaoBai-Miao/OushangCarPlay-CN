@@ -424,6 +424,7 @@
     <string name="dashboard_content_map">Карта · по умолчанию</string>
     <string name="dashboard_content_turn_card">Карточка поворота</string>
     <string name="dashboard_content_map_with_turn_card">Карта с карточкой поворота</string>
+    <string name="dashboard_content_instruments">Официальная приборная панель (CarPlay Ultra)</string>
     <string name="dashboard_content_map_with_custom_turn_card">Карта с собственной карточкой поворота</string>
     <string name="turn_card_size">Размер карточки поворота</string>
     <string name="turn_card_horizontal">Карточка поворота · по горизонтали</string>

@@ -424,6 +424,7 @@
     <string name="dashboard_content_map">Mapa · predeterminado</string>
     <string name="dashboard_content_turn_card">Tarjeta de giro</string>
     <string name="dashboard_content_map_with_turn_card">Mapa con tarjeta de giro</string>
+    <string name="dashboard_content_instruments">Cuadro de instrumentos oficial (CarPlay Ultra)</string>
     <string name="dashboard_content_map_with_custom_turn_card">Mapa con tarjeta de giro personalizada</string>
     <string name="turn_card_size">Tamaño de la tarjeta de giro</string>
     <string name="turn_card_horizontal">Tarjeta de giro · horizontal</string>

@@ -424,6 +424,7 @@
     <string name="dashboard_content_map">الخريطة · الافتراضي</string>
     <string name="dashboard_content_turn_card">بطاقة الانعطاف</string>
     <string name="dashboard_content_map_with_turn_card">خريطة مع بطاقة الانعطاف</string>
+    <string name="dashboard_content_instruments">لوحة العدادات الرسمية (CarPlay Ultra)</string>
     <string name="dashboard_content_map_with_custom_turn_card">خريطة مع بطاقة انعطاف مخصصة</string>
     <string name="turn_card_size">حجم بطاقة الانعطاف</string>
     <string name="turn_card_horizontal">بطاقة الانعطاف · أفقيًا</string>

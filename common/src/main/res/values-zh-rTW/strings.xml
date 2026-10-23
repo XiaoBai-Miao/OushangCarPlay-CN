@@ -437,6 +437,7 @@
     <string name="dashboard_content_map">地圖 · 預設</string>
     <string name="dashboard_content_turn_card">轉向提示卡</string>
     <string name="dashboard_content_map_with_turn_card">地圖和轉向提示卡</string>
+    <string name="dashboard_content_instruments">官方儀表板（CarPlay Ultra）</string>
     <string name="dashboard_content_map_with_custom_turn_card">地圖和自訂轉向卡</string>
     <string name="turn_card_size">轉向提示卡大小</string>
     <string name="turn_card_horizontal">轉向提示卡 · 水平位置</string>

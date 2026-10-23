@@ -476,6 +476,7 @@
     <string name="dashboard_content_map">Map · default</string>
     <string name="dashboard_content_turn_card">Turn card</string>
     <string name="dashboard_content_map_with_turn_card">Map with official turn card</string>
+    <string name="dashboard_content_instruments">Official instrument cluster (CarPlay Ultra)</string>
     <string name="dashboard_content_map_with_custom_turn_card">Map with custom turn card</string>
     <string name="turn_card_size">Turn card size</string>
     <string name="turn_card_horizontal">Turn card · horizontal</string>

@@ -2657,7 +2657,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                     // 与 DiLink4ClusterDisplay 的那套是同构替换。
                     clusterSafeAreaControls(card)
                         val sizes = CarPlayClusterDisplay.scalePresets
-                        val contents = CarPlayClusterDisplay.Content.entries
                         val content = AirPlayPersistence.loadClusterContent(this)
                         val customCard = CarPlayClusterDisplay.usesCustomTurnCard(content)
                         // v108: 转向卡的 ClusterCardPlacementPreview(FULL) 已整合进
@@ -2665,13 +2664,29 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                         // 小窗卡几何是窗内百分比，与主面板坐标不是一套体系。
                         var smallWindowPlacementPreview: ClusterCardPlacementPreview? = null
                         val officialCardOnly = content == CarPlayClusterDisplay.Content.TURN_CARD
-                        choice(card, getString(R.string.dashboard_shows), listOf(
-                            getString(R.string.dashboard_content_map),
-                            getString(R.string.dashboard_content_turn_card),
-                            getString(R.string.dashboard_content_map_with_turn_card),
-                            getString(R.string.dashboard_content_map_with_custom_turn_card),
-                        ), contents.indexOf(content).coerceAtLeast(0), reconnects = false) {
-                            val next = contents[it]
+                        // ★ v126: 选项列表由 CarPlayClusterDisplay.options 生成，
+                        //   标签与枚举项成对给出，索引不可能再错位。
+                        //   （之前手写的 4 个文案数组与 Content.entries 顺序不同，
+                        //   选「地图和官方转向卡」实际存成 INSTRUMENTS。）
+                        //   ★ INSTRUMENTS 是 Apple 官方仪表 —— 走 CarPlay Ultra 的
+                        //   车辆状态协议，由 iPhone 自己画转速/功率/续航。
+                        val contentOptions = CarPlayClusterDisplay.options(
+                            mapOf(
+                                CarPlayClusterDisplay.Content.MAP to getString(R.string.dashboard_content_map),
+                                CarPlayClusterDisplay.Content.TURN_CARD to getString(R.string.dashboard_content_turn_card),
+                                CarPlayClusterDisplay.Content.INSTRUMENTS to getString(R.string.dashboard_content_instruments),
+                                CarPlayClusterDisplay.Content.MAP_WITH_CUSTOM_CARD to
+                                    getString(R.string.dashboard_content_map_with_custom_turn_card),
+                            ),
+                        )
+                        choice(
+                            card,
+                            getString(R.string.dashboard_shows),
+                            contentOptions.map { it.label },
+                            contentOptions.indexOfFirst { it.content == content }.coerceAtLeast(0),
+                            reconnects = false,
+                        ) {
+                            val next = contentOptions[it].content
                             val request = ++clusterContentRequestVersion
                             AirPlayPersistence.saveClusterContent(this, next)
                             render()

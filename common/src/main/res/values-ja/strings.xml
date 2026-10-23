@@ -478,6 +478,7 @@
     <string name="dashboard_content_map">地図 · 標準設定</string>
     <string name="dashboard_content_turn_card">案内カード</string>
     <string name="dashboard_content_map_with_turn_card">地図と純正の案内カード</string>
+    <string name="dashboard_content_instruments">純正の計器盤（CarPlay Ultra）</string>
     <string name="dashboard_content_map_with_custom_turn_card">地図とカスタム案内カード</string>
     <string name="turn_card_size">案内カードのサイズ</string>
     <string name="turn_card_horizontal">案内カード · 左右</string>

@@ -23,6 +23,30 @@ object CarPlayClusterDisplay {
         MAP_WITH_CUSTOM_CARD(MAP_URL),
     }
 
+    /**
+     * ★ v126: 设置页的仪表内容选项，**顺序与 [Content.entries] 严格一致**。
+     *
+     * 之前设置页手写了一个 4 项的文案数组，而 [Content.entries] 也是 4 项但
+     * 顺序不同（枚举是 MAP / TURN_CARD / INSTRUMENTS / MAP_WITH_CUSTOM_CARD），
+     * 于是按索引取值时整体错位一格：选「地图和官方转向卡」实际存成
+     * INSTRUMENTS，选「地图和自定义转向卡」实际存成 MAP_WITH_CUSTOM_CARD。
+     * 后果是「地图和官方转向卡」永远选不到，而 INSTRUMENTS（Apple 官方仪表，
+     * 走 CarPlay Ultra 车辆状态协议）从未被正确暴露。
+     *
+     * 现在标签与枚举项**成对**给出，索引不可能再错位。
+     *
+     * @param labels 每个枚举项的显示文案，**必须**覆盖全部枚举项。
+     */
+    data class ContentOption(val content: Content, val label: String)
+
+    fun options(labels: Map<Content, String>): List<ContentOption> =
+        Content.entries.map { content ->
+            ContentOption(
+                content,
+                labels[content] ?: error("仪表内容选项缺少 ${content.name} 的文案"),
+            )
+        }
+
     fun usesCustomTurnCard(content: Content): Boolean = content == Content.MAP_WITH_CUSTOM_CARD
 
     fun usesOfficialTurnCard(content: Content): Boolean =

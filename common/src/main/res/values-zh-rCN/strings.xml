@@ -438,6 +438,7 @@
     <string name="dashboard_content_map">地图 · 默认</string>
     <string name="dashboard_content_turn_card">转向提示卡</string>
     <string name="dashboard_content_map_with_turn_card">地图和官方转向卡</string>
+    <string name="dashboard_content_instruments">官方仪表盘（CarPlay Ultra）</string>
     <string name="dashboard_content_map_with_custom_turn_card">地图和自定义转向卡</string>
     <string name="turn_card_size">转向提示卡大小</string>
     <string name="turn_card_horizontal">转向提示卡 · 水平位置</string>
