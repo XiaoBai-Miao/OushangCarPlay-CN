@@ -32,11 +32,14 @@ class B561UltraProtocolTest {
     @Test
     fun `vehicle state changes are traced so logcat can show them`() {
         val recorder = Recorder()
-        val protocol = B561UltraProtocol(
+        val factory = B561UltraProtocol(
             sample = { null },
             trace = { recorder.accept(it) },
         )
-        protocol.onGaugesChanged(
+        // v132: 数据先到工厂（HostActivity 的推送点），经 forSession 转发到
+        // 会话实例后才真正落日志 —— 断言的是「最终日志流得出去」。
+        factory.forSession()
+        factory.onGaugesChanged(
             B561UltraGauges(
                 speedKph = 42f,
                 gear = 4,
@@ -200,6 +203,9 @@ class B561UltraProtocolTest {
             clock = { now },
             trace = { recorder.accept(it) },
         )
+        // v132: 工厂实例只是转发器 —— 真正持有通道/订阅的是 forSession
+        // 造出的会话实例。VehicleStatus 推到工厂上，等价于推到会话上。
+        val session = protocol.forSession() as B561UltraProtocol
         // 首条数据：lastHeartbeat 还是初值，间隔不足 → 不打心跳。
         protocol.onGaugesChanged(B561UltraGauges(speedKph = 10f))
         assertTrue(recorder.lines.none { it.startsWith("CAF ALIVE") })
@@ -217,6 +223,50 @@ class B561UltraProtocolTest {
         now = 9_000
         protocol.onGaugesChanged(B561UltraGauges(speedKph = 12f))
         assertEquals(1, recorder.lines.count { it.startsWith("CAF ALIVE") })
+    }
+
+    @Test
+    fun `gauges pushed to the factory reach the session instance`() {
+        val recorder = Recorder()
+        var now = 0L
+        val factory = B561UltraProtocol(sample = { null }, clock = { now }, trace = { recorder.accept(it) })
+        val session = factory.forSession() as B561UltraProtocol
+        // HostActivity 的 onReadingChanged 推到工厂实例上；
+        // VEHICLE 日志必须由会话实例打出来（数据真的到了有通道的那一边）。
+        factory.onGaugesChanged(B561UltraGauges(motorRpm = 900f, batteryPercent = 80))
+        val vehicle = recorder.lines.filter { it.startsWith("VEHICLE") }
+        assertEquals(1, vehicle.size)
+        assertTrue(vehicle[0].contains("rpm=900"))
+        assertTrue(vehicle[0].contains("battery=80"))
+        // 同样的值再推：会话实例去重，不打第二条。
+        factory.onGaugesChanged(B561UltraGauges(motorRpm = 900f, batteryPercent = 80))
+        assertEquals(1, recorder.lines.count { it.startsWith("VEHICLE") })
+    }
+
+    @Test
+    fun `a closed session no longer receives gauges`() {
+        val recorder = Recorder()
+        val factory = B561UltraProtocol(sample = { null }, trace = { recorder.accept(it) })
+        val session = factory.forSession() as B561UltraProtocol
+        session.close()
+        assertTrue(recorder.lines.any { it == "SESSION CLOSED" })
+        recorder.lines.clear()
+        // 会话已关：转发不到它，也不能崩；工厂只缓存。
+        factory.onGaugesChanged(B561UltraGauges(batteryPercent = 42))
+        assertTrue(recorder.lines.none { it.startsWith("VEHICLE") })
+    }
+
+    @Test
+    fun `gauges without any session only cache and never crash`() {
+        val recorder = Recorder()
+        val factory = B561UltraProtocol(sample = { null }, trace = { recorder.accept(it) })
+        factory.onGaugesChanged(B561UltraGauges(batteryPercent = 42))
+        assertTrue(recorder.lines.none { it.startsWith("VEHICLE") })
+        // 之后来会话：下一次变化会把最新值带过去（首次 register 之前
+        // initialValue 预填已经保证 UI 有初始值，见 B561VehicleStateAccessoryTest）。
+        val session = factory.forSession() as B561UltraProtocol
+        factory.onGaugesChanged(B561UltraGauges(batteryPercent = 43))
+        assertTrue(recorder.lines.any { it.startsWith("VEHICLE") && it.contains("battery=43") })
     }
 
     @Test

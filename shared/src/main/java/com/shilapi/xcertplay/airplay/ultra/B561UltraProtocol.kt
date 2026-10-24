@@ -85,11 +85,26 @@ class B561UltraProtocol(
     private val cafConnections = ConcurrentHashMap.newKeySet<String>()
     private val nextId = AtomicLong(10_000)
 
+    /**
+     * ★ v132: 最近一个由 [forSession] 造出的**会话实例**。
+     *
+     * v131 真车黑屏的根因就在这里：[AirPlaySession] 持有的是 `forSession()`
+     * 的产物（decorateInfo / RCS LISTEN / CAF register 全走它），而
+     * `CarPlayHostActivity` 的 `onReadingChanged` 推到的是
+     * `AirPlayConfig.protocolExtension` 里的**工厂实例**（本对象）——
+     * 两者不是同一个东西。结果：会话实例有订阅没数据（零 updateNotify），
+     * 工厂实例有数据没订阅（`CAF ALIVE subs=0 channels=0` 刷屏），
+     * iPhone 官方仪表拿不到任何数据 → 集群屏全黑。
+     *
+     * 现在工厂实例把车辆数据转发给活跃会话实例，两边合一。
+     */
+    @Volatile private var activeSession: B561UltraProtocol? = null
+
     /** 上次 CAF ALIVE 心跳的时间戳（[clock] 同源）。 */
     private var lastHeartbeat = 0L
 
     override fun forSession(): AirPlayProtocolExtension =
-        B561UltraProtocol(sample, clock, trace)
+        B561UltraProtocol(sample, clock, trace).also { activeSession = it }
 
     override fun decorateInfo(info: MutableMap<String, Any?>) {
         val accessory = newAccessory()
@@ -317,6 +332,8 @@ class B561UltraProtocol(
 
     override fun close() {
         if (!closed.compareAndSet(false, true)) return
+        // 断开的会话不再接收转发（v132）。
+        if (activeSession == this) activeSession = null
         closeChannels()
         cafConnections.clear()
         log("SESSION CLOSED")
@@ -332,9 +349,23 @@ class B561UltraProtocol(
     /**
      * 车辆读数变了 → 推给所有通道。
      *
-     * 由外部（我们的车辆数据层）在读数更新时调用。
+     * 由外部（我们的车辆数据层）在读数更新时调用。**这个调用落在工厂实例上**
+     * （`CarPlayHostActivity.ultraProtocolInstance`），真正持有 RCS 通道的是
+     * [forSession] 造出的会话实例 —— 所以这里必须转发过去（v132 黑屏修复）。
      */
     fun onGaugesChanged(value: B561UltraGauges?) {
+        val session = activeSession
+        if (session != null && !session.closed.get()) {
+            session.receiveGauges(value)
+            return
+        }
+        // 没有活跃会话：只缓存，等 forSession 后由下次变化带入
+        // （register 的 initialValue 预填已经保证 UI 有初始值）。
+        gauges = value
+    }
+
+    /** 会话实例真正接收车辆数据的入口（v132 从 onGaugesChanged 拆出）。 */
+    internal fun receiveGauges(value: B561UltraGauges?) {
         if (closed.get()) return
         val previous = gauges
         if (previous == value) return
