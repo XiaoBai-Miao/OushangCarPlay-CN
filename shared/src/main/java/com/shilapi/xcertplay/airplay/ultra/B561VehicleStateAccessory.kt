@@ -15,11 +15,32 @@ import com.shilapi.xcertplay.vehicle.B561UltraGauges
  * 把我们的车辆数据（转速/功率/续航/里程/胎压…）通过 CAF characteristic
  * 暴露给 iPhone，iPhone 据此渲染自己的仪表与能耗页面。
  *
+ * ## ★ v130: 为什么要重写这棵树
+ *
+ * v125/v126 只声明了 4 个 accessory（combustion / electric / fuel / tires），
+ * 而且 fuel 与 tires 的 **kind 与 LIVI 对不上**。真车实测（v126 日志）：
+ * iPhone 走完 `configRequest → configResponse` 之后**一条 registerRequest
+ * 都没发**，RCS 通道静默到 EOF —— 没有订阅就没有 updateNotify，
+ * 车辆数据一条都到不了 iPhone，Ultra 仪表自然出不来（仪表上只有地图流）。
+ *
+ * v130 按 **LIVI（f-io/LIVI，`vehicle_state.rs`）的最小可用集**重建：
+ * navigation / automaker_settings / vehicle_resources / fuel / trip_computer /
+ * tires / audio + engines，iid、kind、characteristic type 逐项对齐。
+ * 其中最关键的两处修正：
+ *
+ * 1. **fuel accessory**：kind `0x0100_0002` → `0x0900_0006`，
+ *    service `0x1A00_0002` → `0x1A00_0005`，
+ *    fuelLevel type `0x3000_0007` → `0x4100_0002`（LIVI 的 `fuel()`）；
+ *    续航/里程从"挤在一个 service 里"拆成 trip_computer 的 distance service，
+ *    每个距离补 miles 孪生特性（`0x3000_004B`）与 hidden 标志（`0x3600_0023`）。
+ * 2. **tires accessory**：kind `0x0100_0004` → `0x0A00_0001`（LIVI 的 `tires()`）。
+ *
+ * 另外补上 **navigation**（iid 256）—— 它带 `vehicleEnabled=true`，
+ * 是"这台车的仪表能显示导航"的声明；v125/v126 完全没有它。
+ *
  * ## iid 与 type 的来源
  *
- * 全部照 **LIVI**（Rust，Linux 车机）的 `vehicle_state.rs` —— 它是开源实现里
- * 最完整的一套 CarPlay Ultra 车辆状态（`set_gauges`，:2279）。
- * 关键映射：
+ * 全部照 LIVI 的 `vehicle_state.rs`（Rust，开源里最完整的一套）：
  *
  * | 语义 | iid | characteristic type | 格式 |
  * |---|---|---|---|
@@ -27,15 +48,26 @@ import com.shilapi.xcertplay.vehicle.B561UltraGauges
  * | 转速上限 | 2563 | `0x3000_004E` | UINT32 |
  * | 红线 | 2564 | `0x3000_004F` | UINT32 |
  * | 功率 `power` | 2818 | `0x3000_0028` | FLOAT，单位 kW(884) |
- * | 油量 `fuelLevel` | 1538 | `0x3000_0007` | UINT8，% |
- * | 续航 | 1541 / 1794 | `0x3000_004A` | UINT64，km(151) |
- * | 总里程 | 1798 | `0x3000_004A` | UINT64，km(151) |
+ * | 油量 `fuelLevel` | 1538 | `0x4100_0002` | UINT8，% |
+ * | 油量低标记 | 1539 | `0x4100_001A` | UINT8，% |
+ * | 燃油续航 km / mi | 1541 / 1542 | `0x3000_004A` / `0x3000_004B` | UINT64 |
+ * | 剩余续航 km / mi | 1794 / 1795 | 同上 | UINT64 |
+ * | 总里程 km / mi | 1798 / 1799 | 同上 | UINT64 |
+ * | 胎压 kPa | 2050+5n | `0x3000_001B` | UINT32，单位 kPa(932) |
+ * | 音量 | 2306+… | `0x3300_0006` | UINT8，% |
  *
  * accessory / service 的 kind：
- * - `combustion engine` accessory：iid 2560，kind `0x0900_0005`，
- *   service iid 2561、kind `0x1A00_000F` —— **有发动机转速**（燃油/混动）
- * - `electric engine` accessory：iid 2816，kind `0x0900_0004`，
- *   service iid 2817、kind `0x1A00_000D` —— **只有功率**（纯电）
+ * - `navigation`：iid 256，kind `0x0E00_0002` —— **Ultra 导航门面**
+ * - `automaker settings`：iid 1280，kind `0x0500_0001`
+ * - `vehicle resources`：iid 768，kind `0x0120_0002`（interiorStyle）
+ * - `combustion engine`：iid 2560，kind `0x0900_0005`，service iid 2561、
+ *   kind `0x1A00_000F` —— **有发动机转速**（燃油/混动）
+ * - `electric engine`：iid 2816，kind `0x0900_0004`，service iid 2817、
+ *   kind `0x1A00_000D` —— **只有功率**（纯电）
+ * - `fuel`：iid 1536，kind `0x0900_0006`
+ * - `trip computer`：iid 1792，kind `0x0400_0001`
+ * - `tires`：iid 2048，kind `0x0A00_0001`
+ * - `audio`：iid 2304，kind `0x0200_0001`
  *
  * ## ★ 纯电车没有「电机转速」这个字段
  *
@@ -60,125 +92,44 @@ internal class B561VehicleStateAccessory(
     /** 上次已发出的值，用来判断「真的变了」。 */
     private var lastSent: Map<Long, Any?> = emptyMap()
 
+    /** iPhone 写过来的值（phone-owned 特性：导航 legs / 音量…）。原样回读。 */
+    private val written = linkedMapOf<Long, Any?>()
+
     /** 本 accessory 声明的全部 iid。 */
     private val knownIds: Set<Long> = buildSet {
+        addAll(NAVIGATION_IDS)
+        addAll(AUTOMAKER_IDS)
+        addAll(VEHICLE_RESOURCE_IDS)
         addAll(ENGINE_RPM_IDS.toList())
         add(ENGINE_POWER)
-        add(FUEL_LEVEL)
-        add(FUEL_RANGE)
-        add(REMAINING_RANGE)
-        add(ODOMETER)
+        addAll(FUEL_IDS)
+        addAll(TRIP_IDS)
         addAll(TIRE_PRESSURE_IDS)
+        addAll(TIRE_EXTRA_IDS)
+        addAll(AUDIO_IDS)
     }
 
     /**
      * CAF config 树：告诉 iPhone「我有哪些 characteristic、什么格式、什么量程」。
      *
+     * 顺序照 LIVI 的默认配件表：navigation / automaker / vehicle_resources /
+     * fuel / trip_computer / tires / audio，engines 追加在最后
+     * （LIVI 的 `with_engines` 就是 extend 到末尾）。
+     *
      * 纯电车**不声明**转速那三个 iid（Apple 协议里纯电车没有转速字段）。
      */
-    fun config(hasEngineRpm: Boolean): Map<String, Any?> {
-        val accessories = arrayListOf<Map<String, Any?>>()
-        val engineServices = arrayListOf<Map<String, Any?>>()
-        if (hasEngineRpm) {
-            engineServices.add(
-                service(
-                    2561, 0x1A00_000F,
-                    listOf(
-                        rpmCharacteristic(ENGINE_RPM, 0x3000_0024, "rotationalSpeed"),
-                        rpmCharacteristic(2563, 0x3000_004E, "rotationalSpeedMax", fixed = true),
-                        rpmCharacteristic(2564, 0x3000_004F, "rotationalSpeedMarkerRedline", fixed = true),
-                    ),
-                ),
-            )
-            accessories.add(accessory(2560, 0x0900_0005, engineServices))
-        }
-        // 电动引擎：功率。纯电与混动都有。
-        accessories.add(
-            accessory(
-                2816, 0x0900_0004,
-                listOf(
-                    service(
-                        2817, 0x1A00_000D,
-                        listOf(
-                            characteristic(
-                                ENGINE_POWER, 0x3000_0028, CafCharacteristicFormat.FLOAT, 0.0,
-                            ).apply {
-                                put("minimumValue", -1000.0)
-                                put("maximumValue", 1000.0)
-                                put("stepValue", 0.1)
-                                put("units", KILOWATTS)
-                            },
-                        ),
-                    ),
-                ),
-            ),
+    fun config(hasEngineRpm: Boolean = true): Map<String, Any?> {
+        val accessories = arrayListOf<Map<String, Any?>>(
+            navigation(),
+            automakerSettings(),
+            vehicleResources(),
+            fuel(),
+            tripComputer(),
+            tires(),
+            audio(),
         )
-        // 油量 / 续航 / 里程。
-        accessories.add(
-            accessory(
-                1536, 0x0100_0002,
-                listOf(
-                    service(
-                        1537, 0x1A00_0002,
-                        listOf(
-                            characteristic(
-                                FUEL_LEVEL, 0x3000_0007, CafCharacteristicFormat.UINT8, 0,
-                            ).apply {
-                                put("minimumValue", 0L)
-                                put("maximumValue", 100L)
-                                put("stepValue", 1L)
-                                put("units", PERCENT)
-                            },
-                            distanceCharacteristic(FUEL_RANGE, 0x3000_004A, "fuelRangeKm"),
-                            distanceCharacteristic(REMAINING_RANGE, 0x3000_004A, "remainingRangeKm"),
-                            distanceCharacteristic(ODOMETER, 0x3000_004A, "odometerKm"),
-                        ),
-                    ),
-                ),
-            ),
-        )
-        // 四轮胎压。照 LIVI 的 `tires()` accessory（vehicle_state.rs:1100）：
-        // accessory iid 2048，每个轮一个 service（iid = 2048+1+5*n），
-        // service kind `0x1B00_0001`，胎压值 characteristic `0x3000_001B`（kPa）。
-        accessories.add(
-            accessory(
-                TIRES_ACCESSORY, 0x0100_0004,
-                (0 until 4).map { wheel ->
-                    val iid = tirePressureIid(wheel)
-                    service(
-                        iid - 1, 0x1B00_0001,
-                        listOf(
-                            characteristic(
-                                iid, 0x3000_001B, CafCharacteristicFormat.UINT32, 0L,
-                            ).apply {
-                                put("minimumValue", 0L)
-                                put("maximumValue", 1000L)
-                                put("stepValue", 1L)
-                                put("units", KILOPASCALS)
-                            },
-                            characteristic(
-                                iid + 1, 0x3600_0065, CafCharacteristicFormat.STRING,
-                                WHEEL_LAYOUT_KEYS[wheel], mutable = false,
-                            ),
-                            characteristic(
-                                iid + 2, 0x3000_001C, CafCharacteristicFormat.UINT8, 0L,
-                            ).apply {
-                                put("minimumValue", 0L)
-                                put("maximumValue", 5L)
-                                put("stepValue", 1L)
-                            },
-                            characteristic(
-                                iid + 3, 0x3000_001A, CafCharacteristicFormat.UINT8, 3L,
-                            ).apply {
-                                put("minimumValue", 0L)
-                                put("maximumValue", 4L)
-                                put("stepValue", 1L)
-                            },
-                        ),
-                    )
-                },
-            ),
-        )
+        if (hasEngineRpm) accessories.add(combustionEngine())
+        accessories.add(electricEngine())
         return linkedMapOf("accessories" to accessories)
     }
 
@@ -186,6 +137,11 @@ internal class B561VehicleStateAccessory(
      * 处理一条 CAF 请求。
      *
      * 返回 null 表示这条消息不归我们管（交给上层）。
+     *
+     * ★ v130：补上 writeRequest / controlRequest 的应答。
+     * v125/v126 对这两类命令**静默丢弃**（返回 null 不上报），
+     * 而 phone-owned 特性（导航 legs、音量）一旦声明，iPhone 就一定会写 ——
+     * 不应答会被当成插件无响应。
      */
     fun handle(message: CafMessageReader): CafRcsFrame? {
         if (message.pluginId != PLUGIN_ID) {
@@ -197,12 +153,14 @@ internal class B561VehicleStateAccessory(
             CafCommand.CONFIG_REQUEST -> CarAccessoryMessages.configResponse(
                 PLUGIN_ID, message.requireTransactionId(), config(hasEngineRpm = true),
             )
+
             CafCommand.READ_REQUEST -> {
                 val ids = identifiers(message)
                 CarAccessoryMessages.readResponse(
                     PLUGIN_ID, message.requireTransactionId(), values(ids), errors(ids),
                 )
             }
+
             CafCommand.REGISTER_REQUEST -> {
                 // CarPlay Ultra 的「订阅」就是 CAF 的 registerRequest ——
                 // CAF 没有单独的 subscribe 命令（那是 UAV 协议的）。
@@ -213,12 +171,33 @@ internal class B561VehicleStateAccessory(
                     PLUGIN_ID, transaction, values(ids), errors(ids),
                 )
             }
+
             CafCommand.UNREGISTER_REQUEST -> {
                 val ids = identifiers(message)
                 val transaction = message.requireTransactionId()
                 subscriptions.removeAll(ids.toSet())
                 CarAccessoryMessages.unregisterResponse(PLUGIN_ID, transaction)
             }
+
+            // ★ v130：phone-owned 特性的写入。我们不驱动这些特性，
+            //   但必须原样收下并回读，否则 iPhone 认为插件无响应。
+            CafCommand.WRITE_REQUEST -> {
+                message.valuesMap().forEach { (iid, value) -> written[iid] = value }
+                CarAccessoryMessages.writeResponse(
+                    PLUGIN_ID, message.requireTransactionId(), emptyMap(),
+                )
+            }
+
+            // ★ v130：control（收音机按键那类）。我们一个 control 都没声明，
+            //   照 LIVI 的做法全部回 NO_SUCH_COMMAND。
+            CafCommand.CONTROL_REQUEST -> {
+                val ids = identifiers(message)
+                CarAccessoryMessages.controlResponse(
+                    PLUGIN_ID, message.requireTransactionId(), emptyMap(),
+                    ids.associateWith { NO_SUCH_COMMAND },
+                )
+            }
+
             else -> null
         }
     }
@@ -242,7 +221,7 @@ internal class B561VehicleStateAccessory(
 
     /** 按 iid 取当前值；没有值的 iid 不出现在结果里（报 0 会被当成真值）。 */
     private fun values(ids: List<Long>): Map<Long, Any?> {
-        val data = sample() ?: return emptyMap()
+        val data = sample()
         val result = linkedMapOf<Long, Any?>()
         for (id in ids) {
             valueOf(data, id)?.let { result[id] = it }
@@ -251,29 +230,53 @@ internal class B561VehicleStateAccessory(
     }
 
     /** 按 iid 取值；null = 没有该读数。 */
-    private fun valueOf(data: B561UltraGauges, id: Long): Any? {
+    private fun valueOf(data: B561UltraGauges?, id: Long): Any? {
+        // iPhone 写过的值优先回读（phone-owned 特性）—— 这与车辆数据无关，
+        // **没有 sample 时也必须能回读**（v130 修：旧写法 sample 为 null 时
+        // 整个 values() 直接返回空表，写进来的音量/导航 legs 读不回来，
+        // iPhone 会认为插件无响应）。
+        written[id]?.let { return it }
+        if (data == null) return null
         when (id) {
             ENGINE_RPM -> return data.primaryRpm?.toLong()
             2563L -> return MAX_RPM
             2564L -> return REDLINE_RPM
             ENGINE_POWER -> return data.powerKw?.toDouble()
             FUEL_LEVEL -> return data.fuelPercent?.toLong()
-            FUEL_RANGE -> return data.rangeKm?.toLong()
-            REMAINING_RANGE -> return data.rangeKm?.toLong()
-            ODOMETER -> return data.odometerKm?.toLong()
+            FUEL_LEVEL_MARKER_LOW -> return LOW_FUEL_PCT
+            FUEL_RANGE_KM -> return data.rangeKm?.toLong()
+            FUEL_RANGE_MILES -> return miles(data.rangeKm)
+            FUEL_RANGE_HIDDEN -> return data.rangeKm == null
+            REMAINING_RANGE_KM -> return data.rangeKm?.toLong()
+            REMAINING_RANGE_MILES -> return miles(data.rangeKm)
+            REMAINING_RANGE_HIDDEN -> return data.rangeKm == null
+            ODOMETER_KM -> return data.odometerKm?.toLong()
+            ODOMETER_MILES -> return data.odometerKm?.let { miles(it.toInt()) }
         }
         val index = TIRE_PRESSURE_IDS.indexOf(id)
-        if (index < 0) return null
-        val tires = data.tirePressureBar ?: return null
-        if (index >= tires.size) return null
-        // bar → kPa（Apple 侧用 kPa；LIVI 的 set_gauges 也是这么转的）
-        return (tires[index] * 100f).toLong()
+        if (index >= 0) {
+            val tires = data.tirePressureBar ?: return null
+            if (index >= tires.size) return null
+            // bar → kPa（Apple 侧用 kPa；LIVI 的 set_gauges 也是这么转的）
+            return (tires[index] * 100f).toLong()
+        }
+        // 胎压传感器状态：有读数 → ACTIVE(1)，没有 → 初始的 WAITING(3)。
+        // TIRE_EXTRA_IDS 每轮 3 项（布局 key / 胎压状态 / 传感器状态），
+        // 传感器状态落在每轮第 3 项 → 索引 % 3 == 2。
+        val extra = TIRE_EXTRA_IDS.indexOf(id)
+        if (extra >= 0 && extra % 3 == 2) {
+            return if (data.tirePressureBar != null) SENSOR_ACTIVE else SENSOR_WAITING
+        }
+        return null
     }
 
-    /** 报错的 iid：请求了但我们没数据。 */
+    /** km → miles（Apple 侧的双单位孪生特性）。 */
+    private fun miles(km: Int?): Long? = km?.let { Math.round(it / KM_PER_MILE) }
+
+    /** 报错的 iid：请求了但我们没数据（phone 写过的值不算缺数据）。 */
     private fun errors(ids: List<Long>): Map<Long, Long> {
         val data = sample()
-        return ids.filter { data == null || valueOf(data, it) == null }
+        return ids.filter { valueOf(data, it) == null }
             .associateWith { NO_VALUE }
     }
 
@@ -291,9 +294,12 @@ internal class B561VehicleStateAccessory(
 
     // ── CAF 树构造辅助 ──────────────────────────────────────────────────
 
+    /** 特性归属：决定 writable / oemWritable 两个标志。 */
+    private enum class Owner { PHONE, CAR, SHARED }
+
     private fun accessory(iid: Long, type: Long, services: List<Map<String, Any?>>) =
         linkedMapOf<String, Any?>(
-            "type" to type, "iid" to iid, "version" to "1.0", "services" to services,
+            "type" to type, "iid" to iid, "version" to ACCESSORY_VERSION, "services" to services,
         )
 
     private fun service(iid: Long, type: Long, chars: List<Map<String, Any?>>) =
@@ -306,29 +312,335 @@ internal class B561VehicleStateAccessory(
         type: Long,
         format: CafCharacteristicFormat,
         value: Any?,
-        writable: Boolean = false,
+        owner: Owner = Owner.CAR,
         mutable: Boolean = true,
     ) = linkedMapOf<String, Any?>(
-        "iid" to iid, "type" to type, "format" to format.wireValue, "writable" to writable,
-        "oemWritable" to true, "mutable" to mutable, "priority" to 1L,
+        "iid" to iid,
+        "type" to type,
+        "format" to format.wireValue,
+        "writable" to (owner != Owner.CAR),
+        "oemWritable" to (owner != Owner.PHONE),
+        "mutable" to mutable,
+        "priority" to HIGH_PRIORITY,
     ).apply {
         if (value != null) put("initialValue", value)
         if (mutable) put("supportsInvalid", true)
+        // 非数值格式照 LIVI 补 maximumLength，缺了它 iPhone 可能拒解析整棵树。
+        if (format == CafCharacteristicFormat.STRING || format == CafCharacteristicFormat.DATA ||
+            format == CafCharacteristicFormat.DICTIONARY || format == CafCharacteristicFormat.ARRAY
+        ) {
+            put("maximumLength", MAX_LENGTH)
+        }
     }
 
-    private fun rpmCharacteristic(iid: Long, type: Long, name: String, fixed: Boolean = false) =
-        characteristic(iid, type, CafCharacteristicFormat.UINT32, 0L, mutable = !fixed).apply {
-            put("minimumValue", 0L)
-            put("maximumValue", MAX_RPM)
-            put("stepValue", 1L)
-            put("units", REVOLUTIONS_PER_MINUTE)
+    /** 数值区间三元组（minimum / maximum / step），照 LIVI 的 up_to/between。 */
+    private fun MutableMap<String, Any?>.range(min: Long, max: Long, step: Long = 1L) =
+        apply {
+            put("minimumValue", min)
+            put("maximumValue", max)
+            put("stepValue", step)
         }
 
-    private fun distanceCharacteristic(iid: Long, type: Long, name: String) =
-        characteristic(iid, type, CafCharacteristicFormat.UINT64, 0L).apply {
-            put("minimumValue", 0L)
-            put("units", KILOMETERS)
+    private fun MutableMap<String, Any?>.range(min: Double, max: Double, step: Double) =
+        apply {
+            put("minimumValue", min)
+            put("maximumValue", max)
+            put("stepValue", step)
         }
+
+    private fun rpmCharacteristic(iid: Long, type: Long, fixed: Boolean) =
+        characteristic(iid, type, CafCharacteristicFormat.UINT32, 0L, mutable = !fixed)
+            .range(0L, MAX_RPM)
+            .apply { put("units", REVOLUTIONS_PER_MINUTE) }
+
+    private fun distanceCharacteristic(iid: Long, type: Long, units: Long) =
+        characteristic(iid, type, CafCharacteristicFormat.UINT64, 0L)
+            .apply {
+                put("minimumValue", 0L)
+                put("units", units)
+            }
+
+    // ── 各 accessory ───────────────────────────────────────────────────
+
+    /**
+     * navigation（LIVI `navigation()`，iid 256）。
+     *
+     * 三个 service：应用开关 / 路线状态 / 车机侧信息。
+     * `vehicleEnabled=true`（iid 264）是「这台车的仪表能显示导航」的声明 ——
+     * v125/v126 缺了整个 accessory，iPhone 无从判断集群可导航。
+     */
+    private fun navigation() = accessory(
+        NAVIGATION, 0x0E00_0002,
+        listOf(
+            service(
+                257, 0x1E00_0104,
+                listOf(
+                    characteristic(258, 0x4500_0103, CafCharacteristicFormat.BOOL, null, Owner.PHONE),
+                    characteristic(259, 0x4500_0112, CafCharacteristicFormat.UINT32, null, Owner.PHONE),
+                    characteristic(260, 0x4500_0109, CafCharacteristicFormat.ARRAY, null, Owner.PHONE),
+                    characteristic(261, 0x4500_010D, CafCharacteristicFormat.UINT8, null, Owner.PHONE)
+                        .range(0L, 4L),
+                    characteristic(262, 0x4500_0104, CafCharacteristicFormat.BOOL, null, Owner.PHONE),
+                    characteristic(263, 0x4500_010E, CafCharacteristicFormat.STRING, VEHICLE_BRAND, mutable = false),
+                    characteristic(264, 0x4500_0105, CafCharacteristicFormat.BOOL, true),
+                ),
+            ),
+            service(
+                265, 0x1E00_0102,
+                listOf(
+                    characteristic(266, 0x4500_0108, CafCharacteristicFormat.DICTIONARY, null, Owner.PHONE),
+                    characteristic(267, 0x4500_0106, CafCharacteristicFormat.UINT8, null, Owner.PHONE)
+                        .range(0L, 2L),
+                    characteristic(268, 0x4500_0107, CafCharacteristicFormat.DICTIONARY, null, Owner.PHONE),
+                    characteristic(269, 0x4500_0110, CafCharacteristicFormat.UINT8, null, Owner.PHONE)
+                        .range(0L, 6L),
+                    characteristic(270, 0x4500_0101, CafCharacteristicFormat.UINT8, null, Owner.PHONE)
+                        .range(0L, 255L),
+                    characteristic(271, 0x4500_0102, CafCharacteristicFormat.STRING, null, Owner.PHONE),
+                ),
+            ),
+            service(
+                272, 0x1E00_0103,
+                listOf(
+                    characteristic(273, 0x4500_010C, CafCharacteristicFormat.UINT8, 0L)
+                        .range(0L, 5L),
+                    characteristic(
+                        274, 0x4500_010A, CafCharacteristicFormat.STRING, NAVIGATION_SYSTEM_NAME,
+                        mutable = false,
+                    ),
+                    characteristic(
+                        275, 0x4500_0111, CafCharacteristicFormat.STRING, VEHICLE_BRAND,
+                        mutable = false,
+                    ),
+                ),
+            ),
+        ),
+    )
+
+    /**
+     * automaker settings（LIVI `automaker_settings()`，iid 1280）。
+     *
+     * 两行版本信息 + 一个 section —— iPhone 的 OEM 设置区里显示
+     * 「Version / Version Build」，排障时能直接认出车机软件版本。
+     */
+    private fun automakerSettings() = accessory(
+        AUTOMAKER_SETTINGS, 0x0500_0001,
+        listOf(
+            infoLine(1281, "B561VehicleStateVersion", "Version", ACCESSORY_VERSION, "info.circle", 0),
+            infoLine(1289, "B561VehicleStateBuildDate", "Version Build", BUILD_DATE, "hammer", 1),
+            service(
+                1297, 0x1600_0020,
+                listOf(
+                    characteristic(1298, 0x3000_0019, CafCharacteristicFormat.STRING, SETTINGS_SECTION, mutable = false),
+                    characteristic(1299, 0x3000_0003, CafCharacteristicFormat.UINT8, 0L, mutable = false)
+                        .range(0L, 100L),
+                    characteristic(1300, 0x3600_0004, CafCharacteristicFormat.STRING, SETTINGS_SECTION, mutable = false),
+                ),
+            ),
+        ),
+    )
+
+    /** LIVI 的 `info_line`：一行 OEM 设置项。 */
+    private fun infoLine(
+        iid: Long,
+        id: String,
+        label: String,
+        value: String,
+        symbol: String,
+        order: Long,
+    ) = service(
+        iid, 0x1600_0015,
+        listOf(
+            characteristic(iid + 1, 0x3000_0019, CafCharacteristicFormat.STRING, id, mutable = false),
+            characteristic(iid + 2, 0x3000_0001, CafCharacteristicFormat.STRING, label, mutable = false),
+            characteristic(iid + 3, 0x3000_0017, CafCharacteristicFormat.STRING, value, mutable = false),
+            characteristic(iid + 4, 0x3600_0006, CafCharacteristicFormat.UINT8, 0L, mutable = false)
+                .range(0L, 15L),
+            characteristic(iid + 5, 0x3000_005E, CafCharacteristicFormat.STRING, symbol, mutable = false),
+            characteristic(iid + 6, 0x3000_0003, CafCharacteristicFormat.UINT8, order, mutable = false)
+                .range(0L, 100L),
+            characteristic(iid + 7, 0x3600_0028, CafCharacteristicFormat.STRING, SETTINGS_SECTION, mutable = false),
+        ),
+    )
+
+    /** vehicle resources（LIVI `vehicle_resources()`，iid 768）：内饰风格。 */
+    private fun vehicleResources() = accessory(
+        VEHICLE_RESOURCES, 0x0120_0002,
+        listOf(
+            service(
+                769, 0x2000_0001,
+                listOf(
+                    characteristic(
+                        770, 0x4800_0004, CafCharacteristicFormat.STRING, INTERIOR_STYLE,
+                        mutable = false,
+                    ),
+                ),
+            ),
+        ),
+    )
+
+    /**
+     * combustion engine（LIVI `combustion_engine()`，iid 2560）。
+     *
+     * 纯电车把电机转速映射到这里的转速槽位（见类注释）。
+     */
+    private fun combustionEngine() = accessory(
+        COMBUSTION_ENGINE, 0x0900_0005,
+        listOf(
+            service(
+                2561, 0x1A00_000F,
+                listOf(
+                    rpmCharacteristic(ENGINE_RPM, 0x3000_0024, fixed = false),
+                    rpmCharacteristic(2563, 0x3000_004E, fixed = true),
+                    rpmCharacteristic(2564, 0x3000_004F, fixed = true),
+                ),
+            ),
+        ),
+    )
+
+    /** electric engine（LIVI `electric_engine()`，iid 2816）：只有功率。 */
+    private fun electricEngine() = accessory(
+        ELECTRIC_ENGINE, 0x0900_0004,
+        listOf(
+            service(
+                2817, 0x1A00_000D,
+                listOf(
+                    characteristic(
+                        ENGINE_POWER, 0x3000_0028, CafCharacteristicFormat.FLOAT, 0.0,
+                    ).range(-1000.0, 1000.0, 0.1).apply { put("units", KILOWATTS) },
+                ),
+            ),
+        ),
+    )
+
+    /**
+     * fuel（LIVI `fuel()`，iid 1536）。
+     *
+     * ★ v130 修正：kind/service/characteristic type 全部按 LIVI 对齐
+     * （原来是 `0x0100_0002` / `0x1A00_0002` / `0x3000_0007`）。
+     */
+    private fun fuel() = accessory(
+        FUEL, 0x0900_0006,
+        listOf(
+            service(
+                1537, 0x1A00_0005,
+                listOf(
+                    characteristic(FUEL_LEVEL, 0x4100_0002, CafCharacteristicFormat.UINT8, 0)
+                        .range(0L, 100L).apply { put("units", PERCENT) },
+                    characteristic(
+                        FUEL_LEVEL_MARKER_LOW, 0x4100_001A, CafCharacteristicFormat.UINT8,
+                        LOW_FUEL_PCT, mutable = false,
+                    ).range(0L, 100L).apply { put("units", PERCENT) },
+                ),
+            ),
+            distanceService(1540, 0x1A00_0015, FUEL_RANGE_KM, FUEL_RANGE_MILES, FUEL_RANGE_HIDDEN),
+        ),
+    )
+
+    /**
+     * trip computer（LIVI `trip_computer()`，iid 1792）。
+     *
+     * ★ v130 新增：剩余续航与总里程原来挤在 fuel accessory 里，
+     * LIVI 把它们放在独立的 trip computer，各带 km + miles 孪生特性。
+     */
+    private fun tripComputer() = accessory(
+        TRIP_COMPUTER, 0x0400_0001,
+        listOf(
+            distanceService(1793, 0x1A00_000B, REMAINING_RANGE_KM, REMAINING_RANGE_MILES, REMAINING_RANGE_HIDDEN),
+            distanceService(1797, 0x1A00_000A, ODOMETER_KM, ODOMETER_MILES, null),
+        ),
+    )
+
+    /** LIVI 的 `distance()`：一个距离 service = km + miles（+ 可选 hidden）。 */
+    private fun distanceService(
+        iid: Long,
+        type: Long,
+        kmIid: Long,
+        milesIid: Long,
+        hiddenIid: Long?,
+    ): Map<String, Any?> {
+        val chars = arrayListOf<Map<String, Any?>>(
+            distanceCharacteristic(kmIid, 0x3000_004A, KILOMETERS),
+            distanceCharacteristic(milesIid, 0x3000_004B, MILES),
+        )
+        if (hiddenIid != null) {
+            chars.add(
+                characteristic(hiddenIid, 0x3600_0023, CafCharacteristicFormat.BOOL, true, mutable = false),
+            )
+        }
+        return service(iid, type, chars)
+    }
+
+    /**
+     * tires（LIVI `tires()`，iid 2048）。
+     *
+     * ★ v130 修正：accessory kind `0x0100_0004` → `0x0A00_0001`。
+     * 每个轮一个 service（iid = 2048+1+5*n），service kind `0x1B00_0001`。
+     */
+    private fun tires() = accessory(
+        TIRES_ACCESSORY, 0x0A00_0001,
+        (0 until 4).map { wheel ->
+            val iid = tirePressureIid(wheel)
+            service(
+                iid - 1, 0x1B00_0001,
+                listOf(
+                    characteristic(iid, 0x3000_001B, CafCharacteristicFormat.UINT32, 0L)
+                        .range(0L, 1000L).apply { put("units", KILOPASCALS) },
+                    characteristic(
+                        iid + 1, 0x3600_0065, CafCharacteristicFormat.STRING,
+                        WHEEL_LAYOUT_KEYS[wheel], mutable = false,
+                    ),
+                    characteristic(iid + 2, 0x3000_001C, CafCharacteristicFormat.UINT8, 0L)
+                        .range(0L, 5L),
+                    characteristic(iid + 3, 0x3000_001A, CafCharacteristicFormat.UINT8, SENSOR_WAITING)
+                        .range(0L, 4L),
+                ),
+            )
+        },
+    )
+
+    /**
+     * audio（LIVI `audio()`，iid 2304）：五路音量 + 总音量静音。
+     *
+     * 我们没有音量数据源 —— 这些特性照 LIVI 声明（initial 50 / false），
+     * iPhone 写进来的值原样回读；读不到真实音量时报 NO_VALUE，不编造。
+     */
+    private fun audio() = accessory(
+        AUDIO, 0x0200_0001,
+        listOf(
+            volumeService(VOLUME, 0L, VOLUME_LABEL, withMute = true),
+            volumeService(NAV_VOLUME, 1L, null, withMute = false),
+            volumeService(CALL_VOLUME, 2L, null, withMute = false),
+            volumeService(SIRI_VOLUME, 3L, null, withMute = false),
+            volumeService(MUSIC_VOLUME, 6L, MUSIC_VOLUME_LABEL, withMute = false),
+        ),
+    )
+
+    /** LIVI 的 `volume()`：一路音量 = volume + volumeType（+ label / mute）。 */
+    private fun volumeService(
+        iid: Long,
+        type: Long,
+        label: String?,
+        withMute: Boolean,
+    ): Map<String, Any?> {
+        val chars = arrayListOf<Map<String, Any?>>(
+            characteristic(iid, 0x3300_0006, CafCharacteristicFormat.UINT8, 50L, Owner.SHARED)
+                .range(0L, 100L),
+            characteristic(iid + 1, 0x3300_0005, CafCharacteristicFormat.UINT8, type, mutable = false)
+                .range(0L, LAST_VOLUME_TYPE),
+        )
+        if (label != null) {
+            chars.add(
+                characteristic(iid + 2, 0x3000_0001, CafCharacteristicFormat.STRING, label, mutable = false),
+            )
+        }
+        if (withMute) {
+            chars.add(
+                characteristic(MUTE, 0x3300_0009, CafCharacteristicFormat.BOOL, false, Owner.SHARED),
+            )
+        }
+        return service(iid - 1, 0x1300_0002, chars)
+    }
 
     companion object {
         /** CAF plugin 标识。 */
@@ -346,14 +658,32 @@ internal class B561VehicleStateAccessory(
         /** 油量百分比 iid。 */
         const val FUEL_LEVEL = 1538L
 
+        /** 油量低标记 iid（LIVI `fuelLevelMarkerLow`）。 */
+        const val FUEL_LEVEL_MARKER_LOW = 1539L
+
         /** 燃油续航 iid（km）。 */
-        const val FUEL_RANGE = 1541L
+        const val FUEL_RANGE_KM = 1541L
+
+        /** 燃油续航 iid（miles）。 */
+        const val FUEL_RANGE_MILES = 1542L
+
+        /** 燃油续航 hidden 标志 iid。 */
+        const val FUEL_RANGE_HIDDEN = 1543L
 
         /** 剩余续航 iid（km）。 */
-        const val REMAINING_RANGE = 1794L
+        const val REMAINING_RANGE_KM = 1794L
+
+        /** 剩余续航 iid（miles）。 */
+        const val REMAINING_RANGE_MILES = 1795L
+
+        /** 剩余续航 hidden 标志 iid。 */
+        const val REMAINING_RANGE_HIDDEN = 1796L
 
         /** 总里程 iid（km）。 */
-        const val ODOMETER = 1798L
+        const val ODOMETER_KM = 1798L
+
+        /** 总里程 iid（miles）。 */
+        const val ODOMETER_MILES = 1799L
 
         /** 胎压 accessory 的 iid（LIVI `TIRES`）。 */
         const val TIRES_ACCESSORY = 2048L
@@ -373,14 +703,92 @@ internal class B561VehicleStateAccessory(
         /** 四个轮的胎压 iid。 */
         val TIRE_PRESSURE_IDS: List<Long> = (0 until 4).map { tirePressureIid(it) }
 
-        private val ENGINE_RPM_IDS = longArrayOf(ENGINE_RPM, 2563L, 2564L)
+        /** 每轮额外的 iid（布局 key / 胎压状态 / 传感器状态）。 */
+        val TIRE_EXTRA_IDS: List<Long> = (0 until 4).flatMap { wheel ->
+            val iid = tirePressureIid(wheel)
+            listOf(iid + 1, iid + 2, iid + 3)
+        }
 
+        // ── v130 新增 accessory 的 iid 组 ──
+
+        /** navigation accessory（LIVI `navigation()`）。 */
+        const val NAVIGATION = 256L
+
+        /** navigation 三个 service 的全部 iid（258..275）。 */
+        val NAVIGATION_IDS: List<Long> = (258L..275L).toList()
+
+        /** automaker settings accessory（LIVI `automaker_settings()`）。 */
+        const val AUTOMAKER_SETTINGS = 1280L
+
+        /** automaker settings 的 iid：两行 info_line + section。 */
+        val AUTOMAKER_IDS: List<Long> = listOf(
+            1282L, 1283L, 1284L, 1285L, 1286L, 1287L, 1288L,
+            1290L, 1291L, 1292L, 1293L, 1294L, 1295L, 1296L,
+            1298L, 1299L, 1300L,
+        )
+
+        /** vehicle resources accessory（LIVI `vehicle_resources()`）。 */
+        const val VEHICLE_RESOURCES = 768L
+
+        const val INTERIOR_STYLE_IID = 770L
+
+        /** 内饰风格值（LIVI 同款 "5Seater"）。 */
+        const val INTERIOR_STYLE = "5Seater"
+
+        val VEHICLE_RESOURCE_IDS: List<Long> = listOf(INTERIOR_STYLE_IID)
+
+        /** combustion engine accessory（LIVI `combustion_engine()`）。 */
+        const val COMBUSTION_ENGINE = 2560L
+
+        /** electric engine accessory（LIVI `electric_engine()`）。 */
+        const val ELECTRIC_ENGINE = 2816L
+
+        /** fuel accessory（LIVI `fuel()`）。 */
+        const val FUEL = 1536L
+
+        /** trip computer accessory（LIVI `trip_computer()`）。 */
+        const val TRIP_COMPUTER = 1792L
+
+        /** fuel accessory 的 iid（LIVI `fuel()`，含距离 service）。 */
+        val FUEL_IDS: List<Long> = listOf(
+            FUEL_LEVEL, FUEL_LEVEL_MARKER_LOW,
+            FUEL_RANGE_KM, FUEL_RANGE_MILES, FUEL_RANGE_HIDDEN,
+        )
+
+        /** trip computer 的 iid（LIVI `trip_computer()`）。 */
+        val TRIP_IDS: List<Long> = listOf(
+            REMAINING_RANGE_KM, REMAINING_RANGE_MILES, REMAINING_RANGE_HIDDEN,
+            ODOMETER_KM, ODOMETER_MILES,
+        )
+
+        /** audio accessory（LIVI `audio()`）。 */
+        const val AUDIO = 2304L
+
+        const val VOLUME = 2306L
+        const val MUTE = 2309L
+        const val NAV_VOLUME = 2311L
+        const val CALL_VOLUME = 2314L
+        const val MUSIC_VOLUME = 2317L
+        const val SIRI_VOLUME = 2321L
+
+        val AUDIO_IDS: List<Long> = listOf(
+            VOLUME, VOLUME + 1, VOLUME + 2, MUTE,
+            NAV_VOLUME, NAV_VOLUME + 1,
+            CALL_VOLUME, CALL_VOLUME + 1,
+            MUSIC_VOLUME, MUSIC_VOLUME + 1, MUSIC_VOLUME + 2,
+            SIRI_VOLUME, SIRI_VOLUME + 1,
+        )
+
+        private val ENGINE_RPM_IDS = longArrayOf(ENGINE_RPM, 2563L, 2564L)
 
         /** 转速表满量程。 */
         const val MAX_RPM = 8000L
 
         /** 红线。 */
         const val REDLINE_RPM = 6500L
+
+        /** 低油量标记（%）。 */
+        const val LOW_FUEL_PCT = 15L
 
         /** 单位：转每分钟。 */
         const val REVOLUTIONS_PER_MINUTE = 981L
@@ -391,16 +799,66 @@ internal class B561VehicleStateAccessory(
         /** 单位：公里。 */
         const val KILOMETERS = 151L
 
+        /** 单位：英里。 */
+        const val MILES = 164L
+
         /** 单位：千帕。 */
         const val KILOPASCALS = 932L
 
         /** 单位：百分比。 */
         const val PERCENT = 1205L
 
+        /** 胎压传感器状态：活跃。 */
+        const val SENSOR_ACTIVE = 1L
+
+        /** 胎压传感器状态：等待（初始值）。 */
+        const val SENSOR_WAITING = 3L
+
         /** 「无值」的 CAF 错误码。 */
         const val NO_VALUE = -6727L
 
         /** 参数错误码。 */
         const val PARAMETER_ERROR = -6735L
+
+        /** 「没有这个 control」的 CAF 错误码（LIVI `NO_SUCH_COMMAND`）。 */
+        const val NO_SUCH_COMMAND = -6735L
+
+        /** 特性优先级（LIVI `HIGH_PRIORITY`）。 */
+        const val HIGH_PRIORITY = 1L
+
+        /** 非数值特性的最大长度（LIVI `MAX_LENGTH`）。 */
+        const val MAX_LENGTH = 65535L
+
+        /** 音量类型上限（LIVI `LAST_VOLUME_TYPE`）。 */
+        const val LAST_VOLUME_TYPE = 7L
+
+        /** km → mile 换算（LIVI `KM_PER_MILE`）。 */
+        const val KM_PER_MILE = 1.609344
+
+        // ── OEM 设置区显示用字符串 ──
+
+        /**
+         * accessory 版本 —— 与 `mobile/build.gradle.kts` 的 versionName 对齐，
+         * 出现在 iPhone 的 OEM 设置区里，排障时能认出车机软件版本。
+         */
+        const val ACCESSORY_VERSION = "0.2.19-oushang1"
+
+        /** 构建日期（LIVI 同款：空串时 info_line 显示「?」）。 */
+        const val BUILD_DATE = ""
+
+        /** OEM 设置区名称。 */
+        const val SETTINGS_SECTION = "B561"
+
+        /** iPhone 仪表上显示的车辆品牌。 */
+        const val VEHICLE_BRAND = "UNI-Z"
+
+        /** iPhone 仪表上显示的导航系统名。 */
+        const val NAVIGATION_SYSTEM_NAME = "Apple Maps"
+
+        /** 音量 UI 里的主音量标签。 */
+        const val VOLUME_LABEL = "CarPlay"
+
+        /** 音量 UI 里的音乐音量标签。 */
+        const val MUSIC_VOLUME_LABEL = "Music"
     }
 }

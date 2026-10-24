@@ -53,6 +53,18 @@ import java.util.concurrent.atomic.AtomicLong
  * logcat / VHAL 读到的 B561 车辆属性。**读不到的字段不声明**，
  * 绝不给 iPhone 假的 0。
  *
+ * ## ★ v130 相对 v126 改了什么
+ *
+ * 1. **displayPanels 改 LIVI themed 量产结构**：插件挂到集群 panel 自身
+ *    （`displayPlugins`，`videoStreams=[集群 uuid]`），删掉虚拟 panel ——
+ *    v126 的虚拟 panel 插件 `videoStreams` 为空，插件输出无处可去。
+ * 2. **CAF 特征树对齐 LIVI 最小可用集**（见 [B561VehicleStateAccessory]）：
+ *    补 navigation / automaker_settings / vehicle_resources / trip_computer /
+ *    audio，修 fuel / tires 的 kind。
+ * 3. **writeRequest / controlRequest 不再静默丢弃**。
+ * 4. **publish 合并 + `CAF ALIVE subs=N` 心跳**：区分「手机没订阅」与
+ *    「我们推得慢」，并防高频数据源灌满 worker 队列触发 close。
+ *
  * ## 参考
  *
  * - 协议框架：VoyahPlay 的 `VoyahUltraProtocol`（Kotlin）
@@ -73,6 +85,9 @@ class B561UltraProtocol(
     private val cafConnections = ConcurrentHashMap.newKeySet<String>()
     private val nextId = AtomicLong(10_000)
 
+    /** 上次 CAF ALIVE 心跳的时间戳（[clock] 同源）。 */
+    private var lastHeartbeat = 0L
+
     override fun forSession(): AirPlayProtocolExtension =
         B561UltraProtocol(sample, clock, trace)
 
@@ -91,29 +106,35 @@ class B561UltraProtocol(
                 B561VehicleStateAccessory.PLUGIN_NAME to B561VehicleStateAccessory.PLUGIN_ID,
             ),
         )
-        // ★ v126: displayPanels —— 这段是 **iPhone 决定「Ultra 仪表画在哪」的唯一依据**。
+        // ★ v130: displayPanels —— 照 LIVI 的 **themed 量产路径**
+        // （`info.rs::add_display_panels` 的 `theme_displays = Some(..)` 分支，
+        // 测试断言原文："the cluster carries the plug-in, no extra panel"）。
         //
-        // v125 这里只把每个 display 抄成一个 panel，properties 恒为空、
-        // 没有 displayPlugins、也没有虚拟 cluster panel —— 结果 iPhone 收到
-        // vehicleStateProtocol 声明后虽然开了 RCS/CAF 通道，却**不知道要把
-        // 仪表画到哪块屏**，于是官方仪表出不来。
+        // v125/v126 抄的是 LIVI 的**非 themed** 分支：插件挂在追加的
+        // **虚拟 cluster panel** 上，且 `videoStreams` 为空 —— 插件输出
+        // 无处可去（LIVI 对那条路径的注释：a plug-in would black out
+        // the cluster）。结果：iPhone 只在集群屏上放 CarPlay 地图流，
+        // 官方 Ultra 仪表永远出不来（v126 实车症状）。
         //
-        // 正确形态（照 LIVI 的 info.rs:add_display_panels）：
-        // ① 每个真实 display 一个 panel，uid = "<uuid>-panel"；
-        // ② **仪表屏**（type=111）的 panel 带 properties=["showsInstruments"]，
-        //    但**不能**带 displayPlugins —— 插件会把该屏拉黑
-        //    （LIVI 注释原文："a plug-in would black out the cluster"）；
-        // ③ 额外追加一个**虚拟 cluster panel**：没有视频流、带 showsInstruments、
-        //    带 displayPlugins 指向我们的 CAF plugin —— iPhone 在这块虚拟 panel 上
-        //    用 CAF 数据画官方仪表。
+        // 量产形态：
+        // ① 每个真实 display 一个 panel，uid 用显示名（LIVI 的 theme names）；
+        // ② **仪表屏**（type=111）panel 带 properties=["showsInstruments"]，
+        //    且 displayPlugins 指向我们的 CAF 插件 —— 插件 uid 与 panel uid
+        //    相同，videoStreams=[集群屏自己的 uuid]（iPhone 把 CAF 车辆状态
+        //    直接画进集群屏的视频流里）；
+        // ③ 主屏 panel 不带插件；
+        // ④ **不追加虚拟 panel**。
         val panels = mutableListOf<Map<String, Any?>>()
         (info["displays"] as? List<*>).orEmpty()
             .filterIsInstance<Map<*, *>>().forEach { display ->
                 val uuid = display["uuid"] as? String ?: return@forEach
                 // type 可能被 plist 解码成 Int 或 Long —— 按数值比，别按类型比。
                 val isCluster = (display["type"] as? Number)?.toInt() == CLUSTER_STREAM_TYPE
-                panels += linkedMapOf<String, Any?>(
-                    "uid" to "$uuid-panel",
+                // themed 模式 panel uid 是显示名；插件 uid 与 panel uid 相同
+                // （LIVI: streams 非空时 plugin_uid = uid）。
+                val uid = if (isCluster) CLUSTER_PANEL_UID else MAIN_PANEL_UID
+                val panel = linkedMapOf<String, Any?>(
+                    "uid" to uid,
                     "widthPixels" to display["widthPixels"],
                     "heightPixels" to display["heightPixels"],
                     "widthPhysical" to display["widthPhysical"],
@@ -128,29 +149,16 @@ class B561UltraProtocol(
                         ),
                     ),
                 )
+                if (isCluster) {
+                    panel["displayPlugins"] = listOf(
+                        linkedMapOf<String, Any?>(
+                            "uid" to uid,
+                            "videoStreams" to listOf(uuid),
+                        ),
+                    )
+                }
+                panels += panel
             }
-        // 虚拟 cluster panel：尺寸取仪表屏（没有就取第一块屏）。
-        val sized = panels.firstOrNull { panel ->
-            (panel["properties"] as? List<*>)?.any { it == SHOWS_INSTRUMENTS } == true
-        } ?: panels.firstOrNull()
-        if (sized != null) {
-            panels += linkedMapOf<String, Any?>(
-                "uid" to "$CLUSTER_PANEL_UID-panel",
-                "widthPixels" to sized["widthPixels"],
-                "heightPixels" to sized["heightPixels"],
-                "widthPhysical" to sized["widthPhysical"],
-                "heightPhysical" to sized["heightPhysical"],
-                "properties" to listOf(SHOWS_INSTRUMENTS),
-                // 虚拟 panel 没有视频流 —— 仪表是 CAF 数据画出来的，不是视频。
-                "initialVideoStreams" to emptyList<Any?>(),
-                "displayPlugins" to listOf(
-                    linkedMapOf<String, Any?>(
-                        "uid" to "$CLUSTER_PANEL_UID-plugin",
-                        "videoStreams" to emptyList<Any?>(),
-                    ),
-                ),
-            )
-        }
         info["displayPanels"] = panels
         log(
             "INFO VSP=1 plugin=0 WIRE_REV=$WIRE_REV " +
@@ -331,8 +339,38 @@ class B561UltraProtocol(
         val previous = gauges
         if (previous == value) return
         gauges = value
-        log("VEHICLE rpm=${value?.primaryRpm} power=${value?.powerKw} battery=${value?.batteryPercent}")
+        log(
+            "VEHICLE rpm=${value?.primaryRpm} power=${value?.powerKw} " +
+                "battery=${value?.batteryPercent}",
+        )
+        heartbeat()
         channels.values.forEach { it.publish() }
+    }
+
+    /**
+     * ★ v130: CAF 链路存活心跳 + 零订阅告警。
+     *
+     * v126 真车日志的教训：iPhone 走完 `configRequest → configResponse`
+     * 之后**一条 registerRequest 都没发**，RCS 通道静默到 EOF。
+     * 没有订阅时 `changed()` 永远返回 null，车辆数据一条都到不了
+     * iPhone —— 而日志上完全看不出「手机没订阅」还是「我们推得慢」。
+     *
+     * 现在每 5 秒打一条 `CAF ALIVE subs=N`；subs=0 时明确告警
+     * （phone registered nothing），下次抓车机日志一眼可辨。
+     */
+    private fun heartbeat() {
+        val now = clock()
+        if (now - lastHeartbeat < ALIVE_INTERVAL_MS) return
+        lastHeartbeat = now
+        val subs = channels.values.sumOf { it.subscribedCount() }
+        if (subs == 0) {
+            log(
+                "CAF ALIVE subs=0 channels=${channels.size} — " +
+                    "phone registered nothing; no updateNotify will ever go out",
+            )
+        } else {
+            log("CAF ALIVE subs=$subs channels=${channels.size}")
+        }
     }
 
     private fun newAccessory() = B561VehicleStateAccessory({ gauges })
@@ -362,6 +400,9 @@ class B561UltraProtocol(
         private val stopped = AtomicBoolean(false)
         private val accessory = newAccessory()
         private var encoding = CafBodyEncoding.OPACK
+
+        /** ★ v130: 发布合并标志 —— 见 [publish]。 */
+        private val publishPending = AtomicBoolean(false)
         private val worker = ThreadPoolExecutor(
             1, 1, 0, TimeUnit.MILLISECONDS, ArrayBlockingQueue<Runnable>(64),
         ) { runnable ->
@@ -407,7 +448,28 @@ class B561UltraProtocol(
             }
         }
 
-        fun publish() = enqueue { accessory.changed()?.let(::send) }
+        /** 当前订阅的 iid 数（诊断用，见 [B561UltraProtocol.heartbeat]）。 */
+        fun subscribedCount(): Int = accessory.subscribedIds().size
+
+        /**
+         * ★ v130: 合并发布。
+         *
+         * logcat 字段每秒变多次，`onGaugesChanged` 会连着调 publish ——
+         * 旧写法每次都入队，worker 队列（64）一满就
+         * `CAF queue full` → close 通道，表现为「数据刷新慢 /
+         * 时断时续」。现在用 [AtomicBoolean] 合并：一次 worker 执行把
+         * 期间积累的所有变化一次性发出（[B561VehicleStateAccessory.changed]
+         * 本身就只报与上次比真的变了的 iid）。
+         */
+        fun publish() {
+            if (stopped.get()) return
+            if (publishPending.compareAndSet(false, true)) {
+                enqueue {
+                    publishPending.set(false)
+                    accessory.changed()?.let(::send)
+                }
+            }
+        }
 
         private fun send(frame: com.shilapi.xcertplay.airplay.rcs.caf.CafRcsFrame) {
             log(
@@ -459,18 +521,27 @@ class B561UltraProtocol(
         const val WIRE_REV = "b561-vsp-vehicle-state"
 
         /**
-         * 虚拟 cluster panel 的 UUID 家族第三项。
+         * ★ v130: panel 显示名（LIVI themed 模式的 theme names）。
          *
-         * 与主屏 `...1111-...0001`、仪表屏 `...2222-...0002` 同族 ——
-         * 这是 Apple CarPlay Ultra 的约定（LIVI 的 `info.rs` 也用这一族）。
-         * iPhone 靠这个 panel 把 CAF 车辆状态画成官方仪表。
+         * v126 及以前这里放的是 UUID 家族第三项
+         * （`b7e6c5a0-3333-...`）—— 那是 LIVI **非 themed** 分支
+         * 虚拟 panel 的命名。v130 改走 LIVI 量产 themed 路径：
+         * panel uid 用显示名，插件 uid 与 panel uid 相同，
+         * videoStreams 指向集群屏自己的 display uuid
+         * （`AirPlayInfoPlist` 里的 `...2222-...0002`）。
          */
-        const val CLUSTER_PANEL_UID = "b7e6c5a0-3333-4000-8000-000000000003"
+        const val MAIN_PANEL_UID = "Main_Display"
+
+        /** 集群 panel 显示名（LIVI 同款 "Cluster_Display"）。 */
+        const val CLUSTER_PANEL_UID = "Cluster_Display"
 
         /** 仪表屏的 stream type（CarPlay 的 instrument cluster）。 */
         const val CLUSTER_STREAM_TYPE = 111
 
         /** panel 属性：这一块显示仪表。 */
         const val SHOWS_INSTRUMENTS = "showsInstruments"
+
+        /** CAF ALIVE 心跳间隔（ms）—— 订阅诊断用。 */
+        const val ALIVE_INTERVAL_MS = 5_000L
     }
 }
