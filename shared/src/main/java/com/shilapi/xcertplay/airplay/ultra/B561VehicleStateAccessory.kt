@@ -38,6 +38,19 @@ import com.shilapi.xcertplay.vehicle.B561UltraGauges
  * 另外补上 **navigation**（iid 256）—— 它带 `vehicleEnabled=true`，
  * 是"这台车的仪表能显示导航"的声明；v125/v126 完全没有它。
  *
+ * ## ★ v131: initialValue 预填（LIVI `initial_values()` 对齐）
+ *
+ * v130 真车日志实证：iPhone 订阅之后拿到的 register 响应**全是
+ * -6727（NO_VALUE）**，车辆 UI 一片空白 —— 车机两个数据源
+ * （logcat 子进程 / CarCabinManager）在那台车上全废。
+ * LIVI 的量产做法（`initial_values()`）是把 config 树里声明的
+ * initialValue 直接预填进响应：RPM=0 / 音量=50 / 传感器 WAITING…
+ * iPhone 至少看到合法下限，数据源恢复后真实值覆盖。
+ *
+ * 取值优先级：**iPhone 写过的值 > 真实读数 > initialValue**。
+ * register 响应同时记为"已发送"基线 —— 不同步的话，第一条 gauges
+ * 更新会把全部预填值当变化重发（0→0 也算变），白灌全量帧。
+ *
  * ## iid 与 type 的来源
  *
  * 全部照 LIVI 的 `vehicle_state.rs`（Rust，开源里最完整的一套）：
@@ -94,6 +107,42 @@ internal class B561VehicleStateAccessory(
 
     /** iPhone 写过来的值（phone-owned 特性：导航 legs / 音量…）。原样回读。 */
     private val written = linkedMapOf<Long, Any?>()
+
+    /**
+     * 树里声明了 initialValue 的特性 → 预填值（LIVI `initial_values()`）。
+     *
+     * ★ v131：为什么需要它。v130 真车日志实证：iPhone 订阅之后拿到的
+     * register 响应**全是 -6727（NO_VALUE）**，车辆 UI 一片空白 ——
+     * 我们的两个车机数据源（logcat 子进程 / CarCabinManager）在那台车上
+     * 全废，一个真实读数都拿不到。LIVI 的量产做法是把 config 树里声明的
+     * initialValue 直接预填进响应：iPhone 至少能看到合法初始值
+     * （RPM=0 / 音量=50 / 传感器 WAITING…），数据源恢复后真实值覆盖。
+     *
+     * 取值优先级：**iPhone 写过的值 > 真实读数 > initialValue**。
+     * 注意这与"读不到就不给"不矛盾 —— 铁律管的是 `changed()`（不得把
+     * 预填的 0 当真实变化推给 iPhone），这里只管一次性响应的下限。
+     */
+    private val initialValues: Map<Long, Any?> by lazy {
+        val result = linkedMapOf<Long, Any?>()
+
+        fun walk(node: Any?) {
+            when (node) {
+                is Map<*, *> -> {
+                    // 只有 characteristic 带 initialValue 键；accessory/service
+                    // 的 iid 不会误收（它们没有这个键）。
+                    val iid = (node["iid"] as? Number)?.toLong()
+                    if (iid != null && node.containsKey("initialValue")) {
+                        result[iid] = node["initialValue"]
+                    }
+                    node.values.forEach(::walk)
+                }
+                is List<*> -> node.forEach(::walk)
+            }
+        }
+
+        walk(config(hasEngineRpm = true))
+        result
+    }
 
     /** 本 accessory 声明的全部 iid。 */
     private val knownIds: Set<Long> = buildSet {
@@ -167,8 +216,13 @@ internal class B561VehicleStateAccessory(
                 val ids = if (message.values() == "*") knownIds.toList() else identifiers(message)
                 val transaction = message.requireTransactionId()
                 subscriptions.addAll(ids.filter { it in knownIds })
+                val values = values(ids)
+                // ★ v131：register 响应就是当前值快照 —— 把它记为"已发送"基线。
+                // 不同步的话，第一条 gauges 更新会把全部预填值当变化重发
+                // （0→0 也算变），白灌一条全量 updateNotify。
+                lastSent = lastSent + values
                 CarAccessoryMessages.registerResponse(
-                    PLUGIN_ID, transaction, values(ids), errors(ids),
+                    PLUGIN_ID, transaction, values, errors(ids),
                 )
             }
 
@@ -229,14 +283,28 @@ internal class B561VehicleStateAccessory(
         return result
     }
 
-    /** 按 iid 取值；null = 没有该读数。 */
+    /**
+     * 按 iid 取值；null = 没有该读数。
+     *
+     * 三级取值：iPhone 写过的值 → 真实读数 → initialValue 预填。
+     */
     private fun valueOf(data: B561UltraGauges?, id: Long): Any? {
-        // iPhone 写过的值优先回读（phone-owned 特性）—— 这与车辆数据无关，
+        // ① iPhone 写过的值优先回读（phone-owned 特性）—— 这与车辆数据无关，
         // **没有 sample 时也必须能回读**（v130 修：旧写法 sample 为 null 时
         // 整个 values() 直接返回空表，写进来的音量/导航 legs 读不回来，
         // iPhone 会认为插件无响应）。
         written[id]?.let { return it }
-        if (data == null) return null
+        // ② 真实读数优先于 initialValue —— 车机有真数据时报真值。
+        if (data != null) {
+            computedValue(data, id)?.let { return it }
+        }
+        // ③ initialValue 预填（LIVI initial_values()，v131）：无真实读数时
+        // 至少给合法初始值，不再一片 NO_VALUE。
+        return initialValues[id]
+    }
+
+    /** 从真实读数算值；null = 这个读数没有（再往下跌落 initialValue）。 */
+    private fun computedValue(data: B561UltraGauges, id: Long): Any? {
         when (id) {
             ENGINE_RPM -> return data.primaryRpm?.toLong()
             2563L -> return MAX_RPM
@@ -348,8 +416,16 @@ internal class B561VehicleStateAccessory(
             put("stepValue", step)
         }
 
-    private fun rpmCharacteristic(iid: Long, type: Long, fixed: Boolean) =
-        characteristic(iid, type, CafCharacteristicFormat.UINT32, 0L, mutable = !fixed)
+    /**
+     * 转速类特性。
+     *
+     * ★ v131 修正：`initial` 不再是硬编码 0 —— LIVI 的 `combustion_engine()`
+     * 里 rotationalSpeed initial=0，但 **rotationalSpeedMax initial=max、
+     * rotationalSpeedMarkerRedline initial=redline**（v125 移植时把三个
+     * 都写成 0，上限=0 会让 iPhone 的转速表刻度塌缩，预填后直接暴露）。
+     */
+    private fun rpmCharacteristic(iid: Long, type: Long, initial: Long, fixed: Boolean) =
+        characteristic(iid, type, CafCharacteristicFormat.UINT32, initial, mutable = !fixed)
             .range(0L, MAX_RPM)
             .apply { put("units", REVOLUTIONS_PER_MINUTE) }
 
@@ -490,9 +566,9 @@ internal class B561VehicleStateAccessory(
             service(
                 2561, 0x1A00_000F,
                 listOf(
-                    rpmCharacteristic(ENGINE_RPM, 0x3000_0024, fixed = false),
-                    rpmCharacteristic(2563, 0x3000_004E, fixed = true),
-                    rpmCharacteristic(2564, 0x3000_004F, fixed = true),
+                    rpmCharacteristic(ENGINE_RPM, 0x3000_0024, initial = 0L, fixed = false),
+                    rpmCharacteristic(2563, 0x3000_004E, initial = MAX_RPM, fixed = true),
+                    rpmCharacteristic(2564, 0x3000_004F, initial = REDLINE_RPM, fixed = true),
                 ),
             ),
         ),
@@ -525,7 +601,7 @@ internal class B561VehicleStateAccessory(
             service(
                 1537, 0x1A00_0005,
                 listOf(
-                    characteristic(FUEL_LEVEL, 0x4100_0002, CafCharacteristicFormat.UINT8, 0)
+                    characteristic(FUEL_LEVEL, 0x4100_0002, CafCharacteristicFormat.UINT8, 0L)
                         .range(0L, 100L).apply { put("units", PERCENT) },
                     characteristic(
                         FUEL_LEVEL_MARKER_LOW, 0x4100_001A, CafCharacteristicFormat.UINT8,

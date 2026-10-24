@@ -14,7 +14,7 @@ import org.junit.Test
 /**
  * [B561VehicleStateAccessory] 的回归测试。
  *
- * 重点验证三件事：
+ * 重点验证四件事：
  * 1. **iid / kind / characteristic type 与 LIVI 一致** —— 这些数字是 Apple
  *    CarPlay Ultra 协议的约定，错了 iPhone 就读不到对应数据
  *    （v125/v126 的 fuel/tires 数字不对，真车上 iPhone 走完
@@ -23,6 +23,8 @@ import org.junit.Test
  *    （没有订阅就没有 updateNotify —— v126 日志里 iPhone 从未注册）。
  * 3. **writeRequest / controlRequest 有应答**（v130 补，静默丢弃会被
  *    iPhone 当成插件无响应）。
+ * 4. **initialValue 预填**（v131 补，LIVI `initial_values()` 对齐）：
+ *    无真实读数时响应里给树里声明的初始值，不再一片 NO_VALUE。
  */
 class B561VehicleStateAccessoryTest {
 
@@ -225,6 +227,11 @@ class B561VehicleStateAccessoryTest {
         assertEquals(0x3000_004EL, (chars[1] as Map<*, *>)["type"])
         assertEquals(2564L, (chars[2] as Map<*, *>)["iid"])
         assertEquals(0x3000_004FL, (chars[2] as Map<*, *>)["type"])
+        // ★ v131：initial 值照 LIVI —— 转速=0、上限=MAX_RPM、红线=REDLINE_RPM。
+        // v125 把三个都写成 0，上限=0 会让 iPhone 转速表刻度塌缩。
+        assertEquals(0L, (chars[0] as Map<*, *>)["initialValue"])
+        assertEquals(B561VehicleStateAccessory.MAX_RPM, (chars[1] as Map<*, *>)["initialValue"])
+        assertEquals(B561VehicleStateAccessory.REDLINE_RPM, (chars[2] as Map<*, *>)["initialValue"])
     }
 
     @Test
@@ -291,7 +298,8 @@ class B561VehicleStateAccessoryTest {
 
     @Test
     fun `register then changed reports subscribed values and dedupes`() {
-        val data = B561UltraGauges(
+        // 可变 sample：模拟"注册之后车辆数据更新"。
+        var current: B561UltraGauges? = B561UltraGauges(
             speedKph = 52.5f,
             motorRpm = 1200f,
             powerKw = 42.5f,
@@ -300,32 +308,43 @@ class B561VehicleStateAccessoryTest {
             odometerKm = 54266f,
             gear = 8,
         )
-        val accessory = accessoryWith(data)
+        val accessory = B561VehicleStateAccessory { current }
         val response = accessory.handleOrFail(
             request(CafCommand.REGISTER_REQUEST, mapOf(2562L to null, 2818L to null)),
         )
         assertEquals(CafCommand.REGISTER_RESPONSE, response.envelope.message.command)
         assertEquals(setOf(2562L, 2818L), accessory.subscribedIds())
+        // register 响应就是当前值快照：转速 Float → UINT32 Long；
+        // 功率 Float → FLOAT Double。
+        assertEquals(1200L, responseValues(response)[2562L])
+        assertEquals(42.5, responseValues(response)[2818L])
 
+        // ★ v131：register 已把返回值记为基线 —— 数据没变就不该再发
+        // updateNotify（否则每条 gauges 更新都会白灌一条全量帧）。
+        assertNull("注册即快照，无变化不得补发", accessory.changed())
+
+        // 数据真的变了 → 只发变化的那一项。
+        current = current!!.copy(motorRpm = 1500f)
         val changed = accessory.changed()
-        assertNotNull("注册之后必须有 updateNotify", changed)
+        assertNotNull("数据变化之后必须有 updateNotify", changed)
         assertEquals(CafCommand.UPDATE_NOTIFY, changed!!.envelope.message.command)
         val values = responseValues(changed)
-        // 转速 Float → UINT32 Long；功率 Float → FLOAT Double。
-        assertEquals(1200L, values[2562L])
-        assertEquals(42.5, values[2818L])
+        assertEquals(1500L, values[2562L])
+        assertEquals("只报变化的 iid", 1, values.size)
         // 第二次调用（数据没变）→ 无帧。
         assertNull(accessory.changed())
     }
 
     @Test
     fun `unregister stops updates`() {
-        val data = B561UltraGauges(motorRpm = 1200f)
-        val accessory = accessoryWith(data)
+        var current: B561UltraGauges? = B561UltraGauges(motorRpm = 1200f)
+        val accessory = B561VehicleStateAccessory { current }
         accessory.handleOrFail(request(CafCommand.REGISTER_REQUEST, mapOf(2562L to null)))
+        current = current!!.copy(motorRpm = 1500f)
         assertNotNull(accessory.changed())
         accessory.handleOrFail(request(CafCommand.UNREGISTER_REQUEST, mapOf(2562L to null)))
         assertTrue(accessory.subscribedIds().isEmpty())
+        current = current!!.copy(motorRpm = 3000f)
         assertNull(accessory.changed())
     }
 
@@ -340,7 +359,7 @@ class B561VehicleStateAccessoryTest {
     }
 
     @Test
-    fun `read returns live values and errors for missing readings`() {
+    fun `read returns live values and prefilled initials for missing readings`() {
         val data = B561UltraGauges(motorRpm = 1200f, powerKw = 42.5f)
         val accessory = accessoryWith(data)
         val response = accessory.handleOrFail(
@@ -348,23 +367,39 @@ class B561VehicleStateAccessoryTest {
         )
         assertEquals(CafCommand.READ_RESPONSE, response.envelope.message.command)
         assertEquals(1200L, responseValues(response)[2562L])
-        // 燃油车才有的油量：没有读数 → NO_VALUE，绝不报 0。
-        assertEquals(
-            B561VehicleStateAccessory.NO_VALUE,
-            responseErrors(response)[1538L],
-        )
+        // ★ v131：燃油车才有的油量，这台车没有读数 → 回落树里声明的
+        // initialValue=0（LIVI initial_values() 同款），不再是 NO_VALUE。
+        assertEquals(0L, responseValues(response)[1538L])
+        assertEquals(emptyMap<Long, Long>(), responseErrors(response))
     }
 
     @Test
-    fun `a snapshot without readings never reports a zero value`() {
+    fun `a snapshot without readings falls back to the declared initials`() {
         val data = B561UltraGauges(speedKph = 10f)
         val accessory = accessoryWith(data)
         val response = accessory.handleOrFail(
             request(CafCommand.READ_REQUEST, mapOf(2562L to null, 1798L to null)),
         )
+        // ★ v131：没有真实读数 → 回落 initialValue（转速 0 / 里程 0）。
+        // v130 及以前这里是一片 NO_VALUE，真车上 iPhone 车辆 UI 全空白。
+        assertEquals(mapOf(2562L to 0L, 1798L to 0L), responseValues(response))
+        assertEquals(emptyMap<Long, Long>(), responseErrors(response))
+    }
+
+    @Test
+    fun `phone owned characteristics without initial still report no value`() {
+        // navigation 的 phone-owned  legs 特性树里没有 initialValue，
+        // 也没被 iPhone 写过 → 仍然报 NO_VALUE（预填不是万能胶）。
+        val accessory = accessoryWith(B561UltraGauges(speedKph = 10f))
+        val response = accessory.handleOrFail(
+            request(CafCommand.READ_REQUEST, mapOf(266L to null, 267L to null)),
+        )
         assertEquals(emptyMap<Long, Any?>(), responseValues(response))
         assertEquals(
-            mapOf(2562L to B561VehicleStateAccessory.NO_VALUE, 1798L to B561VehicleStateAccessory.NO_VALUE),
+            mapOf(
+                266L to B561VehicleStateAccessory.NO_VALUE,
+                267L to B561VehicleStateAccessory.NO_VALUE,
+            ),
             responseErrors(response),
         )
     }
@@ -383,15 +418,13 @@ class B561VehicleStateAccessoryTest {
         assertEquals(250L, responseValues(response)[2050L])
         // 有读数 → 传感器状态 ACTIVE(1)。
         assertEquals(1L, responseValues(response)[2053L])
-        // 没有胎压读数时：胎压值报 NO_VALUE，传感器状态 WAITING(3)。
+        // 没有胎压读数时：胎压值回落 initialValue=0，传感器状态 WAITING(3)。
         val waiting = accessoryWith(B561UltraGauges(speedKph = 30f)).handleOrFail(
             request(CafCommand.READ_REQUEST, mapOf(2050L to null, 2053L to null)),
         )
+        assertEquals(0L, responseValues(waiting)[2050L])
         assertEquals(3L, responseValues(waiting)[2053L])
-        assertEquals(
-            B561VehicleStateAccessory.NO_VALUE,
-            responseErrors(waiting)[2050L],
-        )
+        assertEquals(emptyMap<Long, Long>(), responseErrors(waiting))
     }
 
     @Test
@@ -404,14 +437,11 @@ class B561VehicleStateAccessoryTest {
         )
         assertEquals(312L, responseValues(response)[1794L])
         assertEquals(194L, responseValues(response)[1795L])
-        // 没有读数时孪生特性也不出现。
+        // 没有读数时孪生特性回落 initialValue=0（miles 与 km 同步）。
         val empty = accessoryWith(B561UltraGauges(speedKph = 1f)).handle(
             request(CafCommand.READ_REQUEST, mapOf(1795L to null)),
         )
-        assertEquals(
-            B561VehicleStateAccessory.NO_VALUE,
-            responseErrors(empty)[1795L],
-        )
+        assertEquals(0L, responseValues(empty)[1795L])
     }
 
     @Test
@@ -484,5 +514,97 @@ class B561VehicleStateAccessoryTest {
         assertEquals(7L, response.envelope.message.transactionId)
         val config = responseValues(response)
         assertEquals(9, (config["accessories"] as List<*>).size)
+    }
+
+    // ── initialValue 预填（v131，LIVI initial_values() 对齐）──────────────
+
+    @Test
+    fun `register response prefills the declared initial values`() {
+        // ★ v130 真车实证：数据源全废时 register 响应全是 NO_VALUE，
+        // iPhone 车辆 UI 一片空白。v131 按 LIVI 的 initial_values()
+        // 预填树里声明的初始值，至少让 UI 有合法下限。
+        val accessory = accessoryWith(null)
+        val response = accessory.handleOrFail(
+            request(
+                CafCommand.REGISTER_REQUEST,
+                mapOf(
+                    2562L to null, // 转速 → 0
+                    2563L to null, // 转速上限 → MAX_RPM
+                    2818L to null, // 功率 → 0.0
+                    2306L to null, // 主音量 → 50
+                    2053L to null, // 胎压传感器状态 → WAITING(3)
+                ),
+            ),
+        )
+        val values = responseValues(response)
+        assertEquals(0L, values[2562L])
+        assertEquals(B561VehicleStateAccessory.MAX_RPM, values[2563L])
+        assertEquals(0.0, values[2818L])
+        assertEquals(50L, values[2306L])
+        assertEquals(B561VehicleStateAccessory.SENSOR_WAITING, values[2053L])
+        // 全部有值 → 一个 error 都不报。
+        assertEquals(emptyMap<Long, Long>(), responseErrors(response))
+    }
+
+    @Test
+    fun `initial values cover every characteristic that declares one`() {
+        // initialValues 必须与 config 树里带 initialValue 键的 characteristic
+        // 一一对应 —— 少一个就有一个特性在无数据时退回 NO_VALUE。
+        val accessory = accessoryWith(null)
+        val declared = linkedSetOf<Long>()
+        val config = accessory.config(hasEngineRpm = true)
+        (config["accessories"] as List<*>).forEach { accessoryNode ->
+            ((accessoryNode as Map<*, *>)["services"] as List<*>).forEach { serviceNode ->
+                ((serviceNode as Map<*, *>)["characteristics"] as List<*>).forEach { charNode ->
+                    val char = charNode as Map<*, *>
+                    if (char.containsKey("initialValue")) {
+                        declared.add(char["iid"] as Long)
+                    }
+                }
+            }
+        }
+        // 树里声明了初始值的特性必须是一个可观的规模（整棵树 60+ 项）。
+        assertTrue("树里带 initialValue 的特性至少 40 个", declared.size >= 40)
+        // 抽查几个关键项都在声明集合里。
+        listOf(2562L, 2563L, 2564L, 2818L, 1538L, 2306L, 2309L, 2053L).forEach {
+            assertTrue("iid=$it 必须声明 initialValue", it in declared)
+        }
+    }
+
+    @Test
+    fun `a live reading overrides the prefilled initial`() {
+        // 预填只是下限：真实读数来了必须赢。
+        var current: B561UltraGauges? = null
+        val accessory = B561VehicleStateAccessory { current }
+        // 无数据 → 预填 0。
+        val initial = accessory.handleOrFail(
+            request(CafCommand.READ_REQUEST, mapOf(2562L to null)),
+        )
+        assertEquals(0L, responseValues(initial)[2562L])
+        // 有数据 → 真实值。
+        current = B561UltraGauges(motorRpm = 2400f)
+        val live = accessory.handleOrFail(
+            request(CafCommand.READ_REQUEST, mapOf(2562L to null)),
+        )
+        assertEquals(2400L, responseValues(live)[2562L])
+    }
+
+    @Test
+    fun `prefilled baseline does not renotify when the value matches`() {
+        // register 时预填 RPM=0 已记为基线；真实读数也是 0（车静止）
+        // → 没有变化 → 不发 updateNotify。
+        val accessory = accessoryWith(B561UltraGauges(motorRpm = 0f))
+        accessory.handleOrFail(request(CafCommand.REGISTER_REQUEST, mapOf(2562L to null)))
+        assertNull(accessory.changed())
+        // 一旦真的转起来（0 → 900）才发 —— 注意变化必须发生在 register 之后，
+        // register 同步基线的语义就是"注册时的快照不再重发"。
+        var current: B561UltraGauges? = B561UltraGauges(motorRpm = 0f)
+        val moving = B561VehicleStateAccessory { current }
+        moving.handleOrFail(request(CafCommand.REGISTER_REQUEST, mapOf(2562L to null)))
+        assertNull(moving.changed())
+        current = B561UltraGauges(motorRpm = 900f)
+        val changed = moving.changed()
+        assertNotNull(changed)
+        assertEquals(900L, responseValues(changed!!)[2562L])
     }
 }

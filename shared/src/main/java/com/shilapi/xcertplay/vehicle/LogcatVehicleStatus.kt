@@ -3,10 +3,13 @@ package com.shilapi.xcertplay.vehicle
 import android.util.Log
 import java.io.BufferedReader
 import java.io.InputStreamReader
+import java.util.Collections
 import java.util.concurrent.Executors
 import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * 从 **logcat** 读取 B561 车辆数据（车速/挡位/电量/电压/电流）。
@@ -39,15 +42,38 @@ import java.util.concurrent.TimeUnit
  *
  * 读 logcat 需要 `READ_LOGS`。B561 是**平台签名**交付（证书
  * `c8a2e9bc…92ab8`），`READ_LOGS` 在 AOSP 里是 `signature|privileged`，
- * 平台签名的 app 可以拿到。若实车被拒（`logcat` 子进程立刻退出且无输出），
- * [isRunning] 为 false，调用方退回"无车辆数据"——**不报假值**。
+ * 平台签名的 app 可以拿到。若实车被拒，见下面的诊断增强 ——
+ * **拒绝信息必须能进我们自己的日志**，否则就是静默失败。
+ *
+ * ## ★ v131 诊断增强（真车「零输出」排障）
+ *
+ * v126/v130 真车日志连续两版出现同一个症状：`logcat started` 之后
+ * **一条 `logcat reading` 都没有**（v130 是 80 秒零条、零异常），
+ * 车辆数据链路整个静默。旧结构有三个盲区，v131 全部补上：
+ *
+ * 1. **读循环不再占用巡检线程**。旧结构把阻塞的 `readLine()` 直接放在
+ *    `scheduleWithFixedDelay` 的单线程任务里 —— 第一次调用就卡在
+ *    `readLine` 上，后续周期任务全部排在后面，既不会打诊断也不会走
+ *    重启路径。现在巡检（[supervise]）只做状态检查，阻塞读全部移到
+ *    常驻的 pump 线程。
+ * 2. **stderr 主动捕获**。旧注释说"不重定向 stderr，让它继承 fd"——
+ *    但 Android 上 app 进程的 fd 2 指向 /dev/null，权限拒绝信息
+ *    （`unable to log: Permission denied` 之类）**根本看不见**。
+ *    现在 stderr 由独立线程读走并打进我们自己的 tag。
+ * 3. **三张诊断牌**：首行超时告警（10 秒没读到第一行，带 stderr 快照
+ *    与进程存活状态）、未解析行样本（有行但 parseLine 匹配不上时打
+ *    首行截断）、30 秒摘要心跳（`lines=/unparsed=/fields=/alive=`）。
+ *    下次抓车机日志，三种故障一眼区分：
+ *    - `lines=0 alive=true` → 没行（权限 / tag 不匹配）；
+ *    - `lines>0 unparsed=lines` → 有行但解析不了（格式变了）；
+ *    - `fields={}` 长期不变 → 有行有解析，值没变（车静止 / 桌面被遮）。
  *
  * ## 子进程生命周期
  *
  * 与 [CarCabinVehicleStatus] 同样的坑：`CarPlayHostActivity` 里
- * `onStart`→`start` / `onStop`→`stop` 成对出现，线程池一旦 `shutdownNow()`
- * 就永久不能接受新任务。所以 [stop] 只停子进程不置空 executor，
- * 每次 [start] 用 `takeUnless { isShutdown }` 判断是否重建。
+ * `onStart`→`start` / `onStop`→`stop` 成对出现，线程池一旦
+ * `shutdownNow()` 就永久不能接受新任务。所以 [stop] 只停子进程不置空
+ * executor，每次 [start] 用 `takeUnless { isShutdown }` 判断是否重建。
  */
 class LogcatVehicleStatus(
     private val tag: String = "B561-VehicleLog",
@@ -62,6 +88,36 @@ class LogcatVehicleStatus(
     /** 正在运行的 `logcat` 进程；null 表示未启动或已退出。 */
     @Volatile
     private var logcat: Process? = null
+
+    /** 常驻读线程；null 表示当前没有读循环在跑。 */
+    @Volatile
+    private var pump: Thread? = null
+
+    /** 当前这批子进程的启动时刻（nanoTime），用于首行超时判定。 */
+    @Volatile
+    private var processStartedAt = 0L
+
+    /** stderr 最近的行（诊断快照）：权限拒绝/用法错误都走这条路。 */
+    private val stderrLines: MutableList<String> = Collections.synchronizedList(ArrayList())
+
+    /** 读到的总行数 / parseLine 匹配失败的行数。 */
+    private val linesRead = AtomicLong(0)
+
+    private val linesUnparsed = AtomicLong(0)
+
+    /** 是否读到过第一行（区分"还没读到"与"读不到"）。 */
+    @Volatile
+    private var firstLineSeen = false
+
+    /** 「长时间无输出」告警是否已打过（一次性，不刷屏）。 */
+    private val noOutputWarned = AtomicBoolean(false)
+
+    /** 上一条诊断心跳的时刻（nanoTime）。 */
+    @Volatile
+    private var lastHeartbeatAt = 0L
+
+    /** 上一批已结算的字段快照；新一批有变化才回调。 */
+    private var lastFlushed: Map<String, Any> = emptyMap()
 
     /** 最近一次读到的字段；空表示还没读到任何东西。 */
     @Volatile
@@ -89,7 +145,7 @@ class LogcatVehicleStatus(
             }
             .also { executor = it }
         try {
-            pool.scheduleWithFixedDelay(::drainOnce, 0, POLL_INTERVAL_MILLIS, TimeUnit.MILLISECONDS)
+            pool.scheduleWithFixedDelay(::supervise, 0, POLL_INTERVAL_MILLIS, TimeUnit.MILLISECONDS)
         } catch (_: RejectedExecutionException) {
             started = false
             Log.w(tag, "logcat poll rejected by the executor; retrying on the next start()")
@@ -100,8 +156,11 @@ class LogcatVehicleStatus(
         if (!started) return
         started = false
         executor?.shutdownNow()
+        // destroy 会让 pump 线程的 readLine() 立刻 EOF 退出；线程是 daemon，
+        // 即使慢一步也不拖住进程退出。
         logcat?.destroy()
         logcat = null
+        pump = null
         isRunning = false
     }
 
@@ -161,45 +220,177 @@ class LogcatVehicleStatus(
         )
     }
 
+    // ── 巡检 / 读循环 / 诊断（v131 重构）─────────────────────────────────
+
     /**
-     * 消费一次 logcat 输出。
+     * 每秒巡检一次（**永不阻塞**）。
      *
-     * 做成"启动一次子进程 + 逐行读"而不是每次重起：
-     * `logcat` 子进程读的是**环形缓冲**的当前尾部，重新启动会漏掉
-     * 启动瞬间之前打的行（车速这种高频字段会丢一帧）。
+     * 职责只有两个：子进程不在就起一个；在读循环活着的时候打诊断。
+     * 重启逻辑天然安全 —— pump 线程退出时已经自己销毁了旧进程。
      */
-    private fun drainOnce() {
+    private fun supervise() {
+        if (!started) return
         val process = ensureLogcat() ?: return
+        val thread = pump
+        if (thread == null || !thread.isAlive) {
+            startPump(process)
+            return
+        }
+        reportDiagnostics(process)
+    }
+
+    /** 起一条新的 stderr 收集线程 + 常驻读线程。 */
+    private fun startPump(process: Process) {
+        stderrLines.clear()
+        linesRead.set(0)
+        linesUnparsed.set(0)
+        firstLineSeen = false
+        noOutputWarned.set(false)
+        val now = System.nanoTime()
+        processStartedAt = now
+        lastHeartbeatAt = now
+        lastFlushed = emptyMap()
+        drainStderrAsync(process)
+        val thread = Thread({ pumpLoop(process) }, "b561-vehicle-pump").apply { isDaemon = true }
+        pump = thread
+        thread.start()
+        Log.i(tag, "logcat pump started, process=${describe(process)}")
+    }
+
+    /**
+     * 常驻读循环：逐行喂 parser，缓冲读空就结算一批。
+     *
+     * "缓冲读空再结算"复刻了旧 `drainOnce` 的 before/after 语义 ——
+     * 一批行只回调一次，不会每行都推仪表。`BufferedReader.ready()`
+     * 在缓冲非空或底层可读时为 true，所以空闲时会自然落到结算点。
+     */
+    private fun pumpLoop(process: Process) {
         try {
             BufferedReader(InputStreamReader(process.inputStream)).use { reader ->
-                val before = fields
-                while (true) {
+                while (started) {
                     val line = reader.readLine() ?: break
-                    val parsed = B561VehicleLogParser.parseLine(line) ?: continue
-                    synchronized(fields) { fields = LinkedHashMap(fields).apply { putAll(parsed) } }
-                }
-                val after = fields
-                if (after != before) {
-                    isRunning = true
-                    Log.i(
-                        tag,
-                        "logcat reading speed=${after[B561VehicleLogParser.KEY_SPEED]} " +
-                            "gear=${after[B561VehicleLogParser.KEY_GEAR]} " +
-                            "battery=${after[B561VehicleLogParser.KEY_BATTERY]}% " +
-                            "voltage=${after[B561VehicleLogParser.KEY_VOLTAGE]} " +
-                            "current=${after[B561VehicleLogParser.KEY_CURRENT]} " +
-                            "motorRpm=${after[B561VehicleLogParser.KEY_MOTOR_RPM]}",
-                    )
-                    runCatching { onFieldsChanged?.invoke(after) }
-                        .onFailure { Log.w(tag, "onFieldsChanged failed: ${it.message}") }
+                    linesRead.incrementAndGet()
+                    firstLineSeen = true
+                    val parsed = runCatching { B561VehicleLogParser.parseLine(line) }.getOrNull()
+                    if (parsed == null) {
+                        val count = linesUnparsed.incrementAndGet()
+                        // 未解析行样本：直接回答"有行但解析不了"还是"根本没行"。
+                        if (count == 1L || count % UNPARSED_SAMPLE_EVERY == 0L) {
+                            Log.d(tag, "logcat unparsed #$count: ${line.take(UNPARSED_SAMPLE_CHARS)}")
+                        }
+                    } else {
+                        synchronized(fields) {
+                            fields = LinkedHashMap(fields).apply { putAll(parsed) }
+                        }
+                    }
+                    if (!reader.ready()) flushIfChanged()
                 }
             }
         } catch (e: Exception) {
-            // 进程被回收 / 权限被拒 / stdout 关闭。子进程置空，下个周期重启。
+            // 进程被回收 / 权限被拒 / stdout 关闭。
             Log.w(tag, "logcat stream ended: ${e.javaClass.simpleName}: ${e.message}")
-            logcat = null
+        } finally {
+            // 一律销毁旧进程，下个巡检周期全新启动 ——
+            // 避免"流已断但进程还活着"时对着一条死流永久阻塞。
+            runCatching { process.destroy() }
+            if (logcat === process) logcat = null
             isRunning = false
         }
+    }
+
+    /** 结算一批：字段真的变了才打日志 + 回调。 */
+    private fun flushIfChanged() {
+        val snapshot = fields
+        if (snapshot == lastFlushed) return
+        lastFlushed = snapshot
+        isRunning = true
+        Log.i(
+            tag,
+            "logcat reading speed=${snapshot[B561VehicleLogParser.KEY_SPEED]} " +
+                "gear=${snapshot[B561VehicleLogParser.KEY_GEAR]} " +
+                "battery=${snapshot[B561VehicleLogParser.KEY_BATTERY]}% " +
+                "voltage=${snapshot[B561VehicleLogParser.KEY_VOLTAGE]} " +
+                "current=${snapshot[B561VehicleLogParser.KEY_CURRENT]} " +
+                "motorRpm=${snapshot[B561VehicleLogParser.KEY_MOTOR_RPM]}",
+        )
+        runCatching { onFieldsChanged?.invoke(snapshot) }
+            .onFailure { Log.w(tag, "onFieldsChanged failed: ${it.message}") }
+    }
+
+    /**
+     * 诊断报告：首行超时告警 + 30 秒摘要心跳。
+     *
+     * 只在读循环活着时调用，所以这里看到的计数就是当前这批进程的真实状态。
+     */
+    private fun reportDiagnostics(process: Process) {
+        val now = System.nanoTime()
+        val elapsedMs = (now - processStartedAt) / 1_000_000
+        // ① 首行超时（一次性）：10 秒没读到第一行，把 stderr 快照和进程
+        //    存活状态一起打出来 —— 权限拒绝在这条里现形。
+        if (!firstLineSeen && elapsedMs >= NO_OUTPUT_WARN_MILLIS &&
+            noOutputWarned.compareAndSet(false, true)
+        ) {
+            Log.w(
+                tag,
+                "logcat no output for ${elapsedMs}ms; alive=${process.isAlive} " +
+                    "stderr=[${stderrSnapshot()}]",
+            )
+        }
+        // ② 摘要心跳：下次抓车机日志，三种故障（没行 / 解析不了 / 值不变）
+        //    一眼区分。
+        if (now - lastHeartbeatAt >= HEARTBEAT_NANOS) {
+            lastHeartbeatAt = now
+            Log.i(
+                tag,
+                "logcat pump lines=${linesRead.get()} unparsed=${linesUnparsed.get()} " +
+                    "fields=${snapshotFieldNames()} alive=${process.isAlive}",
+            )
+        }
+    }
+
+    /** 心跳里的字段名清单（不带值，避免日志泄露与刷屏）。 */
+    private fun snapshotFieldNames(): String =
+        fields.keys.joinToString(prefix = "{", postfix = "}") { it }
+
+    /** stderr 快照（诊断告警用）：空集合打 `(empty)`，否则取最近几行截断拼接。 */
+    private fun stderrSnapshot(): String = synchronized(stderrLines) {
+        if (stderrLines.isEmpty()) {
+            "(empty)"
+        } else {
+            stderrLines.takeLast(STDERR_SNAPSHOT_LINES).joinToString(" | ") { it.take(80) }
+        }
+    }
+
+    /**
+     * stderr 收集线程。
+     *
+     * ★ v131 新增。Android 上 app 进程的 fd 2 指向 /dev/null，
+     * "不重定向 stderr"等于把权限拒绝信息扔进黑洞 —— v126/v130 两版
+     * 真车零输出，很可能就是被拒之后什么都看不见。
+     */
+    private fun drainStderrAsync(process: Process) {
+        Thread({
+            var printed = 0L
+            try {
+                BufferedReader(InputStreamReader(process.errorStream)).use { reader ->
+                    while (started) {
+                        val line = reader.readLine() ?: break
+                        synchronized(stderrLines) {
+                            if (stderrLines.size >= STDERR_KEEP) stderrLines.removeAt(0)
+                            stderrLines.add(line)
+                        }
+                        // 前 20 条全打（拒绝信息通常就几行），之后静默收集，
+                        // 需要时仍能从告警的快照里看到。
+                        if (printed < STDERR_LOG_LIMIT) {
+                            printed++
+                            Log.i(tag, "logcat stderr: ${line.take(STDERR_LOG_CHARS)}")
+                        }
+                    }
+                }
+            } catch (_: Exception) {
+                // stderr 读失败不影响主链路。
+            }
+        }, "b561-vehicle-stderr").apply { isDaemon = true }.start()
     }
 
     /**
@@ -226,10 +417,7 @@ class LogcatVehicleStatus(
                 "logcat",
                 "-v", "brief",
                 *LOG_TAGS,
-            )
-                // 不重定向 stderr：logcat 的权限拒绝信息会打到 stderr，
-                // 让它继承本进程的 fd 才能在 logcat 里看到我们自己的失败原因。
-                .start()
+            ).start()
         }.getOrElse {
             Log.w(tag, "cannot start logcat: ${it.javaClass.simpleName}: ${it.message}")
             null
@@ -270,12 +458,37 @@ class LogcatVehicleStatus(
         )
 
         /**
-         * 重启周期。
+         * 巡检周期。
          *
-         * 只有子进程死掉才会走 [drainOnce] 的重启路径，正常情况下
-         * `readLine()` 会**阻塞**直到有新行 —— 所以这个周期实际只影响
-         * 故障恢复节奏，1 秒足够，且不影响数据新鲜度。
+         * 只做状态检查（永不阻塞），所以这个周期就是故障恢复节奏，
+         * 1 秒足够，且不影响数据新鲜度。
          */
         const val POLL_INTERVAL_MILLIS = 1_000L
+
+        /** 首行超时告警阈值：10 秒没读到第一行就打（一次性）。 */
+        internal const val NO_OUTPUT_WARN_MILLIS = 10_000L
+
+        /** 摘要心跳周期。 */
+        internal const val HEARTBEAT_MILLIS = 30_000L
+
+        /** stderr 环形缓冲容量（告警快照用）。 */
+        internal const val STDERR_KEEP = 32
+
+        /** stderr 全量打印的条数上限，之后只收集不打印。 */
+        internal const val STDERR_LOG_LIMIT = 20L
+
+        /** stderr 单行打印截断长度。 */
+        internal const val STDERR_LOG_CHARS = 200
+
+        /** stderr 快照拼接的行数。 */
+        internal const val STDERR_SNAPSHOT_LINES = 3
+
+        /** 未解析行样本的采样间隔（第 1 条必打）。 */
+        internal const val UNPARSED_SAMPLE_EVERY = 500L
+
+        /** 未解析行样本的截断长度。 */
+        internal const val UNPARSED_SAMPLE_CHARS = 160
+
+        private val HEARTBEAT_NANOS = HEARTBEAT_MILLIS * 1_000_000
     }
 }
