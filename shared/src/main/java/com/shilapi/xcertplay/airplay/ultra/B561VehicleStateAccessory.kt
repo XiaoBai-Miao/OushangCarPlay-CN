@@ -156,6 +156,7 @@ internal class B561VehicleStateAccessory(
         addAll(TIRE_PRESSURE_IDS)
         addAll(TIRE_EXTRA_IDS)
         addAll(AUDIO_IDS)
+        addAll(CLIMATE_IDS)
     }
 
     /**
@@ -172,6 +173,7 @@ internal class B561VehicleStateAccessory(
             navigation(),
             automakerSettings(),
             vehicleResources(),
+            climate(),
             fuel(),
             tripComputer(),
             tires(),
@@ -718,6 +720,137 @@ internal class B561VehicleStateAccessory(
         return service(iid - 1, 0x1300_0002, chars)
     }
 
+    /**
+     * climate accessory（LIVI `climate()`，iid 512，kind `0x0100_0001`）。
+     *
+     * ★ v133 新增：CarPlay Ultra 空调控制（WWDC24 "Climate"）。iPhone 的
+     * CarPlay 空调 UI 按这棵树渲染；调节请求经 writeRequest 进来，回读由
+     * [written] 兜底（iPhone 写什么读什么），未写的特性由 initialValue 预填。
+     */
+    private fun climate() = accessory(
+        CLIMATE, 0x0100_0001,
+        listOf(
+            // 513: 主服务 —— 空调总开关 / 压缩机 / 最大 AC / 最大除霜。
+            service(
+                513, 0x1100_0001,
+                listOf(
+                    climateOn(HVAC_ON, true),
+                    climateOn(COMPRESSOR, true),
+                    climateOn(MAX_AC, false),
+                    climateOn(MAX_DEFROST, false),
+                ),
+            ),
+            climateZone(
+                518, DRIVER_TEMPERATURE_ON, DRIVER_TARGET_TEMPERATURE,
+                DRIVER_CURRENT_TEMPERATURE, "seat_front_left",
+            ),
+            // 523: 风扇 —— 开关 / 档位 / 自动模式。
+            service(
+                523, 0x1100_0007,
+                listOf(
+                    climateOn(FAN_ON, true),
+                    characteristic(
+                        FAN_LEVEL, 0x3100_0012, CafCharacteristicFormat.UINT8, 3L, Owner.SHARED,
+                    ).range(0L, FAN_LEVEL_MAX),
+                    climateOn(FAN_AUTO, true, 0x3000_005FL),
+                    layoutKey(531, "seat_front"),
+                ),
+            ),
+            // 527: 内循环。
+            service(527, 0x1100_0011, listOf(climateOn(RECIRCULATION_ON, false))),
+            // 529: 自动空调。
+            service(529, 0x1100_0008, listOf(climateOn(AUTO_CLIMATE_ON, true))),
+            climateZone(
+                532, PASSENGER_TEMPERATURE_ON, PASSENGER_TARGET_TEMPERATURE,
+                PASSENGER_CURRENT_TEMPERATURE, "seat_front_right",
+            ),
+            // 537: 双区同步。
+            service(
+                537, 0x1100_0012,
+                listOf(
+                    climateOn(ZONES_SYNCED, false),
+                    layoutKey(539, "seat_front"),
+                ),
+            ),
+            windowHeating(540, FRONT_WINDOW_HEATING, 542, "windshield_front"),
+            windowHeating(544, REAR_WINDOW_HEATING, 546, "windshield_rear"),
+            vent(548, VENT_UPPER, on = false),
+            vent(553, VENT_MIDDLE, on = true),
+            vent(558, VENT_LOWER, on = false),
+        ),
+    )
+
+    /** LIVI 的 `on()`：一个 shared Bool 特性（默认 type `0x3000_0002`）。 */
+    private fun climateOn(iid: Long, initial: Boolean, type: Long = 0x3000_0002L) =
+        characteristic(iid, type, CafCharacteristicFormat.BOOL, initial, Owner.SHARED)
+
+    /** LIVI 的 `zone()`：一个温区 = 开关 + 目标温度 + 当前温度 + 座位布局键。 */
+    private fun climateZone(
+        iid: Long,
+        onIid: Long,
+        targetIid: Long,
+        currentIid: Long,
+        seatKey: String,
+    ): Map<String, Any?> = service(
+        iid, 0x1100_0002,
+        listOf(
+            climateOn(onIid, true),
+            characteristic(
+                targetIid, 0x3100_0017, CafCharacteristicFormat.FLOAT, TEMPERATURE_INITIAL,
+                Owner.SHARED,
+            ).range(TEMPERATURE_LO, TEMPERATURE_HI, 0.5).apply { put("units", CELSIUS) },
+            characteristic(
+                currentIid, 0x3100_0019, CafCharacteristicFormat.FLOAT, TEMPERATURE_INITIAL,
+            ).range(CURRENT_TEMPERATURE_LO, CURRENT_TEMPERATURE_HI, 0.5)
+                .apply { put("units", CELSIUS) },
+            layoutKey(currentIid + 1, seatKey),
+        ),
+    )
+
+    /** LIVI 的 `window_heating()`：加热档位 + 除霜类型 + 座位布局键（后两者 fixed）。 */
+    private fun windowHeating(
+        iid: Long,
+        levelIid: Long,
+        defrostIid: Long,
+        windowKey: String,
+    ): Map<String, Any?> = service(
+        iid, 0x1100_0005,
+        listOf(
+            characteristic(
+                levelIid, 0x3000_0004, CafCharacteristicFormat.UINT8, 0L, Owner.SHARED,
+            ).range(0L, 1L),
+            characteristic(
+                defrostIid, 0x3100_0014, CafCharacteristicFormat.UINT8, DEFROST_FILAMENT,
+                mutable = false,
+            ).range(0L, FAN_LEVEL_MAX),
+            layoutKey(defrostIid + 1, windowKey),
+        ),
+    )
+
+    /** LIVI 的 `vent()`：通风口 = 开关 + 自动模式 + 风向组合 + 座位布局键（后两者 fixed）。 */
+    private fun vent(
+        iid: Long,
+        direction: Long,
+        on: Boolean,
+    ): Map<String, Any?> = service(
+        iid, 0x1100_0006,
+        listOf(
+            climateOn(iid + 1, on),
+            climateOn(iid + 2, true, 0x3000_005FL),
+            characteristic(
+                iid + 3, 0x3100_0025, CafCharacteristicFormat.ARRAY,
+                listOf(direction), mutable = false,
+            ),
+            layoutKey(iid + 4, "seat_front"),
+        ),
+    )
+
+    /** LIVI 的 `seat()`：座位布局键（car-owned + fixed）。 */
+    private fun layoutKey(iid: Long, key: String) =
+        characteristic(
+            iid, 0x3600_0065, CafCharacteristicFormat.STRING, key, mutable = false,
+        )
+
     companion object {
         /** CAF plugin 标识。 */
         const val PLUGIN_ID = 0L
@@ -856,6 +989,86 @@ internal class B561VehicleStateAccessory(
         )
 
         private val ENGINE_RPM_IDS = longArrayOf(ENGINE_RPM, 2563L, 2564L)
+
+        /**
+         * climate accessory（LIVI `climate()`，iid 512，kind `0x0100_0001`）。
+         *
+         * ★ v133 新增：CarPlay Ultra 的空调控制 UI（WWDC24 "Climate" 分类）。
+         * 12 个 service 的 iid/kind/type/initial 与 LIVI 逐项一致：
+         * 主服务 513（hvacOn/compressorOn/maxACOn/maxDefrostOn）、
+         * 主驾温区 518、风扇 523、内循环 527、自动空调 529、
+         * 副驾温区 532、双区同步 537、前/后窗加热 540/544、
+         * 上/中/下通风口 548/553/558。
+         * 车机无空调读数源（B561UltraGauges 没有空调字段）：
+         * iPhone 写入走 written 回读，未写的由 initialValue 预填兜底。
+         */
+        const val CLIMATE = 512L
+
+        /** 主服务：空调开关 / 压缩机 / 最大 AC / 最大除霜。 */
+        const val HVAC_ON = 514L
+        const val COMPRESSOR = 515L
+        const val MAX_AC = 516L
+        const val MAX_DEFROST = 517L
+
+        /** 主驾温区：开关 / 目标温度 / 当前温度 / 座位布局键。 */
+        const val DRIVER_TEMPERATURE_ON = 519L
+        const val DRIVER_TARGET_TEMPERATURE = 520L
+        const val DRIVER_CURRENT_TEMPERATURE = 521L
+
+        /** 风扇：开关 / 档位 / 自动模式 / 座位布局键。 */
+        const val FAN_ON = 524L
+        const val FAN_LEVEL = 525L
+        const val FAN_AUTO = 526L
+
+        /** 内循环开关。 */
+        const val RECIRCULATION_ON = 528L
+
+        /** 自动空调开关。 */
+        const val AUTO_CLIMATE_ON = 530L
+
+        /** 副驾温区：开关 / 目标温度 / 当前温度 / 座位布局键。 */
+        const val PASSENGER_TEMPERATURE_ON = 533L
+        const val PASSENGER_TARGET_TEMPERATURE = 534L
+        const val PASSENGER_CURRENT_TEMPERATURE = 535L
+
+        /** 双区同步开关。 */
+        const val ZONES_SYNCED = 538L
+
+        /** 前/后窗加热档位。 */
+        const val FRONT_WINDOW_HEATING = 541L
+        const val REAR_WINDOW_HEATING = 545L
+
+        /** climate accessory 全部 iid（LIVI 514..562 连续无洞）。 */
+        val CLIMATE_IDS: List<Long> = (514L..562L).toList()
+
+        /** 温度单位：摄氏度（LIVI `CELSIUS = 1082`）。 */
+        const val CELSIUS = 1082L
+
+        /** 空调目标温度下限（LIVI `TEMPERATURE_LO`）。 */
+        const val TEMPERATURE_LO = 16.0
+
+        /** 空调目标温度上限（LIVI `TEMPERATURE_HI`）。 */
+        const val TEMPERATURE_HI = 28.0
+
+        /** 空调初始目标温度（LIVI zone initial 21.0）。 */
+        const val TEMPERATURE_INITIAL = 21.0
+
+        /** 当前温度下限（LIVI current temperature between -40..85）。 */
+        const val CURRENT_TEMPERATURE_LO = -40.0
+
+        /** 当前温度上限。 */
+        const val CURRENT_TEMPERATURE_HI = 85.0
+
+        /** 风扇档位上限（LIVI fanLevel up_to 7）。 */
+        const val FAN_LEVEL_MAX = 7L
+
+        /** 除霜类型：电阻丝加热（LIVI `FILAMENT = 2`）。 */
+        const val DEFROST_FILAMENT = 2L
+
+        /** 通风口风向：上 / 中 / 下（LIVI UPPER=2 / MIDDLE=16 / LOWER=4）。 */
+        const val VENT_UPPER = 2L
+        const val VENT_MIDDLE = 16L
+        const val VENT_LOWER = 4L
 
         /** 转速表满量程。 */
         const val MAX_RPM = 8000L

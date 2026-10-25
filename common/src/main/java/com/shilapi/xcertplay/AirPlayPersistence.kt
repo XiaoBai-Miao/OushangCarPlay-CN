@@ -994,7 +994,12 @@ object AirPlayPersistence {
     fun loadClusterContent(context: Context): CarPlayClusterDisplay.Content =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_CLUSTER_CONTENT, null)
             ?.let { name -> CarPlayClusterDisplay.Content.entries.firstOrNull { it.name == name } }
-            ?: CarPlayClusterDisplay.Content.MAP
+            // ★ v133: 默认官方仪表盘（`maps:/car/instrumentcluster`）而非地图 ——
+            // v130/v132 修好 CAF 数据链路后，Ultra 官方仪表已经能拿到车辆数据；
+            // 之前默认 MAP 时 iPhone 放音乐就把集群换成 now playing 卡片，
+            // 用户看到的是音乐卡片而不是仪表。已存 MAP 偏好的用户在设置里
+            // 手动切回即可（设置页四个选项不变）。
+            ?: CarPlayClusterDisplay.Content.INSTRUMENTS
 
     fun saveClusterContent(context: Context, content: CarPlayClusterDisplay.Content) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY_CLUSTER_CONTENT, content.name).apply()

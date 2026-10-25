@@ -2567,6 +2567,21 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                 // 立刻生效，不必断开 CarPlay 重连。
                 CarPlayBackgroundSession.snapshot()?.sink?.setNavigationDuckingEnabled(it)
             }
+            // ★ v133 B561: 压低幅度可调（导航播报时音乐保持多响）。
+            //   百分比档位，立刻生效；保存盘 + 热更新都由 sink 的 setter 负责。
+            com.shilapi.xcertplay.media.NavigationDuckingSetting.let { nds ->
+                val presets = nds.DUCK_PERCENT_PRESETS
+                choice(card, getString(R.string.navigation_ducking_level),
+                    presets.map { "$it%" },
+                    presets.indexOf(nds.loadDuckPercent(this)).coerceAtLeast(0),
+                    reconnects = false,
+                ) { index ->
+                    val percent = presets[index]
+                    nds.saveDuckPercent(this, percent)
+                    CarPlayBackgroundSession.snapshot()?.sink?.setNavigationDuckPercent(percent)
+                }
+                card.addView(label(getString(R.string.navigation_ducking_level_description), 14, MUTED))
+            }
             // ===== v106 B561: 音频增强（每项独立、默认全关，互不影响）=====
             com.shilapi.xcertplay.media.AudioEnhancements.let { ae ->
                 toggle(card, getString(R.string.audio_enforced_audibility),

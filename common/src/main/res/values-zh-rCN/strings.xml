@@ -987,6 +987,8 @@
     <!-- v105 B561: 导航声道焦点 -->
         <string name="navigation_ducking_media">导航播报压低媒体声音</string>
     <string name="navigation_ducking_media_description">关闭（默认）：导航播报与音乐同时正常音量播放。开启：导航播报时音乐自动压低，最后一次播报后几秒恢复。不会改变你设定的音乐音量，只是播放时压低。</string>
+    <string name="navigation_ducking_level">导航播报时的音乐音量</string>
+    <string name="navigation_ducking_level_description">导航说话时音乐保持多响。越低播报越突出，越高音乐越接近正常音量。</string>
     <string name="navigation_audio_focus">导航播报申请音频焦点</string>
         <string name="navigation_audio_focus_description">关闭（默认）：导航播报叠加在其他音频上而不打断它——这正是原车地图与后装地图能同时发声的原因。开启：导航抢占音频焦点，车机可在播报时压低或暂停其他音频。若播报声音太轻或被盖过，请开启。</string>
 

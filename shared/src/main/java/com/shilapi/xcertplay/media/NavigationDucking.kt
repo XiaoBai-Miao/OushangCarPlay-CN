@@ -53,9 +53,15 @@ object NavigationDucking {
      *
      * 传入的 [fullVolume] 是媒体原本的音量（正常是 1.0），
      * 这样压低是**相对**的，不会把用户已经调低的音量再放大。
+     *
+     * ★ v133: [duckPercent] 可配（0..100，见 [NavigationDuckingSetting]）；
+     *   省略时用 [DUCKED_VOLUME] 的默认 35%。
      */
-    fun mediaVolume(ducked: Boolean, fullVolume: Float): Float =
-        if (ducked) fullVolume * DUCKED_VOLUME else fullVolume
+    fun mediaVolume(ducked: Boolean, fullVolume: Float, duckPercent: Int = DUCK_PERCENT): Float =
+        if (ducked) fullVolume * (duckPercent.coerceIn(5, 100) / 100f) else fullVolume
+
+    /** [DUCKED_VOLUME] 的百分数形式（v133 设置项默认值）。 */
+    const val DUCK_PERCENT = 35
 
     /**
      * 这段 PCM 里有没有**实际的声音**。

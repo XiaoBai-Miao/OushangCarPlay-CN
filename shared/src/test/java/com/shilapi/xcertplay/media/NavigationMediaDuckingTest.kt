@@ -156,6 +156,62 @@ class NavigationMediaDuckingTest {
             coordinators.add(coordinator)
         }
 
+    // ── v133: 压低幅度可调 ───────────────────────────────────────────
+
+    @Test fun duckPercentSettingPersistsAndDefaultsTo35() {
+        // 默认 35（与 NavigationDucking.DUCKED_VOLUME 对齐）。
+        assertEquals(35, NavigationDuckingSetting.DEFAULT_DUCK_PERCENT)
+        assertEquals(
+            NavigationDuckingSetting.DEFAULT_DUCK_PERCENT,
+            NavigationDuckingSetting.loadDuckPercent(context),
+        )
+        NavigationDuckingSetting.saveDuckPercent(context, 60)
+        assertEquals(60, NavigationDuckingSetting.loadDuckPercent(context))
+        // 越界值夹紧到 5..100。
+        NavigationDuckingSetting.saveDuckPercent(context, 250)
+        assertEquals(100, NavigationDuckingSetting.loadDuckPercent(context))
+        NavigationDuckingSetting.saveDuckPercent(context, 1)
+        assertEquals(5, NavigationDuckingSetting.loadDuckPercent(context))
+    }
+
+    @Test fun coordinatorReadsDuckPercentFromSettingsAtConstruction() {
+        NavigationDuckingSetting.saveDuckPercent(context, 60)
+        val coordinator = coordinator(ducking = true)
+        val media = track()
+        coordinator.acquire(media, AudioChannel.MEDIA, attributes)
+        coordinator.onNavigationVoiceFlowing(1_000L)
+        // 构造时读盘：60% 而不是默认 35%。
+        assertEquals(0.6f, volumes(media).last(), 0.0001f)
+    }
+
+    @Test fun duckPercentHotUpdateAppliesWhileDucked() {
+        val coordinator = coordinator(ducking = true)
+        val media = track()
+        coordinator.acquire(media, AudioChannel.MEDIA, attributes)
+        coordinator.onNavigationVoiceFlowing(1_000L)
+        assertEquals(0.35f, volumes(media).last(), 0.0001f)
+        // 设置页改到 60%：压低中立刻按新幅度重算。
+        coordinator.setNavigationDuckPercent(60)
+        assertEquals(0.6f, volumes(media).last(), 0.0001f)
+        // 未压低时改幅度不写轨道（恢复时才会用新值）。
+        coordinator.onNavigationAudioStopped()
+        VolumeTrackingAudioTrack.volumes[media]?.clear()
+        coordinator.setNavigationDuckPercent(20)
+        assertTrue(volumes(media).isEmpty())
+    }
+
+    @Test fun duckPercentNeverMutesOrAmplifies() {
+        // 幅度只是相对缩放：压低时永远低于原音量，且不会到 0。
+        val quiet = NavigationDucking.mediaVolume(ducked = true, fullVolume = 0.5f, duckPercent = 5)
+        assertTrue(quiet > 0f)
+        assertEquals(0.025f, quiet, 0.0001f)
+        assertEquals(
+            0.5f,
+            NavigationDucking.mediaVolume(ducked = true, fullVolume = 0.5f, duckPercent = 100),
+            0.0001f,
+        )
+    }
+
     private fun track(): AudioTrack = AudioTrack.Builder().setAudioAttributes(attributes)
         .setAudioFormat(
             AudioFormat.Builder().setSampleRate(44100).setEncoding(AudioFormat.ENCODING_PCM_16BIT)

@@ -72,6 +72,15 @@ internal class AudioFocusCoordinator(
 
     /** 当前媒体是否处于「因导航播报而压低」的状态。 */
     @Volatile private var navigationDucking: Boolean = false
+
+    /**
+     * ★ v133: 导航播报压媒体时的目标百分比（见 [NavigationDuckingSetting]）。
+     *
+     * 构造时从设置读一次，之后由 [setNavigationDuckPercent] 热更新 ——
+     * 音频线程每帧都跑 [applyMediaVolume]，不能在那里读 SharedPreferences。
+     */
+    @Volatile private var navigationDuckPercent: Int =
+        NavigationDuckingSetting.loadDuckPercent(context)
     private var currentListener = listenerFor(focusGeneration)
     internal val listener: AudioManager.OnAudioFocusChangeListener get() = currentListener
 
@@ -145,6 +154,18 @@ internal class AudioFocusCoordinator(
     /** 媒体音量是否因导航播报而被压低。诊断用。 */
     @Synchronized
     fun isMediaDuckedForNavigation(): Boolean = navigationDucking
+
+    /**
+     * ★ v133: 热更新「导航播报压低媒体的幅度」（百分比）。
+     *
+     * 设置页改完立刻生效 —— 若当前正处于压低状态，
+     * 马上用新幅度重算一遍轨道音量，不必等下一次播报。
+     */
+    @Synchronized
+    fun setNavigationDuckPercent(percent: Int) {
+        navigationDuckPercent = percent.coerceIn(5, 100)
+        if (navigationDucking) applyAllMediaVolumes()
+    }
 
     /**
      * 重新计算压低状态并应用。
@@ -234,7 +255,9 @@ internal class AudioFocusCoordinator(
         if (entry.channel != AudioChannel.MEDIA) return
         // ★ v124 B561: 导航播报压低。因子叠加在系统给的媒体音量之上 ——
         //   两者是独立的：系统 duck 是因为别的 App 抢焦点，我们 duck 是因为导航在说话。
-        val target = NavigationDucking.mediaVolume(navigationDucking, mediaVolume)
+        val target = NavigationDucking.mediaVolume(
+            navigationDucking, mediaVolume, navigationDuckPercent,
+        )
         if (entry.appliedVolume == target) return
         val applied = runCatching { track.setStereoVolume(target, target) == AudioTrack.SUCCESS }.getOrDefault(false)
         if (applied) entry.appliedVolume = target
@@ -331,6 +354,15 @@ class AndroidMediaSink(
     fun setNavigationDuckingEnabled(enabled: Boolean) {
         audioFocusCoordinator.navigationDuckingEnabled = enabled
         audioFocusCoordinator.refreshDuckState()
+    }
+
+    /**
+     * ★ v133: 应用「导航播报压低媒体的幅度」（百分比，5..100）。
+     *
+     * 由设置页调用；保存盘由调用方负责（见 [NavigationDuckingSetting]）。
+     */
+    fun setNavigationDuckPercent(percent: Int) {
+        audioFocusCoordinator.setNavigationDuckPercent(percent)
     }
 
     /** The media-key session may own Android's current focus request for this same sink. */

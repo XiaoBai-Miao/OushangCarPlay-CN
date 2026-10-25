@@ -103,9 +103,9 @@ class B561VehicleStateAccessoryTest {
     fun `config tree carries the LIVI minimum viable accessory set`() {
         val config = accessoryWith(null).config(hasEngineRpm = true)
         val byIid = accessories(config)
-        // 7 个基础 accessory + combustion + electric = 9。
-        assertEquals(9, byIid.size)
-        listOf(256L, 1280L, 768L, 1536L, 1792L, 2048L, 2304L, 2560L, 2816L).forEach {
+        // 8 个基础 accessory + combustion + electric = 10（v133 加 climate）。
+        assertEquals(10, byIid.size)
+        listOf(256L, 1280L, 768L, 512L, 1536L, 1792L, 2048L, 2304L, 2560L, 2816L).forEach {
             assertNotNull("accessory iid=$it 必须在树里（LIVI 最小可用集）", byIid[it])
         }
     }
@@ -114,10 +114,64 @@ class B561VehicleStateAccessoryTest {
     fun `config tree without engine rpm omits the combustion engine`() {
         val config = accessoryWith(null).config(hasEngineRpm = false)
         val byIid = accessories(config)
-        // 纯电：没有 combustion engine，其余 8 个仍在。
-        assertEquals(8, byIid.size)
+        // 纯电：没有 combustion engine，其余 9 个仍在。
+        assertEquals(9, byIid.size)
         assertNull(byIid[2560L])
         assertNotNull(byIid[2816L])
+    }
+
+    @Test
+    fun `climate accessory mirrors LIVI service kinds and iids`() {
+        val byIid = accessories(accessoryWith(null).config())
+        val climate = byIid[512L]
+        assertNotNull("v133: climate accessory（iid 512）必须在树里", climate)
+        val services = (climate!! as Map<*, *>)["services"] as List<*>
+        // 12 个 service，iid 与 LIVI 逐项一致。
+        assertEquals(
+            listOf(513L, 518L, 523L, 527L, 529L, 532L, 537L, 540L, 544L, 548L, 553L, 558L),
+            services.map { (it as Map<*, *>)["iid"] },
+        )
+        // 主服务：hvacOn / compressorOn / maxACOn / maxDefrostOn。
+        val main = services[0] as Map<*, *>
+        assertEquals(0x1100_0001L, main["type"])
+        val chars = main["characteristics"] as List<*>
+        assertEquals(
+            listOf(514L, 515L, 516L, 517L),
+            chars.map { (it as Map<*, *>)["iid"] },
+        )
+        // 温度特性：目标温度 shared + 16..28 步进 0.5 摄氏度；当前温度 car-owned。
+        val driverZone = services[1] as Map<*, *>
+        assertEquals(0x1100_0002L, driverZone["type"])
+        val target = (driverZone["characteristics"] as List<*>)[1] as Map<*, *>
+        assertEquals(520L, target["iid"])
+        assertEquals(0x3100_0017L, target["type"])
+        assertEquals(16.0, target["minimumValue"])
+        assertEquals(28.0, target["maximumValue"])
+        assertEquals(0.5, target["stepValue"])
+        assertEquals(1082L, target["units"]) // CELSIUS
+        assertEquals(true, target["writable"])
+        val current = (driverZone["characteristics"] as List<*>)[2] as Map<*, *>
+        assertEquals(521L, current["iid"])
+        assertEquals(false, current["writable"]) // car-owned
+    }
+
+    @Test
+    fun `climate switches round trip through written values`() {
+        // iPhone 写 hvacOn=false → 回读 false（车机无空调读数源，
+        // written 回读 + initialValue 预填是 v133 的兜底路径）。
+        val accessory = accessoryWith(null)
+        val write = accessory.handleOrFail(
+            request(
+                CafCommand.WRITE_REQUEST,
+                mapOf(514L to false, 520L to 24.0),
+            ),
+        )
+        assertEquals(CafCommand.WRITE_RESPONSE, write.envelope.message.command)
+        val read = accessory.handleOrFail(
+            request(CafCommand.READ_REQUEST, mapOf(514L to null, 520L to null)),
+        )
+        assertEquals(false, responseValues(read)[514L])
+        assertEquals(24.0, responseValues(read)[520L])
     }
 
     @Test
@@ -513,7 +567,8 @@ class B561VehicleStateAccessoryTest {
         )
         assertEquals(7L, response.envelope.message.transactionId)
         val config = responseValues(response)
-        assertEquals(9, (config["accessories"] as List<*>).size)
+        // v133: +climate = 10 个 accessory。
+        assertEquals(10, (config["accessories"] as List<*>).size)
     }
 
     // ── initialValue 预填（v131，LIVI initial_values() 对齐）──────────────

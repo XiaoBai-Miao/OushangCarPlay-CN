@@ -26,6 +26,7 @@ import android.content.Context
 object NavigationDuckingSetting {
     private const val PREFS = "diplay_navigation_ducking"
     private const val KEY_ENABLED = "enabled"
+    private const val KEY_DUCK_PERCENT = "duckPercent"
 
     /** 默认 **false** —— 现有行为（导航叠加在媒体上不打断）保持不变。 */
     fun isEnabled(context: Context?): Boolean {
@@ -40,6 +41,33 @@ object NavigationDuckingSetting {
         runCatching {
             context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
                 .putBoolean(KEY_ENABLED, enabled)
+                .apply()
+        }
+    }
+
+    /**
+     * ★ v133: 导航播报时媒体音量压到的百分比（100 = 不压低，20 = 压到两成）。
+     *
+     * 默认 [DEFAULT_DUCK_PERCENT]（35%）—— 与 [NavigationDucking.DUCKED_VOLUME]
+     * 对齐；之前这个值硬编码，用户无法按听感调整。
+     */
+    const val DEFAULT_DUCK_PERCENT = 35
+
+    /** 设置页可选档位（%）。 */
+    val DUCK_PERCENT_PRESETS = listOf(20, 25, 30, 35, 40, 50, 60)
+
+    fun loadDuckPercent(context: Context?): Int {
+        val app = context?.applicationContext ?: return DEFAULT_DUCK_PERCENT
+        return runCatching {
+            app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .getInt(KEY_DUCK_PERCENT, DEFAULT_DUCK_PERCENT)
+        }.getOrDefault(DEFAULT_DUCK_PERCENT).coerceIn(5, 100)
+    }
+
+    fun saveDuckPercent(context: Context, percent: Int) {
+        runCatching {
+            context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+                .putInt(KEY_DUCK_PERCENT, percent.coerceIn(5, 100))
                 .apply()
         }
     }

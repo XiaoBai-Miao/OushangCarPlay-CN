@@ -987,6 +987,8 @@
     <!-- v105 B561: 导航声道焦点 -->
         <string name="navigation_ducking_media">ナビゲーション音声でメディア音量を下げる</string>
     <string name="navigation_ducking_media_description">オフ（既定）：ナビゲーション音声と音楽は通常の音量で同時に再生されます。オン：ナビゲーションが喋っている間だけ音楽を下げ、最後の音声から数秒後に元に戻します。音楽の音量設定は変更せず、ナビゲーションと同時に再生されるときの相対音量だけを下げます。</string>
+    <string name="navigation_ducking_level">ナビ案内中のメディア音量</string>
+    <string name="navigation_ducking_level_description">ナビ案中に音楽をどの程度の大きさで流すか。低いほど案内が際立ち、高いほど音楽は通常に近くなります。</string>
     <string name="navigation_audio_focus">ナビゲーション音声がオーディオフォーカスを要求する</string>
         <string name="navigation_audio_focus_description">オフ（既定）：ナビゲーション音声は他の音声に重ねて再生し、割り込みません（車載地図と後付け地図アプリが同時に発音できる理由です）。オン：ナビゲーションがオーディオフォーカスを取得し、発声中に他の音声を下げたり一時停止できます。案内が小さい、または聞き取れない場合はオンにしてください。</string>
 
