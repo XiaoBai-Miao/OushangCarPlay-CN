@@ -18,7 +18,6 @@ import android.util.Log
 import android.view.Display
 import android.view.Gravity
 import android.view.Surface
-import android.view.SurfaceHolder
 import android.view.SurfaceView
 import android.view.View
 import android.view.TextureView
@@ -86,8 +85,9 @@ internal class ClusterMapPresentation(
     /**
      * 等待页要不要自带一块不透明底色。
      *
-     * 只有**没有 plan** 的旧固件路径需要 —— 那条路走 SurfaceView，
-     * 首个 surface 到达前它是一块黑面，必须用不透明底色盖住；
+     * 只有**没有 plan** 的旧固件路径需要 —— 那条路的视频未激活时是空的，
+     * 必须用不透明底色盖住（v134 起两条路都是 TextureView，未激活时 alpha=0，
+     * 露出的就是 root 底色，所以这块底色只是让等待页更醒目）；
      * 有 plan 时（TextureView + 透明窗口）底色由 root/对比层负责。
      */
     private var flatPlaceholder = false
@@ -152,28 +152,38 @@ internal class ClusterMapPresentation(
             }
             Log.i(TAG, "layout=$theme viewport=$plan source=${plan.sourceLeft},${plan.sourceTop} dark=$dark")
         } else {
-            // Preserve the original PR renderer for DiLink 5 and unverified firmware.
-            val surfaceView = SurfaceView(context)
-            surfaceView.holder.addCallback(object : SurfaceHolder.Callback {
-                override fun surfaceCreated(holder: SurfaceHolder) {
+            // ★ v134 B561: 这一路原来挂 SurfaceView，在**虚拟屏**上永远黑屏。
+            //
+            //   实证（10-26，RMX2202 + 开发者选项「模拟副屏」720×480）：
+            //   同一个 presentation 里自绘的车速表（普通 View）显示正常，
+            //   而视频那块是纯黑；同时 111 流协商成功（600x400）、解码器
+            //   "first frame rendered"、stats 里 shown=10.6fps —— 帧确实渲染了，
+            //   只是 SurfaceView 走独立合成层，虚拟屏没有独立的硬件合成通道，
+            //   帧出不来。
+            //
+            //   有 plan 的那条路（比亚迪 DiLink 5）用的本来就是 TextureView，
+            //   这里统一成 TextureView：它画在视图树里，任何屏都能出图。
+            //   代价是多一次 GPU 纹理拷贝，但仪表只有一路 600x400 流，可忽略。
+            val textureView = TextureView(context)
+            textureView.surfaceTextureListener = object : TextureView.SurfaceTextureListener {
+                override fun onSurfaceTextureAvailable(texture: SurfaceTexture, width: Int, height: Int) {
                     Log.i(TAG, "cluster surface created")
-                    outputSurface = holder.surface
-                    onSurface(holder.surface)
+                    outputSurface = Surface(texture).also(onSurface)
                 }
-
-                override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
+                override fun onSurfaceTextureSizeChanged(texture: SurfaceTexture, width: Int, height: Int) {
                     Log.i(TAG, "cluster surface ${width}x$height")
                 }
-
-                override fun surfaceDestroyed(holder: SurfaceHolder) {
+                override fun onSurfaceTextureUpdated(texture: SurfaceTexture) = Unit
+                override fun onSurfaceTextureDestroyed(texture: SurfaceTexture): Boolean {
                     Log.i(TAG, "cluster surface destroyed")
                     onSurface(null)
-                    // SurfaceHolder owns this surface; do not release it ourselves.
+                    outputSurface?.release()
                     outputSurface = null
+                    return true
                 }
-            })
-            root.addView(surfaceView, videoParams)
-            videoView = surfaceView
+            }
+            root.addView(textureView, videoParams)
+            videoView = textureView
         }
         // ★ 先建对象、赋给字段，**再**上色。
         //   `waitingLabel = TextView(...).apply { applyWaitingPalette() }` 里

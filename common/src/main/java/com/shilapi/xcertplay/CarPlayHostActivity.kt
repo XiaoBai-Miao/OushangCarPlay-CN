@@ -1775,7 +1775,29 @@ class CarPlayHostActivity : ComponentActivity() {
             }
         }
         override fun onDisplayRemoved(displayId: Int) = Unit
-        override fun onDisplayChanged(displayId: Int) = Unit
+        /**
+         * ★ v134: 出图屏在 **onResume 那一刻还没 usable** 时的兜底重试。
+         *
+         * 实证（10-26，RMX2202 + 开发者选项「模拟副屏」）：连续 4 次冷启动
+         * `ensureClusterPresentation()` 都在 `clusterTargetDisplay()` 上落空
+         * （`ClusterDisplayCatalog.isUsable` 要求 `isValid && state != STATE_OFF`，
+         * 虚拟屏刚加进来、或副屏还熄着时都不满足），而那次之后**没有任何重试** ——
+         * 表现是"仪表全黑，且日志里连一条错误都没有"。
+         *
+         * 屏状态变化（尤其是亮屏 / 虚拟屏就绪）时补一次：
+         * 已经出图就直接返回，不会重复建 presentation。
+         */
+        override fun onDisplayChanged(displayId: Int) {
+            if (isDestroyed || !AirPlayPersistence.loadClusterMapEnabled(this@CarPlayHostActivity)) return
+            if (clusterPresentation != null) return
+            val display = ClusterMapPresentation.findDisplay(this@CarPlayHostActivity) ?: return
+            if (display.displayId != displayId) return
+            appendLog("Cluster map: display ${display.name} usable; retrying presentation")
+            ensureClusterPresentation()
+            if (controller != null && !clusterStreamOnDisplay) {
+                reconnectAfterLoss("Cluster display usable; requesting its stream")
+            }
+        }
     }
 
     private fun clusterDisplayConfig(): AirPlayDisplayConfig? {
