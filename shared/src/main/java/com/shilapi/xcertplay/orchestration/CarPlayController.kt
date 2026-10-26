@@ -785,8 +785,13 @@ class CarPlayController(
         com.shilapi.xcertplay.glance.CarPlayGlance.onFrame(frame)
         com.shilapi.xcertplay.guidance.ClusterGuidanceFeed.onFrame(frame)
         synchronized(callState) {
-            if (callState.accept(frame)) callState.current() else null
-        }?.let { callStateListener?.invoke(it) }
+            // ★ v138: 挂断帧（DISCONNECTED）会让 accept 返回 true 且 current() 为 null。
+            // 旧实现用 ?.let 会吞掉 null，导致 listener 收不到「通话已结束」→ 仪表通话卡不消失。
+            // 只要状态变了就必须通知，null 表示通话结束/清空，由上层隐藏卡片。
+            if (callState.accept(frame)) {
+                callStateListener?.invoke(callState.current())
+            }
+        }
         synchronized(playbackStatus) {
             val previousPlaying = playbackStatus.playing
             playbackStatus.acceptUpdate(frame)?.let { it to (it.playing != previousPlaying) }

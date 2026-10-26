@@ -33,7 +33,14 @@ class CarPlayCallState(private val clock: () -> Long = System::currentTimeMillis
         val display = runCatching { body.optionalString(DISPLAY_NAME) }.getOrNull()?.trim().orEmpty()
         val id = runCatching { body.optionalString(CALL_UUID) }.getOrNull()?.takeIf { it.isNotBlank() } ?: remote
         if (status == DISCONNECTED || status == DISCONNECTING) {
-            calls.remove(id)
+            // ★ v138: 挂断帧可能不带 CALL_UUID / REMOTE_ID（id 为空串）。
+            // 旧实现 calls.remove("") 无法移除先前存的有值 id → 通话残留 → 仪表通话卡不消失。
+            // 此时视为「当前通话已结束」，清空全部通话，保证卡片隐藏。
+            if (id.isBlank()) {
+                calls.clear()
+            } else {
+                calls.remove(id)
+            }
         } else {
             val previous = calls[id]
             val connected = status == ACTIVE || status == HELD

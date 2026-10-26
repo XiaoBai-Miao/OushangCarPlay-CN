@@ -67,4 +67,33 @@ class CarPlayCallStateTest {
         state.clear()
         assertNull(state.current())
     }
+
+    @Test
+    fun hangupReportsChangeWithNullCurrentSoListenerCanHideTheCard() {
+        // 来电 -> 通话中
+        assertTrue(state.accept(update("a", status = 2, name = "Mum")))
+        assertTrue(state.accept(update("a", status = 4, name = "Mum")))
+
+        // 挂断帧：accept 必须返回 true（状态变了），且 current() 为 null（没有进行中的通话）。
+        // CarPlayController.onRouteFrame 依赖这个组合通知上层「通话已结束」，从而隐藏仪表通话卡。
+        assertTrue(state.accept(update("a", status = 0)))
+        assertNull(state.current())
+    }
+
+    @Test
+    fun hangupWithMissingUuidStillClearsTheOnlyCall() {
+        // 有些挂断帧可能不带 CALL_UUID / REMOTE_ID。旧实现里 id 会退化成 ""，
+        // calls.remove("") 无法移除先前存的有值 id → 通话残留。
+        // 本测试断言：即使挂断帧没有 uuid，只要状态变成 disconnected，当前通话也应清空。
+        assertTrue(state.accept(update("a", status = 2, name = "Mum")))
+        assertTrue(state.accept(update("a", status = 4, name = "Mum")))
+
+        // 构造一个不带 uuid 的挂断帧：只有 status=0
+        val hangupNoId = Iap2Messages.buildRaw(CarPlayCallState.CALL_STATE_UPDATE) {
+            u8(2, 0)
+            u8(3, 1)
+        }
+        assertTrue(state.accept(hangupNoId))
+        assertNull(state.current())
+    }
 }
