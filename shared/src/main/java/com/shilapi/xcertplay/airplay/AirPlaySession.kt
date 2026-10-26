@@ -696,6 +696,9 @@ class AirPlaySession(
             response["keepAlivePort"] = openKeepAlive()
         }
         val features = setupEnabledFeatures(config, dict["features"] as? List<*>)
+        // ★ v135: 记下 iPhone 自己提的 features。Ultra 协商失败时（iPhone 重新配过对
+        //   之后就不再提 vehicleStateProtocol）只能从这里看出"是它没提"还是"我们没回"。
+        debugLog("airplay SETUP proposedFeatures=${dict["features"]} enabledFeatures=$features")
         val videoPlaybackEnabled = VideoInCar.FEATURE in features
         val videoDelivery = videoPlaybackAvailability.setFeatureEnabled(videoPlaybackEnabled)
         debugLog("airplay video playback negotiated=$videoPlaybackEnabled availability=$videoDelivery")

@@ -182,8 +182,28 @@ class B561UltraProtocol(
         )
     }
 
-    override fun enabledFeatures(proposed: List<*>?): List<String> =
-        if (proposed.orEmpty().contains(FEATURE)) listOf(FEATURE) else emptyList()
+    /**
+     * ★ v135: **无条件**把车辆状态能力报给 iPhone。
+     *
+     * 之前只在 iPhone 的 SETUP `features` 里已经出现 [FEATURE] 时才回它。
+     * 实测（10-26 真车，RMX2202 之外的 B561）：iPhone **重新配对过一次**之后，
+     * 它在 SETUP 里就不再提 `vehicleStateProtocol`（我们回给它的
+     * enabledFeatures 因此少一项，响应体 183→158 字节），于是
+     * → `negotiated=false`
+     * → 车辆状态数据流（type=130 / RCS）被我们以"VSP 没协商"拒收
+     * → iPhone 的 Ultra 侧建不起来，5 秒后它自己发 TEARDOWN
+     * → 我们重建整条栈再连 → 又是同样流程 ⇒ **无限重连循环**（用户体感：连接很慢）
+     *
+     * 参照 LIVI（`livi_stack.rs`）：它的 `enabledFeatures` 同样是按手机提的来，
+     * 但**车辆状态数据流只要手机 SETUP 了就接上**
+     * （`lane.filter(|_| self.vehicle_state.is_some())`）—— 与 feature 有没有
+     * 协商成功无关。iPhone 明确开了 type=130 就说明它要这条通道。
+     *
+     * 所以这里与 LIVI 对齐：**车机只要提供车辆状态，就把能力声明出去**，
+     * 让 iPhone 第一次连接就能拿到 Ultra 通道，也让它从 /info 学到本车机支持
+     * 车辆状态协议（`vehicleStateProtocolInfo`，那边本来就是无条件带的）。
+     */
+    override fun enabledFeatures(proposed: List<*>?): List<String> = listOf(FEATURE)
 
     override fun onInfoRequest(body: ByteArray) {
         log(
@@ -206,9 +226,25 @@ class B561UltraProtocol(
         ) {
             return null
         }
-        if (!negotiated || closed.get()) {
-            log("RCS rejected: VSP not negotiated or session closed")
+        /**
+         * ★ v135: **不再因为「VSP 没协商」拒收**车辆状态数据流。
+         *
+         * 10-26 真车日志坐实：iPhone 明明 SETUP 了 type=130（`airplay SETUP stream
+         * type=130 payload={controlType=2, channelID=…-RCS-58, …}`），是我们自己
+         * 因为 `negotiated=false` 把它拒了（日志 `RCS rejected: VSP not negotiated`），
+         * 结果一条 RCS LISTEN 都没有（10-25 成功那次有两条），iPhone 的 Ultra 侧
+         * 建不起来 → 5 秒后 TEARDOWN → 无限重连。
+         *
+         * 参照 LIVI：车辆状态通道只取决于「车机有没有车辆状态能力」
+         * （`self.vehicle_state.is_some()`），与 feature 有没有协商成功无关。
+         * 通道的密钥本来就来自配对共享密钥 + seed，跟 feature 无关。
+         */
+        if (closed.get()) {
+            log("RCS rejected: session closed")
             return null
+        }
+        if (!negotiated) {
+            log("RCS accepted without negotiated VSP (LIVI-compatible)")
         }
         val shared = session.sharedSecret ?: return null
         val seed = unsignedPlistDecimal(stream["seed"]) ?: return null

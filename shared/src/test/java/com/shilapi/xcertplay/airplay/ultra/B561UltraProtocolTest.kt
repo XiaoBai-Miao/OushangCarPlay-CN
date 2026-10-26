@@ -82,18 +82,26 @@ class B561UltraProtocolTest {
         assertEquals("同样的读数不该重复刷日志", after, recorder.lines.size)
     }
 
+    /**
+     * ★ v135: 车辆状态能力**无条件**报给 iPhone。
+     *
+     * 之前只在 iPhone 已经提过 `vehicleStateProtocol` 时才回，于是 iPhone 重新
+     * 配过对（清掉本车机的档案）后的第一次连接必然协商不上：Ultra 数据流被拒收
+     * → iPhone 5 秒后 TEARDOWN → 无限重连。参照 LIVI：车辆状态通道只看车机
+     * 有没有这个能力，与 feature 有没有协商成功无关。
+     */
     @Test
-    fun `feature is offered only when the phone proposed it`() {
+    fun `feature is offered even when the phone did not propose it`() {
         val protocol = B561UltraProtocol(sample = { null })
         assertEquals(
             listOf("vehicleStateProtocol"),
             protocol.enabledFeatures(listOf("video", "vehicleStateProtocol")),
         )
         assertEquals(
-            emptyList<String>(),
+            listOf("vehicleStateProtocol"),
             protocol.enabledFeatures(listOf("video", "audio")),
         )
-        assertEquals(emptyList<String>(), protocol.enabledFeatures(null))
+        assertEquals(listOf("vehicleStateProtocol"), protocol.enabledFeatures(null))
     }
 
     @Test
