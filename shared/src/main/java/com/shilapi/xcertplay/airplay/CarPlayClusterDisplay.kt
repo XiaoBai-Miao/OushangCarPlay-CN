@@ -15,11 +15,23 @@ object CarPlayClusterDisplay {
      * What the dashboard shows: one of the cluster contents the iPhone lists in `altScreenURLs`.
      * On the tested car the iPhone glass turn card needed 0–5 kbit/s against 0.3–4 Mbit/s for the map.
      * MAP_WITH_CUSTOM_CARD asks for the map stream so DiPlay can draw a movable card on top.
+     *
+     * ★ v136: 原来的 `INSTRUMENTS`（`maps:/car/instrumentcluster`）已删除。
+     *
+     * 那是 **Apple 官方仪表** —— 要让 iPhone 自己画转速/功率/续航/胎压，
+     * 必须走 CarPlay Ultra 的车辆状态协议（`vehicleStateProtocol` + RCS/CAF）。
+     * 那条协议栈（`airplay/ultra/` + `airplay/rcs/`，共 19 个类）在 v136
+     * 整体删除：它从来没有在真车上跑通过一次（iPhone 重新配对后不再提该
+     * feature → 我们拒收它明确 SETUP 的 type=130 → 5 秒后 TEARDOWN →
+     * 无限重连循环），而且它会独占 `type=100` 数据流与一条 RCS 通道，
+     * 与 iAP2 隧道抢路。
+     *
+     * 现在仪表上的车辆信息**全部由我们自绘**（[com.shilapi.xcertplay.ClusterGaugeCardView]
+     * + 车速表 + 转向/路口/车道/媒体/通话卡），不依赖 iPhone 端能力。
      */
     enum class Content(val url: String) {
         MAP(MAP_URL),
         TURN_CARD("maps:/car/instrumentcluster/instructioncard"),
-        INSTRUMENTS("maps:/car/instrumentcluster"),
         MAP_WITH_CUSTOM_CARD(MAP_URL),
     }
 
@@ -30,8 +42,6 @@ object CarPlayClusterDisplay {
      * 顺序不同（枚举是 MAP / TURN_CARD / INSTRUMENTS / MAP_WITH_CUSTOM_CARD），
      * 于是按索引取值时整体错位一格：选「地图和官方转向卡」实际存成
      * INSTRUMENTS，选「地图和自定义转向卡」实际存成 MAP_WITH_CUSTOM_CARD。
-     * 后果是「地图和官方转向卡」永远选不到，而 INSTRUMENTS（Apple 官方仪表，
-     * 走 CarPlay Ultra 车辆状态协议）从未被正确暴露。
      *
      * 现在标签与枚举项**成对**给出，索引不可能再错位。
      *
@@ -49,8 +59,7 @@ object CarPlayClusterDisplay {
 
     fun usesCustomTurnCard(content: Content): Boolean = content == Content.MAP_WITH_CUSTOM_CARD
 
-    fun usesOfficialTurnCard(content: Content): Boolean =
-        content == Content.TURN_CARD || content == Content.INSTRUMENTS
+    fun usesOfficialTurnCard(content: Content): Boolean = content == Content.TURN_CARD
 
     /**
      * Where the car marker goes, as percent of the panel (left, top, right, bottom). Measured on a

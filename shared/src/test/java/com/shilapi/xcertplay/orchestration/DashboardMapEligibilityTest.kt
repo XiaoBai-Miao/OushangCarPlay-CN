@@ -18,11 +18,19 @@ class DashboardMapEligibilityTest {
         assertFalse(eligible(closed = true))
     }
 
-    @Test fun supportsMapAndCombinedInstrumentsButNotOnlyATurnCard() {
+    @Test fun supportsMapButNotOnlyATurnCard() {
+        // ★ v136: 原来还放行 INSTRUMENTS（Apple 官方仪表）——
+        //   那一项依赖已下线的 CarPlay Ultra 车辆状态协议，随之删除。
         assertTrue(eligible(url = CarPlayClusterDisplay.Content.MAP_WITH_CUSTOM_CARD.url))
-        assertTrue(eligible(url = CarPlayClusterDisplay.Content.INSTRUMENTS.url))
+        assertTrue(eligible(url = CarPlayClusterDisplay.Content.MAP.url))
         assertFalse(eligible(url = CarPlayClusterDisplay.Content.TURN_CARD.url))
         assertFalse(eligible(url = null))
         assertFalse(eligible(url = "unrecognized:/content"))
+    }
+
+    @Test fun theRemovedInstrumentsContentIsNoLongerEligible() {
+        // v136: "maps:/car/instrumentcluster"（官方仪表）必须不再被放行 ——
+        //   那个内容项已经不存在，留着会让"已下线的 Ultra"继续占着仪表音量。
+        assertFalse(eligible(url = "maps:/car/instrumentcluster"))
     }
 }

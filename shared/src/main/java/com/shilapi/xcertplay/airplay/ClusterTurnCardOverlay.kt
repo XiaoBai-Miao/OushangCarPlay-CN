@@ -94,6 +94,13 @@ object ClusterTurnCardOverlay {
     private const val JUNCTION_ASPECT = 0.78f
 
     /**
+     * ★ v136: 自绘仪表卡片的高宽比（宽 : 高 = 1.9）。
+     *
+     * 比转向卡的 2.64:1 更方 —— 左边要放半圆转速表，右边要竖排 4~5 行读数。
+     */
+    private const val GAUGE_ASPECT = 1.9f
+
+    /**
      * B561: 媒体卡专用的自由尺寸几何（宽与高**各自独立**）。
      *
      * ## 为什么 [card] 不够用
@@ -191,6 +198,42 @@ object ClusterTurnCardOverlay {
         val width = (panelHeight * size / 100).coerceAtLeast(180).coerceAtMost(window.width)
         val height = (width * JUNCTION_ASPECT).toInt()
             .coerceAtLeast(140)
+            .coerceAtMost((window.height * 0.62f).toInt())
+        val x = snap(xPercent, xPercents)
+        val y = snap(yPercent, yPercents)
+        val left = (panelWidth * x / 100 - width / 2).coerceIn(0, panelWidth - width)
+        val top = (panelHeight * y / 100 - height / 2).coerceIn(0, panelHeight - height)
+        return CardRect(left, top, width, height)
+    }
+
+    /**
+     * ★ v136: **自绘仪表卡片**的几何。
+     *
+     * ## 为什么单独一份
+     *
+     * 仪表卡片（转速 + 功率/续航/电量/里程/胎压）左边要放一个**半圆转速表**，
+     * 右边要竖排 4~5 行读数 —— 转向卡那种 2.64:1 的横幅太扁，
+     * 转速表会被压成一个椭圆。
+     *
+     * 所以给它一份 **1.9:1** 的偏方版式（宽 : 高）：比横幅高、比路口图矮。
+     * 高度同样受 `window.height` 的 62% 约束（仪表上下有车辆数据叠层）。
+     *
+     * 这份几何被 [com.shilapi.xcertplay.ClusterGaugeCardView] 与设置页的
+     * 「统一卡片预览」共用 —— 同一份输入必然算出同一个矩形，预览与实车不漂。
+     */
+    fun gaugeCard(
+        panelWidth: Int,
+        panelHeight: Int,
+        xPercent: Int,
+        yPercent: Int,
+        sizePercent: Int,
+    ): CardRect {
+        require(panelWidth > 0 && panelHeight > 0)
+        val window = visibleWindow(panelWidth, panelHeight)
+        val size = snap(sizePercent, sizePercents)
+        val width = (panelHeight * size / 100).coerceAtLeast(200).coerceAtMost(window.width)
+        val height = (width / GAUGE_ASPECT).toInt()
+            .coerceAtLeast(120)
             .coerceAtMost((window.height * 0.62f).toInt())
         val x = snap(xPercent, xPercents)
         val y = snap(yPercent, yPercents)

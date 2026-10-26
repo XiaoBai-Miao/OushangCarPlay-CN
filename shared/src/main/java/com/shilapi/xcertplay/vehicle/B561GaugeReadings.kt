@@ -1,16 +1,18 @@
 package com.shilapi.xcertplay.vehicle
 
 /**
- * B561 的 **Ultra 仪表数据快照** —— 自绘仪表盘（转速表/功率表/续航/里程/胎压）的数据源。
+ * B561 的**仪表卡片数据快照** —— 转速表/功率表/续航/里程/胎压的数据源。
  *
  * ## 为什么要有这个
  *
- * 我们的 CarPlay Ultra 走两条路：
- * 1. **自绘仪表盘**（本类 + [ClusterUltraGaugeView]）—— 我们自己在仪表屏上画表，
- *    数据来自 VHAL / logcat。**这条路不依赖 iPhone 端是否支持 Ultra UI**，
- *    是当下唯一能实车验证的。
- * 2. **真 CarPlay Ultra 协议**（`vehicleStateProtocol` + RCS/CAF）—— 让 iPhone 自己画。
- *    这条路需要补齐 RCS/CAF 底层（我们工程目前没有 `airplay/rcs/`）。
+ * 仪表上的车辆信息**全部由我们自绘**（本类 + [com.shilapi.xcertplay.ClusterGaugeCardView]），
+ * 数据来自 VHAL / logcat，**不依赖 iPhone 端是否支持任何 Ultra UI**。
+ *
+ * ★ v136：原来的「真 CarPlay Ultra 协议」（`vehicleStateProtocol` + RCS/CAF，
+ * 让 iPhone 自己画官方仪表）已随 `airplay/ultra/` + `airplay/rcs/` 整体下线 ——
+ * 那条路从未在真车上跑通过一次（iPhone 重新配对后不再提该 feature，
+ * 我们拒收它明确 SETUP 的 type=130 → 5 秒后 TEARDOWN → 无限重连循环）。
+ * 于是本类成了仪表车辆信息的**唯一**来源。
  *
  * ## 字段对照（LIVI 的 `GAUGE_KEYS`，`vehicle_state.rs:1519`）
  *
@@ -30,7 +32,7 @@ package com.shilapi.xcertplay.vehicle
  * **仪表上宁可留空，也不能画一个假的数字** —— 驾驶员会当真的。
  * 所以 [isEmpty] 为真时整个表都不画，而不是画一圈空表盘。
  */
-data class B561UltraGauges(
+data class B561GaugeReadings(
     /** 车速 km/h。 */
     val speedKph: Float? = null,
     /** 挡位原始值（8 = D）。 */
@@ -113,7 +115,7 @@ data class B561UltraGauges(
     // data class 的 equals/hashCode 对数组用引用比较，必须手动改。
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
-        if (other !is B561UltraGauges) return false
+        if (other !is B561GaugeReadings) return false
         return speedKph == other.speedKph &&
             gear == other.gear &&
             motorRpm == other.motorRpm &&

@@ -11,9 +11,6 @@ import com.shilapi.xcertplay.orchestration.ManualHotspotValidation
 
 /** Each grant is requested explicitly from settings; startup never calls this authorization path. */
 internal object CarHotspotSetup {
-    // v100: B561 不是 BYD/DiLink 车机 —— 恒 false,BYD 专有设置区据此整体跳过。
-    fun isBydHeadUnit(context: Context): Boolean = false
-
     enum class Permission(val appOp: String) {
         HOTSPOT("WRITE_SETTINGS"), BOOT_LAUNCH("SYSTEM_ALERT_WINDOW");
 

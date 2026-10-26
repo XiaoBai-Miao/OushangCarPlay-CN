@@ -476,7 +476,6 @@
     <string name="dashboard_content_map">Map · default</string>
     <string name="dashboard_content_turn_card">Turn card</string>
     <string name="dashboard_content_map_with_turn_card">Map with official turn card</string>
-    <string name="dashboard_content_instruments">Official instrument cluster (CarPlay Ultra)</string>
     <string name="dashboard_content_map_with_custom_turn_card">Map with custom turn card</string>
     <string name="turn_card_size">Turn card size</string>
     <string name="turn_card_horizontal">Turn card · horizontal</string>
@@ -931,17 +930,12 @@
     <string name="settings_ambient_album">Follow album cover</string>
     <string name="settings_ambient_album_description">Use the cover’s color or nearby available car colors. Grey, black or missing covers use all 31 colors; mostly white covers can use white or cold white.</string>
     <string name="settings_cluster_speedometer">Cluster speedometer (experimental)</string>
-    <string name="settings_carplay_ultra">CarPlay Ultra vehicle state</string>
-    <string name="settings_carplay_ultra_description">Off (default): the phone is not offered the CarPlay Ultra vehicle state protocol. On: the car offers the vehicle state protocol so the phone can read the car\'s rev counter, power, range, mileage and tyre pressure. Needs a reconnect to take effect.</string>
     <string name="settings_address_family">Preferred address family</string>
     <string name="settings_address_family_automatic">Automatic (default)</string>
     <string name="settings_address_family_ipv4">Prefer IPv4</string>
     <string name="settings_address_family_ipv6">Prefer IPv6</string>
     <string name="settings_vehicle_simulation">Vehicle data simulation (test)</string>
-    <string name="settings_vehicle_simulation_description">Off (default): uses real vehicle data. On: away from the original car head unit, generates a 60-second simulated driving cycle (idle / accelerate / cruise / brake) and feeds it to the Ultra protocol; takes effect immediately. Must stay off on the real car \u2014 the phone\'s map would show simulated range and battery.</string>
-    <string name="settings_cluster_ultra_gauge">CarPlay Ultra gauges</string>
-    <string name="settings_cluster_ultra_gauge_description">Shows a CarPlay Ultra style instrument cluster on the car display: rev counter, power, range or fuel, battery, mileage and tyre pressure. Only the readings the car actually provides are shown. Changes apply immediately.</string>
-    <string name="settings_cluster_ultra_gauge_opacity">Ultra gauges opacity</string>
+    <string name="settings_vehicle_simulation_description">Off (default): uses real vehicle data. On: away from the original car head unit, generates a 60-second simulated driving cycle (idle / accelerate / cruise / brake) and feeds it to the gauge card; takes effect immediately. Must stay off on the real car \u2014 the phone\u0027s map would show simulated range and battery.</string>
     <string name="settings_cluster_speedometer_description">Shows vehicle speed read from the car\'s own vehicle data. Hidden when a reading is unavailable. Changes apply immediately.</string>
     <string name="settings_cluster_speedometer_horizontal">Speedometer horizontal position</string>
     <string name="settings_cluster_speedometer_vertical">Speedometer vertical position</string>
@@ -1065,4 +1059,16 @@
     <string name="superuni_flyscreen">SuperUni fly screen (cluster channel)</string>
     <string name="superuni_flyscreen_description">Asks SuperUni for the physical instrument channel so the CarPlay map reaches the dashboard. Without it the cluster falls back to the direct presentation path.</string>
     <string name="superuni_flyscreen_unavailable">SuperUni is not installed on this car; the direct presentation path is used instead.</string>
+    <string name="settings_cluster_gauge_card">Instrument gauge card</string>
+    <string name="settings_cluster_gauge_card_description">Draws the rev counter, power, range or fuel, battery, mileage and tyre pressure on the instrument cluster. The card reads the car\u0027s own sensors, so it works on any car and needs no phone support. Only the readings the car actually provides are shown \u2014 a missing value is left out rather than faked. Changes apply immediately.</string>
+    <string name="cluster_gauge_card">Gauge card</string>
+    <string name="cluster_gauge_power">Power</string>
+    <string name="cluster_gauge_fuel">Fuel</string>
+    <string name="cluster_gauge_range">Range</string>
+    <string name="cluster_gauge_battery">Battery</string>
+    <string name="cluster_gauge_odometer">Mileage</string>
+    <string name="cluster_gauge_tire_fl">FL</string>
+    <string name="cluster_gauge_tire_fr">FR</string>
+    <string name="cluster_gauge_tire_rl">RL</string>
+    <string name="cluster_gauge_tire_rr">RR</string>
 </resources>

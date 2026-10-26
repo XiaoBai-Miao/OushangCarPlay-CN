@@ -858,26 +858,11 @@ object AirPlayPersistence {
     }
 
     /**
-     * v125: 是否启用 **CarPlay Ultra 协议**（车辆状态协议 / VSP）。
-     *
-     * 默认 **关** —— 它会让 INFO 多出 `vehicleStateProtocolInfo`、SETUP 多协商一个
-     * feature、并开一条 RCS 数据流。实车验证前不默认开。
-     */
-    fun loadCarPlayUltraEnabled(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getBoolean("carplay_ultra_enabled", false)
-
-    fun saveCarPlayUltraEnabled(context: Context, enabled: Boolean) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-            .putBoolean("carplay_ultra_enabled", enabled).apply()
-    }
-
-    /**
      * v127: 车辆数据模拟开关（**测试专用**，默认关）。
      *
      * 开启后 [B561VehicleDataSource] 用 [B561VehicleSimulator] 的 60 秒
      * 驾驶工况替代真实数据源（logcat/VHAL），让脱离原车车机时
-     * CAF/自绘仪表/iAP2 全链路也能跑起来。**真车上必须关闭。**
+     * 自绘仪表/iAP2 全链路也能跑起来。**真车上必须关闭。**
      */
     fun loadVehicleSimulationEnabled(context: Context): Boolean =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -889,48 +874,75 @@ object AirPlayPersistence {
     }
 
     /**
-     * v123: CarPlay Ultra 风格仪表盘是否启用。
-     *
+     * v136: 自绘仪表卡片是否启用。
+ *
      * 默认 **关** —— 它是新增功能，先让用户自己开；
-     * 且它与「仪表车速表」可以同时开（两者位置独立）。
-     */
-    fun loadClusterUltraGaugeEnabled(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getBoolean("cluster_ultra_gauge_enabled", false)
-
-    fun saveClusterUltraGaugeEnabled(context: Context, enabled: Boolean) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-            .putBoolean("cluster_ultra_gauge_enabled", enabled).apply()
-    }
-
-    /** v123: Ultra 仪表盘透明度（%）。默认 100（完全不透明）。 */
-    fun loadClusterUltraGaugeOpacity(context: Context): Int =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getInt("cluster_ultra_gauge_opacity", 100)
-
-    fun saveClusterUltraGaugeOpacity(context: Context, percent: Int) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-            .putInt("cluster_ultra_gauge_opacity", percent.coerceIn(10, 100)).apply()
-    }
-
-    internal fun observeClusterUltraGauge(context: Context, changed: () -> Unit): () -> Unit {
+ * 且它与「仪表车速表」可以同时开（两者位置独立）。
+ *
+ * ★ v136: 键名从 `cluster_ultra_gauge_enabled` 改成 `cluster_gauge_card_enabled`
+ * （"Ultra" 那套协议栈已下线，名字里的 Ultra 已经名不副实）。
+ * 读侧仍认旧键 —— 存量用户的开关状态不能因为改名而丢。
+ */
+    fun loadClusterGaugeCardEnabled(context: Context): Boolean {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-            if (key == "cluster_ultra_gauge_enabled" || key == "cluster_ultra_gauge_opacity") {
-                changed()
-            }
+        // 新键优先；没有就回落旧键（存量用户的开关状态不能因改名而丢）。
+        if (prefs.contains("cluster_gauge_card_enabled")) {
+            return prefs.getBoolean("cluster_gauge_card_enabled", false)
         }
-        prefs.registerOnSharedPreferenceChangeListener(listener)
-        return { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+        return prefs.getBoolean("cluster_ultra_gauge_enabled", false)
     }
 
-    internal fun observeClusterSpeedometer(context: Context, changed: () -> Unit): () -> Unit {
+    fun saveClusterGaugeCardEnabled(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putBoolean("cluster_gauge_card_enabled", enabled).apply()
+    }
+
+    /** v136: 仪表卡片透明度（%）。默认 85（与其它卡一致）。 */
+    fun loadClusterGaugeCardOpacity(context: Context): Int {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-            if (key?.startsWith("cluster_speedometer_") == true) changed()
+        if (prefs.contains("cluster_gauge_card_opacity_percent")) {
+            return prefs.getInt("cluster_gauge_card_opacity_percent", ClusterTurnCardOverlay.DEFAULT_OPACITY_PERCENT)
         }
-        prefs.registerOnSharedPreferenceChangeListener(listener)
-        return { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+        return prefs.getInt("cluster_ultra_gauge_opacity", ClusterTurnCardOverlay.DEFAULT_OPACITY_PERCENT)
+    }
+
+    fun saveClusterGaugeCardOpacity(context: Context, percent: Int) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putInt("cluster_gauge_card_opacity_percent", percent.coerceIn(20, 100)).apply()
+        overlaySettingsListener?.invoke()
+    }
+
+    /** v136: 仪表卡片的水平位置（%）。默认靠左 —— 它比转向卡宽得多。 */
+    fun loadClusterGaugeCardXPercent(context: Context): Int =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getInt("cluster_gauge_card_x_percent", ClusterTurnCardOverlay.DEFAULT_X_PERCENT)
+
+    fun saveClusterGaugeCardXPercent(context: Context, percent: Int) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putInt("cluster_gauge_card_x_percent", percent).apply()
+        overlaySettingsListener?.invoke()
+    }
+
+    /** v136: 仪表卡片的垂直位置（%）。 */
+    fun loadClusterGaugeCardYPercent(context: Context): Int =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getInt("cluster_gauge_card_y_percent", ClusterTurnCardOverlay.DEFAULT_Y_PERCENT)
+
+    fun saveClusterGaugeCardYPercent(context: Context, percent: Int) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putInt("cluster_gauge_card_y_percent", percent).apply()
+        overlaySettingsListener?.invoke()
+    }
+
+    /** v136: 仪表卡片的大小（%）。 */
+    fun loadClusterGaugeCardSizePercent(context: Context): Int =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getInt("cluster_gauge_card_size_percent", ClusterTurnCardOverlay.DEFAULT_SIZE_PERCENT)
+
+    fun saveClusterGaugeCardSizePercent(context: Context, percent: Int) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putInt("cluster_gauge_card_size_percent", percent).apply()
+        overlaySettingsListener?.invoke()
     }
 
     fun loadClusterSpeedometerX(context: Context): Int =
@@ -991,19 +1003,39 @@ object AirPlayPersistence {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_ADAPT_PIP_RESOLUTION, enabled).apply()
     }
 
+    /**
+     * 仪表显示内容。
+     *
+     * ★ v136: 默认改成 [CarPlayClusterDisplay.Content.MAP_WITH_CUSTOM_CARD]
+     * （地图 + **我们自绘**的卡片）。
+     *
+     * 之前默认是 `INSTRUMENTS`（Apple 官方仪表，走 CarPlay Ultra 车辆状态协议）。
+     * 那条协议栈在 v136 已整体删除 —— 它从未在真车上跑通过（iPhone 重新配对后
+     * 不再提 `vehicleStateProtocol`，我们拒收它明确 SETUP 的 type=130，
+     * 5 秒后它 TEARDOWN → 无限重连循环）。
+     *
+     * 存量用户不用手动改：之前存下的 `"INSTRUMENTS"` 在 [Content.entries]
+     * 里已不存在 → `firstOrNull` 返回 null → 落到新默认值。
+     */
     fun loadClusterContent(context: Context): CarPlayClusterDisplay.Content =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_CLUSTER_CONTENT, null)
             ?.let { name -> CarPlayClusterDisplay.Content.entries.firstOrNull { it.name == name } }
-            // ★ v133: 默认官方仪表盘（`maps:/car/instrumentcluster`）而非地图 ——
-            // v130/v132 修好 CAF 数据链路后，Ultra 官方仪表已经能拿到车辆数据；
-            // 之前默认 MAP 时 iPhone 放音乐就把集群换成 now playing 卡片，
-            // 用户看到的是音乐卡片而不是仪表。已存 MAP 偏好的用户在设置里
-            // 手动切回即可（设置页四个选项不变）。
-            ?: CarPlayClusterDisplay.Content.INSTRUMENTS
+            ?: CarPlayClusterDisplay.Content.MAP_WITH_CUSTOM_CARD
 
     fun saveClusterContent(context: Context, content: CarPlayClusterDisplay.Content) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY_CLUSTER_CONTENT, content.name).apply()
         overlaySettingsListener?.invoke()
+    }
+
+    /**
+     * 按**名字**写入仪表内容 —— 只给迁移/测试用。
+     *
+     * v136: `INSTRUMENTS`（Apple 官方仪表）已随 Ultra 协议栈删除，但存量用户的
+     * prefs 里可能还存着那个名字。写入侧不能因此崩掉 —— 名字无效时按原样存下，
+     * 读侧（[loadClusterContent]）会把它解析成 null 并回落到默认值。
+     */
+    internal fun saveClusterContentByName(context: Context, name: String) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY_CLUSTER_CONTENT, name).apply()
     }
 
     /** Fingers for the swipe-down that opens settings; some head units reserve three. */

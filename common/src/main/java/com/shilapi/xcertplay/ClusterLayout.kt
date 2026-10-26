@@ -1,44 +1,39 @@
 package com.shilapi.xcertplay
 
-import android.content.Context
-import android.os.Build
-
 /**
- * v100: B561 仪表布局替身 —— 原 `DiLink51ClusterLayout` 只服务比亚迪 DiLink 集群
- * (按 `Build.FINGERPRINT` 门控)，B561 上 `supported()` 恒 false，布局永远走
- * "纯色全屏"路径([ClusterMapPresentation] 里 `plan == null` 分支)。
+ * v136: 仪表面板的常量与默认安全区。
  *
- * 保留 API 外形是为了让集群呈现与卡片的几何/主题代码原样工作；
- * 计划几何([plan])在 B561 上不产出，显示屏选择走 [com.shilapi.xcertplay.cluster.ClusterDisplayCatalog]。
+ * ## 历史
+ *
+ * v100 之前这里是一整套**比亚迪 DiLink 集群**的布局替身：按 `Build.FINGERPRINT`
+ * 门控、算出仪表屏上的地图矩形（[plan]）、按屏名/指纹挑屏（[displayName]）。
+ * 比亚迪集成在 v100 已被移除，这些函数全部退化成**恒 false / 恒 null** 的占位：
+ *
+ * ```
+ * supported()   → false
+ * plan()        → null
+ * displayName() → null
+ * automatic()   → false
+ * theme()       → SCENARIO
+ * ```
+ *
+ * 于是 [ClusterMapPresentation] 里那一大段"有 plan / 无 plan"的分支、
+ * `InstrumentContrastView` 渐变层、以及选屏末尾的比亚迪 fallback
+ * 全部是**不可达的死代码**。v136 把它们删掉，`ClusterLayout` 只留下
+ * 真正还在用的东西：
+ *
+ * - [STREAM_WIDTH] / [STREAM_HEIGHT] —— 集群视频画布的逻辑尺寸（1920×720）；
+ * - [defaultSafeAreaRect] —— 安全区映射编辑器的默认框。
+ *
+ * 选屏现在完全走 [com.shilapi.xcertplay.cluster.ClusterDisplayCatalog]
+ * （枚举除主屏外的所有屏 + 用户手动选择）。
  */
 internal object ClusterLayout {
-    enum class Theme(val label: String) {
-        SCENARIO("scenario"),
-        MAP("map"),
-        SIMPLE("simple"),
-    }
-
-    data class Plan(val left: Int, val top: Int, val width: Int, val height: Int, val fullMap: Boolean) {
-        val sourceLeft: Int get() = (STREAM_WIDTH - width) / 2
-        val sourceTop: Int get() = STREAM_HEIGHT - height
-    }
-
+    /** 集群视频画布的逻辑宽度（B561 实测 1920×720，比例 8:3）。 */
     const val STREAM_WIDTH = 1920
+
+    /** 集群视频画布的逻辑高度。 */
     const val STREAM_HEIGHT = 720
-
-    /** B561 不是 DiLink 车机 —— 恒 false。 */
-    fun supported(fingerprint: String = Build.FINGERPRINT): Boolean = false
-
-    fun theme(context: Context): Theme = Theme.SCENARIO
-
-    fun automatic(context: Context): Boolean = false
-
-    fun dark(context: Context, theme: Theme = theme(context)): Boolean = false
-
-    fun plan(width: Int, height: Int, theme: Theme): Plan? = null
-
-    /** BYD 屏名匹配在 B561 上不适用 —— 恒 null(显示屏选择走 ClusterDisplayCatalog)。 */
-    fun displayName(names: List<String>, fingerprint: String, theme: Theme): String? = null
 
     /**
      * 默认安全区(= 整块流)。

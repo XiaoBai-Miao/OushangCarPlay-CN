@@ -438,7 +438,6 @@
     <string name="dashboard_content_map">地图 · 默认</string>
     <string name="dashboard_content_turn_card">转向提示卡</string>
     <string name="dashboard_content_map_with_turn_card">地图和官方转向卡</string>
-    <string name="dashboard_content_instruments">官方仪表盘（CarPlay Ultra）</string>
     <string name="dashboard_content_map_with_custom_turn_card">地图和自定义转向卡</string>
     <string name="turn_card_size">转向提示卡大小</string>
     <string name="turn_card_horizontal">转向提示卡 · 水平位置</string>
@@ -890,17 +889,12 @@
     <string name="settings_ambient_album">跟随专辑封面</string>
     <string name="settings_ambient_album_description">按封面取色并近似匹配原车可用色号。灰黑或无封面时使用全部31色；大面积白色封面可使用白色或冷白。</string>
     <string name="settings_cluster_speedometer">仪表盘速度计（实验性）</string>
-    <string name="settings_carplay_ultra">CarPlay Ultra 车辆状态</string>
-    <string name="settings_carplay_ultra_description">关闭（默认）：不向手机提供 CarPlay Ultra 车辆状态协议。开启：车机提供车辆状态协议，手机可读取转速、功率、续航、里程与胎压。需要重连后生效。</string>
     <string name="settings_address_family">无线地址族优先</string>
     <string name="settings_address_family_automatic">自动（默认）</string>
     <string name="settings_address_family_ipv4">优先 IPv4</string>
     <string name="settings_address_family_ipv6">优先 IPv6</string>
     <string name="settings_vehicle_simulation">车辆数据模拟（测试）</string>
-    <string name="settings_vehicle_simulation_description">关闭（默认）：使用真实车辆数据。开启：脱离原车车机时生成一段 60 秒模拟驾驶工况（息速／加速／均速／减速）品向 Ultra 协议，立即生效。真车上必须关闭——手机地图会显示模拟的续航与电量。</string>
-    <string name="settings_cluster_ultra_gauge">CarPlay Ultra 仪表盘</string>
-    <string name="settings_cluster_ultra_gauge_description">在车机屏幕上显示 CarPlay Ultra 风格仪表盘：转速表、功率、续航或油量、电量、里程与胎压。只显示车辆实际提供的读数。更改立即生效。</string>
-    <string name="settings_cluster_ultra_gauge_opacity">Ultra 仪表盘透明度</string>
+    <string name="settings_vehicle_simulation_description">关闭（默认）：使用真实车辆数据。开启：脱离原车车机时生成一段 60 秒模拟驾驶工况（息速／加速／均速／减速）品向仪表卡片，立即生效。真车上必须关闭——手机地图会显示模拟的续航与电量。</string>
     <string name="settings_cluster_speedometer_description">从车机自身的车辆数据读取并显示车速。读数不可用时隐藏。更改立即生效。</string>
     <string name="settings_cluster_speedometer_horizontal">速度计水平位置</string>
     <string name="settings_cluster_speedometer_vertical">速度计垂直位置</string>
@@ -1024,4 +1018,16 @@
     <string name="superuni_flyscreen">SuperUni 飞屏（仪表通道）</string>
     <string name="superuni_flyscreen_description">向 SuperUni 申请物理仪表通道，让 CarPlay 地图显示到仪表屏。关闭后回退到直接投屏方式。</string>
     <string name="superuni_flyscreen_unavailable">本车未安装 SuperUni，将使用直接投屏方式。</string>
+    <string name="settings_cluster_gauge_card">仪表卡片</string>
+    <string name="settings_cluster_gauge_card_description">在仪表盘上绘制转速表、功率、续航或油量、电量、里程与胎压。卡片读的是车辆自己的传感器，所以任何车都能用，不需要手机端支持。只显示车辆实际提供的读数——读不到就留空，绝不编造。更改立即生效。</string>
+    <string name="cluster_gauge_card">仪表卡片</string>
+    <string name="cluster_gauge_power">功率</string>
+    <string name="cluster_gauge_fuel">油量</string>
+    <string name="cluster_gauge_range">续航</string>
+    <string name="cluster_gauge_battery">电量</string>
+    <string name="cluster_gauge_odometer">里程</string>
+    <string name="cluster_gauge_tire_fl">左前</string>
+    <string name="cluster_gauge_tire_fr">右前</string>
+    <string name="cluster_gauge_tire_rl">左后</string>
+    <string name="cluster_gauge_tire_rr">右后</string>
 </resources>

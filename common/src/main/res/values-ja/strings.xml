@@ -478,7 +478,6 @@
     <string name="dashboard_content_map">地図 · 標準設定</string>
     <string name="dashboard_content_turn_card">案内カード</string>
     <string name="dashboard_content_map_with_turn_card">地図と純正の案内カード</string>
-    <string name="dashboard_content_instruments">純正の計器盤（CarPlay Ultra）</string>
     <string name="dashboard_content_map_with_custom_turn_card">地図とカスタム案内カード</string>
     <string name="turn_card_size">案内カードのサイズ</string>
     <string name="turn_card_horizontal">案内カード · 左右</string>
@@ -890,17 +889,12 @@
     <string name="settings_ambient_album">アルバムアートに合わせる</string>
     <string name="settings_ambient_album_description">アルバムアートの色または近い車載ライトの色を使用します。灰色・黒・画像なしでは31色全体を使い、ほぼ白い画像では白や寒色の白を使えます。</string>
     <string name="settings_cluster_speedometer">メーター内速度表示（実験的機能）</string>
-    <string name="settings_carplay_ultra">CarPlay Ultra 車両状態</string>
-    <string name="settings_carplay_ultra_description">オフ（既定）：iPhone に CarPlay Ultra 車両状態プロトコルを提示しません。オン：車両が車両状態プロトコルを提示し、iPhone が回転数・出力・航続距離・走行距離・タイヤ空気圧を読み取れます。再接続が必要です。</string>
     <string name="settings_address_family">優先するアドレスファミリー</string>
     <string name="settings_address_family_automatic">自動（デフォルト）</string>
     <string name="settings_address_family_ipv4">IPv4 優先</string>
     <string name="settings_address_family_ipv6">IPv6 優先</string>
     <string name="settings_vehicle_simulation">車両データシミュレーション（テスト）</string>
-    <string name="settings_vehicle_simulation_description">オフ（既定）：実際の車両データを使用します。オン：純正車載機から切り離した状態で、60 秒間の模擬運転サイクル（アイドル／加速／少庶／減速）を生成して Ultra プロトコルに供給します。即時反映されます。実際の車両では必ずオフにしてください。</string>
-    <string name="settings_cluster_ultra_gauge">CarPlay Ultra ゲージ</string>
-    <string name="settings_cluster_ultra_gauge_description">車機画面に CarPlay Ultra 風の計器盤を表示します：回転数、パワー、航続距離または燃料、バッテリー、走行距離、タイヤ空気圧。車両が実際に提供する値だけを表示します。変更はすぐに反映されます。</string>
-    <string name="settings_cluster_ultra_gauge_opacity">Ultra ゲージの不透明度</string>
+    <string name="settings_vehicle_simulation_description">オフ（既定）：実際の車両データを使用します。オン：純正車載機から切り離した状態で、60 秒間の模擬運転サイクル（アイドル／加速／少庶／減速）を生成してゲージカードに供給します。即時反映されます。実際の車両では必ずオフにしてください。</string>
     <string name="settings_cluster_speedometer_description">車機自身の車両データから取得した車速を表示します。速度を取得できない場合は隠します。変更はすぐに反映されます。</string>
     <string name="settings_cluster_speedometer_horizontal">速度表示の左右位置</string>
     <string name="settings_cluster_speedometer_vertical">速度表示の上下位置</string>
@@ -1024,4 +1018,16 @@
     <string name="superuni_flyscreen">SuperUni フライングスクリーン（メータチャネル）</string>
     <string name="superuni_flyscreen_description">SuperUni に物理メータチャネルを依頼し、CarPlay 地図をメータへ表示します。無効時は直接表示にフォールバックします。</string>
     <string name="superuni_flyscreen_unavailable">この車両に SuperUni がインストールされていません。直接表示を使用します。</string>
+    <string name="settings_cluster_gauge_card">計器ゲージカード</string>
+    <string name="settings_cluster_gauge_card_description">計器パネルに回転数、パワー、航続距離または燃料、バッテリー、走行距離、タイヤ空気圧を描画します。カードの値は車両自体のセンサーから取得するため、どの車でも動作し、手机側のサポートは不要です。車両が実際に提供する値だけを表示し、取得できない項目はでっち上げずに省略します。変更はすぐに反映されます。</string>
+    <string name="cluster_gauge_card">ゲージカード</string>
+    <string name="cluster_gauge_power">出力</string>
+    <string name="cluster_gauge_fuel">燃料</string>
+    <string name="cluster_gauge_range">航続距離</string>
+    <string name="cluster_gauge_battery">バッテリー</string>
+    <string name="cluster_gauge_odometer">走行距離</string>
+    <string name="cluster_gauge_tire_fl">左前</string>
+    <string name="cluster_gauge_tire_fr">右前</string>
+    <string name="cluster_gauge_tire_rl">左後</string>
+    <string name="cluster_gauge_tire_rr">右後</string>
 </resources>

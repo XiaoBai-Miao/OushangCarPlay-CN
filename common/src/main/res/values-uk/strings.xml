@@ -534,7 +534,6 @@
     <string name="widget_minutes">%1$d хв</string>
     <string name="widget_no_route">Немає маршруту</string>
     <string name="widget_not_connected">CarPlay не підключено</string>
-    <string name="dashboard_content_instruments">Офіційна панель приладів (CarPlay Ultra)</string>
     <string name="dashboard_content_map_with_custom_turn_card">Карта з власною карткою маневру</string>
     <string name="turn_card_overlay_size">Розмір власної картки</string>
     <string name="turn_card_overlay_opacity">Прозорість власної картки</string>
@@ -842,17 +841,12 @@
     <string name="settings_ambient_album">Колір обкладинки альбому</string>
     <string name="settings_ambient_album_description">Колір обкладинки приблизно зіставляється з доступними кольорами автомобіля. Для сірої, чорної або відсутньої обкладинки використовуються всі 31 колір; для переважно білої — білий або холодний білий.</string>
     <string name="settings_cluster_speedometer">Спідометр панелі приладів (експериментально)</string>
-    <string name="settings_carplay_ultra">Стан автомобіля CarPlay Ultra</string>
-    <string name="settings_carplay_ultra_description">Вимкнено (типово): протокол стану автомобіля CarPlay Ultra не пропонується телефону. Увімкнено: автомобіль пропонує цей протокол, і телефон може читати обороти двигуна, потужність, запас ходу, пробіг і тиск у шинах. Потрібне перепідключення.</string>
     <string name="settings_address_family">Бажане сімейство адрес</string>
     <string name="settings_address_family_automatic">Автоматично (типово)</string>
     <string name="settings_address_family_ipv4">Надавати перевагу IPv4</string>
     <string name="settings_address_family_ipv6">Надавати перевагу IPv6</string>
     <string name="settings_vehicle_simulation">Симулbяція даних автомобіля (тест)</string>
-    <string name="settings_vehicle_simulation_description">Вимкнено (типово): використовуються реальні дані автомобіля. Увімкнено: поза штатною головою генерується 60-секундний змодельований їздовий цикл і подається в протокол Ultra; застосовується відразу. На реальному автомобілі має бути вимкнено.</string>
-    <string name="settings_cluster_ultra_gauge">Показники CarPlay Ultra</string>
-    <string name="settings_cluster_ultra_gauge_description">Показує панель приладів у стилі CarPlay Ultra на екрані авто: тахометр, потужність, запас ходу або паливо, заряд акумулятора, пробіг і тиск у шинах. Показуються лише ті показники, які авто реально надає. Зміни застосовуються одразу.</string>
-    <string name="settings_cluster_ultra_gauge_opacity">Прозорість показників Ultra</string>
+    <string name="settings_vehicle_simulation_description">Вимкнено (типово): використовуються реальні дані автомобіля. Увімкнено: поза штатною головою генерується 60-секундний смодельований їздовий цикл і подається в картку показників; застосовується одразу. На реальному автомобілі має бути вимкнено.</string>
     <string name="settings_cluster_speedometer_description">Показує швидкість автомобіля, зчитану з власних даних автомобіля. Приховується, якщо дані недоступні. Зміни застосовуються одразу.</string>
     <string name="settings_cluster_speedometer_horizontal">Положення спідометра по горизонталі</string>
     <string name="settings_cluster_speedometer_vertical">Положення спідометра по вертикалі</string>
@@ -976,4 +970,16 @@
     <string name="superuni_flyscreen">Fly screen SuperUni (канал панелі приладів)</string>
     <string name="superuni_flyscreen_description">Запитує в SuperUni фізичний канал панелі приладів, щоб карта CarPlay потрапила на панель. Без нього використовується прямий шлях відображення.</string>
     <string name="superuni_flyscreen_unavailable">SuperUni не встановлено в цьому автомобілі; використовується прямий шлях відображення.</string>
+    <string name="settings_cluster_gauge_card">Картка показників приладів</string>
+    <string name="settings_cluster_gauge_card_description">Малює тахометр, потужність, запас ходу або паливо, заряд акумулятора, пробіг і тиск у шинах на панелі приладів. Картка читає власні датчики автомобіля, тож працює на будь-якому авті й не потребує підтримки від телефона. Показуються лише ті показники, які авто реально надає: відсутнє значення пропускається, а не вигадується. Зміни застосовуються одразу.</string>
+    <string name="cluster_gauge_card">Картка показників</string>
+    <string name="cluster_gauge_power">Потужність</string>
+    <string name="cluster_gauge_fuel">Паливо</string>
+    <string name="cluster_gauge_range">Запас ходу</string>
+    <string name="cluster_gauge_battery">Заряд акумулятора</string>
+    <string name="cluster_gauge_odometer">Пробіг</string>
+    <string name="cluster_gauge_tire_fl">Перед. лів.</string>
+    <string name="cluster_gauge_tire_fr">Перед. прав.</string>
+    <string name="cluster_gauge_tire_rl">Зад. лів.</string>
+    <string name="cluster_gauge_tire_rr">Зад. прав.</string>
 </resources>

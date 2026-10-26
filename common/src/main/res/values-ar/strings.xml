@@ -424,7 +424,6 @@
     <string name="dashboard_content_map">الخريطة · الافتراضي</string>
     <string name="dashboard_content_turn_card">بطاقة الانعطاف</string>
     <string name="dashboard_content_map_with_turn_card">خريطة مع بطاقة الانعطاف</string>
-    <string name="dashboard_content_instruments">لوحة العدادات الرسمية (CarPlay Ultra)</string>
     <string name="dashboard_content_map_with_custom_turn_card">خريطة مع بطاقة انعطاف مخصصة</string>
     <string name="turn_card_size">حجم بطاقة الانعطاف</string>
     <string name="turn_card_horizontal">بطاقة الانعطاف · أفقيًا</string>
@@ -830,17 +829,12 @@
     <string name="settings_ambient_album">اتباع غلاف الألبوم</string>
     <string name="settings_ambient_album_description">يُطابق لون الغلاف تقريبياً مع ألوان السيارة المتاحة. تستخدم الأغلفة الرمادية أو السوداء أو المفقودة جميع الألوان الـ31؛ وقد تستخدم الأغلفة البيضاء غالباً الأبيض أو الأبيض البارد.</string>
     <string name="settings_cluster_speedometer">عداد سرعة لوحة العدادات (تجريبي)</string>
-    <string name="settings_carplay_ultra">حالة مركبة CarPlay Ultra</string>
-    <string name="settings_carplay_ultra_description">معطّل (افتراضي): لا يُقدَّم للهاتف بروتوكول حالة مركبة CarPlay Ultra. مُفعّل: تقدّم السيارة البروتوكول ليقرأ الهاتف دوران المحرك والقدرة والمدى والمسافة وضغط الإطارات. يتطلب إعادة الاتصال.</string>
     <string name="settings_address_family">أفضلية عائلة العناوين</string>
     <string name="settings_address_family_automatic">تلقائي (افتراضي)</string>
     <string name="settings_address_family_ipv4">أفضل IPv4</string>
     <string name="settings_address_family_ipv6">أفضل IPv6</string>
     <string name="settings_vehicle_simulation">محاكاة بيانات المركبة (اختبار)</string>
-    <string name="settings_vehicle_simulation_description">معطّل (افتراضي): يستخدم بيانات المركبة الحقيقية. مُفعّل: بعيدًا عن وحدة التحكم الأصلية، يولّد دورة قيادة محاكاة مدتها 60 ثانية ويغذّي بروتوكول Ultra؛ يسري فورًا. يجب إبقاؤه معطّلًا في السيارة الحقيقية.</string>
-    <string name="settings_cluster_ultra_gauge">مؤشرات CarPlay Ultra</string>
-    <string name="settings_cluster_ultra_gauge_description">يعرض لوحة أجهزة على طراز CarPlay Ultra على شاشة السيارة: عدّاد الدورات، القدرة، المدى أو الوقود، البطارية، المسافة، وضغط الإطارات. تُعرض فقط القراءات التي توفرها السيارة فعليًا. تُطبّق التغييرات فورًا.</string>
-    <string name="settings_cluster_ultra_gauge_opacity">شفافية مؤشرات Ultra</string>
+    <string name="settings_vehicle_simulation_description">معطّل (افتراضي): يستخدم بيانات المركبة الحقيقية. مُفعّل: بعيدًا عن وحدة التحكم الأصلية، يولّد دورة قيادة محاكاة مدتها 60 ثانية ويغذّي بطاقة المقاييس؛ يسري فورًا. يجب إبقاؤه معطّلًا في السيارة الحقيقية.</string>
     <string name="settings_cluster_speedometer_description">يعرض سرعة السيارة المقروءة من بيانات المركبات الخاصة بالسيارة. يختفي إذا كانت القراءة غير متاحة. تُطبّق التغييرات فورًا.</string>
     <string name="settings_cluster_speedometer_horizontal">الموضع الأفقي لعداد السرعة</string>
     <string name="settings_cluster_speedometer_vertical">الموضع العمودي لعداد السرعة</string>
@@ -1013,4 +1007,16 @@
     <string name="superuni_flyscreen">شاشة SuperUni الطائرة (قناة لوحة العدادات)</string>
     <string name="superuni_flyscreen_description">يطلب من SuperUni قناة العدادات المادية حتى تصل خريطة CarPlay إلى لوحة العدادات. بدونها يعود العرض إلى مسار العرض المباشر.</string>
     <string name="superuni_flyscreen_unavailable">SuperUni غير مثبت على هذه السيارة؛ يُستخدم مسار العرض المباشر بدلاً من ذلك.</string>
+    <string name="settings_cluster_gauge_card">بطاقة مقاييس العدادات</string>
+    <string name="settings_cluster_gauge_card_description">يرسم عدّاد الدورات والقدرة والمدى أو الوقود والبطارية والمسافة وضغط الإطارات على لوحة العدادات. تقرأ البطاقة مستشعرات السيارة نفسها، لذا تعمل على أي سيارة ولا تحتاج إلى دعم من الهاتف. تُعرض فقط القراءات التي توفرها السيارة فعليًا \u2014 القيمة المفقودة تُترك فارغة بدل اختراعها. تُطبّق التغييرات فورًا.</string>
+    <string name="cluster_gauge_card">بطاقة المقاييس</string>
+    <string name="cluster_gauge_power">القدرة</string>
+    <string name="cluster_gauge_fuel">الوقود</string>
+    <string name="cluster_gauge_range">المدى</string>
+    <string name="cluster_gauge_battery">البطارية</string>
+    <string name="cluster_gauge_odometer">المسافة</string>
+    <string name="cluster_gauge_tire_fl">أأم يسار</string>
+    <string name="cluster_gauge_tire_fr">أأم يمين</string>
+    <string name="cluster_gauge_tire_rl">خلف يسار</string>
+    <string name="cluster_gauge_tire_rr">خلف يمين</string>
 </resources>

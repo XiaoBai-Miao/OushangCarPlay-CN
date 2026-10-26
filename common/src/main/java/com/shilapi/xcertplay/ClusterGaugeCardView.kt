@@ -7,25 +7,41 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.view.View
-import com.shilapi.xcertplay.vehicle.B561UltraGauges
-import kotlin.math.max
+import com.shilapi.xcertplay.airplay.ClusterTurnCardOverlay
+import com.shilapi.xcertplay.host.R
+import com.shilapi.xcertplay.vehicle.B561GaugeReadings
 import kotlin.math.min
 import kotlin.math.roundToInt
 
 /**
- * 画在仪表屏上的 **CarPlay Ultra 风格仪表盘**。
+ * 画在仪表屏上的**自绘仪表卡片**（转速 / 功率 / 续航 / 里程 / 胎压）。
  *
- * ## 定位
+ * ## ★ v136：它取代了「CarPlay Ultra 官方仪表」
  *
- * CarPlay Ultra（车辆状态协议）在 iPhone 侧能画一整套仪表（转速/油量/续航/里程/胎压），
- * 参考 LIVI 的 `GAUGE_KEYS`（`vehicle_state.rs:1519`）与 `set_gauges`。
+ * 原来这里有两套并存的东西：
  *
- * 真正的 Ultra 协议路线要补齐 RCS/CAF 底层才能让 **iPhone 自己画**，
- * 而我们的工程目前没有 `airplay/rcs/`。所以这里先做**自绘版**：
- * 我们自己在仪表屏上画同样的那套表，数据来自我们已经能读到的 VHAL / logcat。
+ * | | 原 v123 自绘表 | 原 v125 真 Ultra |
+ * |---|---|---|
+ * | 谁画 | **我们**（这个类） | iPhone 自己画 |
+ * | 依赖 | 只要车机能读 VHAL | 要 CarPlay Ultra 车辆状态协议（RCS/CAF）|
+ * | 实车 | 一直可用 | **从未跑通**，且会让 iPhone 反复 TEARDOWN 重连 |
  *
- * 好处：不依赖 iPhone 端是否支持 Ultra UI（VoyahPlay 的 README 就明说
- * 「iPhone 是否出现空调界面尚未确认」），当下就能实车验证。
+ * v136 把真 Ultra 协议栈整体删除（`airplay/ultra/` + `airplay/rcs/`，19 个类），
+ * 于是「官方仪表」这个内容项（`maps:/car/instrumentcluster`）也一并没了 ——
+ * 留着它就是设置页里一个"选了也没用"的死选项。
+ *
+ * 现在**仪表上的车辆信息全部由我们自绘**：这一张仪表卡片 + 车速表卡片 +
+ * 转向/路口/车道/媒体/通话卡，统统走 VHAL / logcat 的真实读数，
+ * 不依赖 iPhone 端是否支持任何 Ultra UI。
+ *
+ * ## 与其它卡片的关系
+ *
+ * 它现在和其它卡（转向/媒体/路口/车道/通话）**共用同一套几何**
+ * （[ClusterTurnCardOverlay.card]）与同一套滑块（水平/垂直/大小/透明度），
+ * 也进设置页的「统一卡片预览」—— 用户可以像摆转向卡一样摆它。
+ *
+ * 之前它是**整屏铺满**（`FrameLayout.LayoutParams(-1, -1)`）、没有位置滑块，
+ * 也没有预览 —— 想调只能靠改代码。
  *
  * ## 显示策略：缺哪个表就少画哪个，绝不编造
  *
@@ -34,17 +50,15 @@ import kotlin.math.roundToInt
  * - TPMS 未连接 → 不画胎压。
  *
  * 一个数据都读不到时**整块隐藏** —— 画一圈空表盘会让驾驶员以为车坏了。
- *
- * ## 与 [ClusterSpeedometerView] 的关系
- *
- * 那个是**单个**车速表（v117 加的），这个是**整套** Ultra 仪表盘。
- * 两者独立开关、位置独立 —— 可以只开其中一个，也可以都开。
  */
-internal class ClusterUltraGaugeView(context: Context) : View(context) {
+internal class ClusterGaugeCardView(context: Context) : View(context), ClusterTurnCardOverlayHost {
 
-    private var gauges: B561UltraGauges? = null
+    private var gauges: B561GaugeReadings? = null
     private var night = false
-    private var opacityPercent = 100
+    private var opacityPercent = ClusterTurnCardOverlay.DEFAULT_OPACITY_PERCENT
+    private var xPercent = ClusterTurnCardOverlay.DEFAULT_X_PERCENT
+    private var yPercent = ClusterTurnCardOverlay.DEFAULT_Y_PERCENT
+    private var sizePercent = ClusterTurnCardOverlay.DEFAULT_SIZE_PERCENT
 
     private val glassPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -90,17 +104,24 @@ internal class ClusterUltraGaugeView(context: Context) : View(context) {
         }
     }
 
-    fun setNightMode(night: Boolean) {
-        if (this.night == night) return
-        this.night = night
+    override fun setLayout(xPercent: Int, yPercent: Int, sizePercent: Int) {
+        this.xPercent = xPercent
+        this.yPercent = yPercent
+        this.sizePercent = sizePercent
+        invalidate()
+    }
+
+    override fun setOpacity(percent: Int) {
+        val next = percent.coerceIn(10, 100)
+        if (next == opacityPercent) return
+        opacityPercent = next
         applyPalette()
         invalidate()
     }
 
-    fun setOpacity(percent: Int) {
-        val next = percent.coerceIn(10, 100)
-        if (next == opacityPercent) return
-        opacityPercent = next
+    override fun setNightMode(night: Boolean) {
+        if (this.night == night) return
+        this.night = night
         applyPalette()
         invalidate()
     }
@@ -110,7 +131,7 @@ internal class ClusterUltraGaugeView(context: Context) : View(context) {
      *
      * [gauges] 为 null 或全空 → 整块隐藏。
      */
-    fun setGauges(gauges: B561UltraGauges?) {
+    fun setGauges(gauges: B561GaugeReadings?) {
         val next = gauges?.takeIf { !it.isEmpty }
         if (next == this.gauges) return
         this.gauges = next
@@ -118,52 +139,67 @@ internal class ClusterUltraGaugeView(context: Context) : View(context) {
         invalidate()
     }
 
+    /** 是否有内容可画；给设置页预览用。 */
+    fun hasContent(): Boolean = gauges != null
+
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        setMeasuredDimension(
+            MeasureSpec.getSize(widthMeasureSpec).coerceAtLeast(1),
+            MeasureSpec.getSize(heightMeasureSpec).coerceAtLeast(1),
+        )
+    }
+
     override fun onDraw(canvas: Canvas) {
+        super.onDraw(canvas)
         val data = gauges ?: return
-        val w = width.toFloat()
-        val h = height.toFloat()
+        // ★ v136: 用自己的偏方几何（1.9:1），不是转向卡那种 2.64:1 横幅 ——
+        //   左边要放半圆转速表，右边要竖排 4~5 行读数。
+        val card = ClusterTurnCardOverlay.gaugeCard(width, height, xPercent, yPercent, sizePercent)
+        val h = card.height.toFloat()
+        val w = card.width.toFloat()
         if (w <= 0f || h <= 0f) return
 
         // 玻璃底板。
-        rect.set(0f, 0f, w, h)
-        canvas.drawRoundRect(rect, radius(h), radius(h), glassPaint)
+        rect.set(card.left.toFloat(), card.top.toFloat(), card.left + w, card.top + h)
+        val radius = h * 0.16f
+        canvas.drawRoundRect(rect, radius, radius, glassPaint)
         rect.inset(1f, 1f)
-        canvas.drawRoundRect(rect, radius(h), radius(h), strokePaint)
+        canvas.drawRoundRect(rect, radius, radius, strokePaint)
 
         // 转速表（若有）：左半区，一个半圆仪表。
         val rpm = data.primaryRpm
         if (rpm != null) {
-            drawTachometer(canvas, 0f, 0f, w * 0.52f, h, rpm, data.gearLabel)
+            drawTachometer(canvas, card.left.toFloat(), card.top.toFloat(), w * 0.52f, h, rpm, data.gearLabel)
         }
 
         // 右侧信息栏：功率 / 续航(或油量) / 电量 / 里程 / 胎压。
-        val rightX = w * 0.54f
-        var y = h * 0.20f
+        val rightX = card.left + w * 0.54f
+        var y = card.top + h * 0.20f
         val rowH = h * 0.155f
 
         data.powerKw?.let {
-            drawRow(canvas, rightX, y, "功率", "${it.roundToInt()} kW")
+            drawRow(canvas, rightX, y, context.getString(R.string.cluster_gauge_power), "${it.roundToInt()} kW")
             y += rowH
         }
         // 燃油车优先显示油量，纯电车显示续航。
         data.fuelPercent?.let {
-            drawRow(canvas, rightX, y, "油量", "$it %")
+            drawRow(canvas, rightX, y, context.getString(R.string.cluster_gauge_fuel), "$it %")
             y += rowH
         }
         data.rangeKm?.let {
-            drawRow(canvas, rightX, y, "续航", "$it km")
+            drawRow(canvas, rightX, y, context.getString(R.string.cluster_gauge_range), "$it km")
             y += rowH
         }
         data.batteryPercent?.let {
-            drawRow(canvas, rightX, y, "电量", "$it %")
+            drawRow(canvas, rightX, y, context.getString(R.string.cluster_gauge_battery), "$it %")
             y += rowH
         }
         data.odometerKm?.let {
-            drawRow(canvas, rightX, y, "里程", "${it.roundToInt()} km")
+            drawRow(canvas, rightX, y, context.getString(R.string.cluster_gauge_odometer), "${it.roundToInt()} km")
             y += rowH
         }
         data.tirePressureBar?.let { tires ->
-            drawTirePressure(canvas, rightX, y, w, tires)
+            drawTirePressure(canvas, rightX, y, card.left + w, tires)
         }
     }
 
@@ -232,7 +268,12 @@ internal class ClusterUltraGaugeView(context: Context) : View(context) {
         right: Float,
         tires: FloatArray,
     ) {
-        val names = arrayOf("左前", "右前", "左后", "右后")
+        val names = arrayOf(
+            context.getString(R.string.cluster_gauge_tire_fl),
+            context.getString(R.string.cluster_gauge_tire_fr),
+            context.getString(R.string.cluster_gauge_tire_rl),
+            context.getString(R.string.cluster_gauge_tire_rr),
+        )
         labelPaint.textSize = hUnit() * 0.86f
         valuePaint.textSize = hUnit() * 0.95f
         val cell = (right - x) / 4f
@@ -245,12 +286,4 @@ internal class ClusterUltraGaugeView(context: Context) : View(context) {
 
     /** 行高基准：按 View 高度推，保证不同仪表分辨率下比例一致。 */
     private fun hUnit(): Float = height * 0.085f
-
-    private fun radius(h: Float): Float = h * 0.12f
 }
-
-/** 供外部算「有没有数据要画」的便捷函数。 */
-internal fun B561UltraGauges.hasAnythingToShow(): Boolean = !isEmpty
-
-/** 把百分比透明度夹到合理区间。 */
-internal fun clusterGaugeOpacity(value: Int): Int = max(10, min(100, value))

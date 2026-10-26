@@ -424,7 +424,6 @@
     <string name="dashboard_content_map">Mapa · predeterminado</string>
     <string name="dashboard_content_turn_card">Tarjeta de giro</string>
     <string name="dashboard_content_map_with_turn_card">Mapa con tarjeta de giro</string>
-    <string name="dashboard_content_instruments">Cuadro de instrumentos oficial (CarPlay Ultra)</string>
     <string name="dashboard_content_map_with_custom_turn_card">Mapa con tarjeta de giro personalizada</string>
     <string name="turn_card_size">Tamaño de la tarjeta de giro</string>
     <string name="turn_card_horizontal">Tarjeta de giro · horizontal</string>
@@ -830,17 +829,12 @@
     <string name="settings_ambient_album">Seguir la portada del álbum</string>
     <string name="settings_ambient_album_description">Usa el color de la portada o colores cercanos disponibles del vehículo. Las portadas grises, negras o ausentes usan los 31 colores; las mayormente blancas pueden usar blanco o blanco frío.</string>
     <string name="settings_cluster_speedometer">Velocímetro del cluster (experimental)</string>
-    <string name="settings_carplay_ultra">Estado del vehículo CarPlay Ultra</string>
-    <string name="settings_carplay_ultra_description">Desactivado (predeterminado): no se ofrece al teléfono el protocolo de estado del vehículo de CarPlay Ultra. Activado: el coche ofrece ese protocolo para que el teléfono pueda leer el régimen, la potencia, la autonomía, el kilometraje y la presión de los neumáticos. Necesita reconectar para aplicarse.</string>
     <string name="settings_address_family">Familia de direcciones preferida</string>
     <string name="settings_address_family_automatic">Automática (predeterminada)</string>
     <string name="settings_address_family_ipv4">Preferir IPv4</string>
     <string name="settings_address_family_ipv6">Preferir IPv6</string>
     <string name="settings_vehicle_simulation">Simulación de datos del vehículo (prueba)</string>
-    <string name="settings_vehicle_simulation_description">Desactivado (predeterminado): usa los datos reales del vehículo. Activado: lejos de la unidad principal original, genera un ciclo de conducción simulado de 60 segundos (ralentí / aceleración / crucero / frenado) y lo envía al protocolo Ultra; surte efecto de inmediato. Debe permanecer desactivado en el coche real.</string>
-    <string name="settings_cluster_ultra_gauge">Indicadores CarPlay Ultra</string>
-    <string name="settings_cluster_ultra_gauge_description">Muestra un cuadro de instrumentos de estilo CarPlay Ultra en la pantalla del coche: tacómetro, potencia, autonomía o combustible, batería, kilometraje y presión de neumáticos. Solo se muestran las lecturas que el coche proporciona realmente. Los cambios se aplican al momento.</string>
-    <string name="settings_cluster_ultra_gauge_opacity">Opacidad de los indicadores Ultra</string>
+    <string name="settings_vehicle_simulation_description">Desactivado (predeterminado): usa los datos reales del vehículo. Activado: lejos de la unidad principal original, genera un ciclo de conducción simulado de 60 segundos (ralentí / aceleración / crucero / frenado) y lo envía a la tarjeta de indicadores; surte efecto de inmediato. Debe permanecer desactivado en el coche real.</string>
     <string name="settings_cluster_speedometer_description">Muestra la velocidad real leída de los datos de vehículo del propio coche. Se oculta si el dato no está disponible. Los cambios se aplican al momento.</string>
     <string name="settings_cluster_speedometer_horizontal">Posición horizontal del velocímetro</string>
     <string name="settings_cluster_speedometer_vertical">Posición vertical del velocímetro</string>
@@ -964,4 +958,16 @@
     <string name="superuni_flyscreen">Pantalla flotante de SuperUni (canal del salpicadero)</string>
     <string name="superuni_flyscreen_description">Pide a SuperUni el canal fisico del salpicadero para que el mapa de CarPlay llegue al panel. Sin el se usa la via de presentacion directa.</string>
     <string name="superuni_flyscreen_unavailable">SuperUni no esta instalado en este coche; se usa la via de presentacion directa.</string>
+    <string name="settings_cluster_gauge_card">Tarjeta de indicadores del cuadro</string>
+    <string name="settings_cluster_gauge_card_description">Dibuja el tacómetro, la potencia, la autonomía o el combustible, la batería, el kilometraje y la presión de neumáticos en el cuadro de instrumentos. La tarjeta lee los sensores del propio coche, así que funciona en cualquier coche y no necesita ninguna función del teléfono. Solo se muestran las lecturas que el coche proporciona realmente; un valor ausente se omite en lugar de inventarse. Los cambios se aplican al momento.</string>
+    <string name="cluster_gauge_card">Tarjeta de indicadores</string>
+    <string name="cluster_gauge_power">Potencia</string>
+    <string name="cluster_gauge_fuel">Combustible</string>
+    <string name="cluster_gauge_range">Autonomía</string>
+    <string name="cluster_gauge_battery">Batería</string>
+    <string name="cluster_gauge_odometer">Kilometraje</string>
+    <string name="cluster_gauge_tire_fl">Del. izq.</string>
+    <string name="cluster_gauge_tire_fr">Del. der.</string>
+    <string name="cluster_gauge_tire_rl">Tras. izq.</string>
+    <string name="cluster_gauge_tire_rr">Tras. der.</string>
 </resources>

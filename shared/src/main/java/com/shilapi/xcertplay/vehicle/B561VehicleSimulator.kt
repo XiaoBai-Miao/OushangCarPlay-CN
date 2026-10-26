@@ -14,8 +14,8 @@ import kotlin.math.sin
  *
  * 两者的共同根因：真车上数据源（logcat 解析 + VHAL）有值，
  * 而**脱离原车车机**（拿手机当车机测）时两条源都是空的 ——
- * `B561VehicleDataSource.currentUltraGauges()` 返回全 null 的
- * [B561UltraGauges]，`onGaugesChanged` 里 `previous == value`
+ * `B561VehicleDataSource.currentGaugeReadings()` 返回全 null 的
+ * [B561GaugeReadings]，`onGaugesChanged` 里 `previous == value`
  * 永远成立，**一次都不会 publish**。iPhone 没有数据可画，
  * 自然不会去画。
  *
@@ -75,7 +75,7 @@ class B561VehicleSimulator {
      * （车速/电量/里程/胎压至少有一个在变），
      * 因此上层 `previous == value` 的短路不会拦住推送。
      */
-    fun advance(dtSeconds: Float): B561UltraGauges {
+    fun advance(dtSeconds: Float): B561GaugeReadings {
         val raw = advanceRaw(dtSeconds)
         lastRaw = raw
 
@@ -86,7 +86,7 @@ class B561VehicleSimulator {
                 TIRE_RIPPLE_AMP
         }
 
-        return B561UltraGauges(
+        return B561GaugeReadings(
             speedKph = raw.speedKph,
             gear = raw.gear,
             motorRpm = if (raw.speedKph < IDLE_SPEED) {

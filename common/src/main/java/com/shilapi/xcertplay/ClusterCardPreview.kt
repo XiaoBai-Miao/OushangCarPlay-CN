@@ -66,6 +66,14 @@ internal class ClusterCardPreview(context: Context) : View(context) {
     private var showCallCard = false
 
     /**
+     * ★ v136: 自绘仪表卡片。默认不画（与实车一致：没车辆读数就不显示）。
+     *
+     * 它取代了原来的「CarPlay Ultra 官方仪表」—— 那套协议栈已下线，
+     * 仪表上的车辆信息现在全部由我们自绘。
+     */
+    private var showGaugeCard = false
+
+    /**
      * v108: 当前选中的卡片 —— 预览框下方的位置滑块调的就是它。
      *
      * 三张卡（转向 / 媒体 / 路口）共用这一个预览框，选中项决定：
@@ -104,6 +112,8 @@ internal class ClusterCardPreview(context: Context) : View(context) {
     private val junctionCard = ClusterJunctionCardView(context)
     private val laneCard = ClusterLaneCardView(context)
     private val callCard = ClusterCallCardView(context)
+    /** ★ v136: 自绘仪表卡片。 */
+    private val gaugeCard = ClusterGaugeCardView(context)
 
     init {
         // 预览里的卡片不吃触摸，也不需要真实数据 ——
@@ -121,6 +131,18 @@ internal class ClusterCardPreview(context: Context) : View(context) {
             com.shilapi.xcertplay.media.CarPlayCallCard(
                 com.shilapi.xcertplay.media.CarPlayCallCard.Phase.RINGING, "示例来电",
             ), 0L,
+        )
+        // ★ v136: 仪表卡片给一组示意读数 —— 让用户看出它长什么样。
+        //   实车上没有数据时整块隐藏，预览里画出来是有意为之（示意版式）。
+        gaugeCard.setGauges(
+            com.shilapi.xcertplay.vehicle.B561GaugeReadings(
+                motorRpm = 1800f,
+                gear = 8,
+                powerKw = 42f,
+                rangeKm = 386,
+                batteryPercent = 72,
+                odometerKm = 18420f,
+            ),
         )
         cardPaint.color = Color.argb(255, 18, 22, 30)
         borderPaint.color = Color.argb(120, 255, 255, 255)
@@ -153,6 +175,8 @@ internal class ClusterCardPreview(context: Context) : View(context) {
         place(mediaCard, "media")
         place(junctionCard, "junction")
         place(callCard, "call")
+        // ★ v136: 仪表卡片共用同一套几何（横幅卡规则）。
+        place(gaugeCard, "gauge")
         panelPaint.color = if (night) Color.rgb(18, 20, 26) else Color.rgb(226, 232, 240)
         hintPaint.color = if (night) Color.argb(110, 255, 255, 255) else Color.argb(150, 0, 0, 0)
         // 夜间面板底色接近卡片底色，亮蓝在两种底色上都清晰；白天用更饱和的蓝。
@@ -191,6 +215,17 @@ internal class ClusterCardPreview(context: Context) : View(context) {
      */
     fun setLaneVisible(visible: Boolean) {
         showLaneCard = visible
+        invalidate()
+    }
+
+    /**
+     * ★ v136: 自绘仪表卡片是否在预览里显示。
+     *
+     * 它取代了原来的「CarPlay Ultra 官方仪表」—— 那套协议栈已下线，
+     * 仪表上的车辆信息现在全部由我们自绘。
+     */
+    fun setGaugeVisible(visible: Boolean) {
+        showGaugeCard = visible
         invalidate()
     }
 
@@ -298,6 +333,8 @@ internal class ClusterCardPreview(context: Context) : View(context) {
         drawCard(canvas, junctionCard, showJunctionCard, "junction")
         drawCard(canvas, laneCard, showLaneCard, "lane")
         drawCard(canvas, callCard, showCallCard, "call")
+        // ★ v136: 自绘仪表卡片。
+        drawCard(canvas, gaugeCard, showGaugeCard, "gauge")
         canvas.restore()
 
         canvas.drawText(
@@ -362,6 +399,8 @@ internal class ClusterCardPreview(context: Context) : View(context) {
                     )
                 }
             "junction" -> ClusterTurnCardOverlay.junctionCard(panelWidth, panelHeight, x, y, size)
+            // ★ v136: 仪表卡片用自己的偏方几何（1.9:1）。
+            "gauge" -> ClusterTurnCardOverlay.gaugeCard(panelWidth, panelHeight, x, y, size)
             // 转向卡与通话卡共用同一套矩形规则（见各自 onDraw）。
             else -> ClusterTurnCardOverlay.card(panelWidth, panelHeight, x, y, size)
         }

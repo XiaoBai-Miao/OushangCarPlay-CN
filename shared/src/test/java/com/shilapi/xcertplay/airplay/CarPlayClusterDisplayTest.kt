@@ -57,7 +57,6 @@ class CarPlayClusterDisplayTest {
             listOf(
                 "maps:/car/instrumentcluster/map",
                 "maps:/car/instrumentcluster/instructioncard",
-                "maps:/car/instrumentcluster",
                 "maps:/car/instrumentcluster/map",
             ),
             CarPlayClusterDisplay.Content.entries.map { it.url },

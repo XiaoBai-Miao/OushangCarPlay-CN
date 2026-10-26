@@ -424,7 +424,6 @@
     <string name="dashboard_content_map">Карта · по умолчанию</string>
     <string name="dashboard_content_turn_card">Карточка поворота</string>
     <string name="dashboard_content_map_with_turn_card">Карта с карточкой поворота</string>
-    <string name="dashboard_content_instruments">Официальная приборная панель (CarPlay Ultra)</string>
     <string name="dashboard_content_map_with_custom_turn_card">Карта с собственной карточкой поворота</string>
     <string name="turn_card_size">Размер карточки поворота</string>
     <string name="turn_card_horizontal">Карточка поворота · по горизонтали</string>
@@ -830,17 +829,12 @@
     <string name="settings_ambient_album">Цвет обложки альбома</string>
     <string name="settings_ambient_album_description">Цвет обложки приближённо сопоставляется с доступными цветами автомобиля. Для серой, чёрной или отсутствующей обложки используются все 31 цвет; для преимущественно белой — белый или холодный белый.</string>
     <string name="settings_cluster_speedometer">Спидометр приборной панели (экспериментально)</string>
-    <string name="settings_carplay_ultra">Состояние автомобиля CarPlay Ultra</string>
-    <string name="settings_carplay_ultra_description">Выключено (по умолчанию): протокол состояния автомобиля CarPlay Ultra телефону не предлагается. Включено: автомобиль предлагает этот протокол, и телефон может читать обороты двигателя, мощность, запас хода, пробег и давление в шинах. Требуется переподключение.</string>
     <string name="settings_address_family">Предпочтительное семейство адресов</string>
     <string name="settings_address_family_automatic">Автоматически (по умолчанию)</string>
     <string name="settings_address_family_ipv4">Предпочитать IPv4</string>
     <string name="settings_address_family_ipv6">Предпочитать IPv6</string>
     <string name="settings_vehicle_simulation">Симуляция данных автомобиля (тест)</string>
-    <string name="settings_vehicle_simulation_description">Выключено (по умолчанию): используются реальные данные автомобиля. Включено: вне штатной головы генерируется 60-секундный смоделированный ездовой цикл и подаётся в протокол Ultra; применяется сразу. На реальном автомобиле должно быть выключено.</string>
-    <string name="settings_cluster_ultra_gauge">Приборы CarPlay Ultra</string>
-    <string name="settings_cluster_ultra_gauge_description">Показывает приборную панель в стиле CarPlay Ultra на экране автомобиля: тахометр, мощность, запас хода или топливо, заряд аккумулятора, пробег и давление в шинах. Показываются только те показания, которые реально предоставляет автомобиль. Изменения применяются сразу.</string>
-    <string name="settings_cluster_ultra_gauge_opacity">Непрозрачность приборов Ultra</string>
+    <string name="settings_vehicle_simulation_description">Выключено (по умолчанию): используются реальные данные автомобиля. Включено: вне штатной головы генерируется 60-секундный смоделированный ездовой цикл и подаётся в карточку приборов; применяется сразу. На реальном автомобиле должно быть выключено.</string>
     <string name="settings_cluster_speedometer_description">Показывает скорость автомобиля, считанную из собственных данных автомобиля. Скрывается, если данные недоступны. Изменения применяются сразу.</string>
     <string name="settings_cluster_speedometer_horizontal">Положение спидометра по горизонтали</string>
     <string name="settings_cluster_speedometer_vertical">Положение спидометра по вертикали</string>
@@ -964,4 +958,16 @@
     <string name="superuni_flyscreen">Fly screen SuperUni (канал приборной панели)</string>
     <string name="superuni_flyscreen_description">Запрашивает у SuperUni физический канал приборной панели, чтобы карта CarPlay попала на панель. Без него используется прямой путь отображения.</string>
     <string name="superuni_flyscreen_unavailable">SuperUni не установлен в этом автомобиле; используется прямой путь отображения.</string>
+    <string name="settings_cluster_gauge_card">Карточка приборов</string>
+    <string name="settings_cluster_gauge_card_description">Рисует тахометр, мощность, запас хода или уровень топлива, заряд аккумулятора, пробег и давление в шинах на приборной панели. Карточка читает собственные датчики автомобиля, поэтому работает на любой машине и не требует поддержки со стороны телефона. Показываются только те показания, которые реально предоставляет автомобиль: отсутствующее значение пропускается, а не выдумывается. Изменения применяются сразу.</string>
+    <string name="cluster_gauge_card">Карточка приборов</string>
+    <string name="cluster_gauge_power">Мощность</string>
+    <string name="cluster_gauge_fuel">Топливо</string>
+    <string name="cluster_gauge_range">Запас хода</string>
+    <string name="cluster_gauge_battery">Заряд аккумулятора</string>
+    <string name="cluster_gauge_odometer">Пробег</string>
+    <string name="cluster_gauge_tire_fl">Перед. лев.</string>
+    <string name="cluster_gauge_tire_fr">Перед. прав.</string>
+    <string name="cluster_gauge_tire_rl">Зад. лев.</string>
+    <string name="cluster_gauge_tire_rr">Зад. прав.</string>
 </resources>

@@ -19,7 +19,7 @@ class B561VehicleSimulatorTest {
     @Test
     fun `advance produces in-range readings over full cycle`() {
         sim.reset()
-        var prev: B561UltraGauges? = null
+        var prev: B561GaugeReadings? = null
         var maxSpeed = 0f
         var minSpeed = Float.MAX_VALUE
         repeat(120) { // 两个完整周期，每秒一步

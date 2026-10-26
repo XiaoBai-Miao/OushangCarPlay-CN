@@ -53,7 +53,7 @@ class B561VehicleDataSource(
 
     /** 模拟器最近一次推进的仪表快照（推进线程写，回调线程读）。 */
     @Volatile
-    private var simGauges: B561UltraGauges? = null
+    private var simGauges: B561GaugeReadings? = null
 
     /** 模拟器最近一次推进的读数（与 [simGauges] 同一次推进产出）。 */
     @Volatile
@@ -162,7 +162,7 @@ class B561VehicleDataSource(
      * 供自绘仪表盘 [com.shilapi.xcertplay.ClusterUltraGaugeView] 使用。
      * 读不到的字段就是 null —— 仪表会少画那几块，而不是画假数字。
      */
-    fun currentUltraGauges(): B561UltraGauges {
+    fun currentGaugeReadings(): B561GaugeReadings {
         // v127: 模拟开启时直接返回模拟器推进的快照（它自带全套字段，
         // 不需要再从 logcat/VHAL 拼）。
         simGauges?.let { return it }
@@ -171,7 +171,7 @@ class B561VehicleDataSource(
         val voltage = currentVoltage()
         val current = currentCurrent()
         val battery = currentBatteryPercent()
-        return B561UltraGauges(
+        return B561GaugeReadings(
             speedKph = speed,
             gear = currentGearRaw(),
             motorRpm = rpm,

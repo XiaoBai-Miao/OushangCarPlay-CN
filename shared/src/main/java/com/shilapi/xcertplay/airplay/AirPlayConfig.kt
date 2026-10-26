@@ -112,16 +112,6 @@ data class AirPlayConfig(
      * 注意与 [disableAudioOutput] 区别：后者删掉整个 audioFormats，CarPlay 会完全无声。
      */
     val disableBluetooth: Boolean = false,
-    /**
-     * ★ v125 B561: 可选的协议扩展（CarPlay Ultra / 车辆状态协议）。
-     *
-     * 为 null 时行为与之前完全一致 —— 扩展的所有挂钩点都是空实现，
-     * 所以默认不引入任何行为变化。
-     *
-     * 扩展是**按会话**创建的：[AirPlayProtocolExtension.forSession] 给每个
-     * CarPlay 会话一份独立实例（Ultra 的 RCS 通道与状态是会话级的）。
-     */
-    val protocolExtension: AirPlayProtocolExtension? = null,
 )
 
 /** The offer, SETUP and controls must all honor the user's audio-output setting. */

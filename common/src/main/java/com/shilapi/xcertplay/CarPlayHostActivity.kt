@@ -1584,7 +1584,7 @@ class CarPlayHostActivity : ComponentActivity() {
         // v117: 车速表。设置项改动要立刻反映到仪表上。
         pushClusterSpeedometer(presentations)
         // v123: Ultra 仪表盘（转速/功率/续航/里程/胎压）。
-        pushClusterUltraGauge(presentations)
+        pushClusterGaugeCard(presentations)
     }
 
     /**
@@ -1626,21 +1626,30 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     /**
-     * v123: 把 Ultra 仪表盘数据（转速/功率/续航/里程/胎压）推给仪表。
+     * v136: 把自绘仪表卡片数据（转速/功率/续航/里程/胎压）推给仪表。
      *
      * 开关关掉或一个数据都读不到时推 null —— 仪表整块隐藏，
      * 绝不画一圈空表盘（驾驶员会以为车坏了）。
+     *
+     * ★ v136: 它取代了原来的「CarPlay Ultra 官方仪表」——
+     *   真 Ultra 协议栈（airplay/ultra/ + airplay/rcs/）已下线，
+     *   仪表上的车辆信息现在全部由我们自绘。
      */
-    private fun pushClusterUltraGauge(presentations: List<ClusterMapPresentation>? = null) {
+    private fun pushClusterGaugeCard(presentations: List<ClusterMapPresentation>? = null) {
         val targets = presentations
             ?: (clusterLayers.values + listOfNotNull(clusterPresentation)).distinct()
         if (targets.isEmpty()) return
-        val enabled = AirPlayPersistence.loadClusterUltraGaugeEnabled(this)
-        val gauges = if (enabled) vehicleStatus.currentUltraGauges() else null
+        val enabled = AirPlayPersistence.loadClusterGaugeCardEnabled(this)
+        val readings = if (enabled) vehicleStatus.currentGaugeReadings() else null
         for (presentation in targets) {
-            presentation.setUltraGauges(gauges)
-            presentation.setUltraGaugeOpacity(AirPlayPersistence.loadClusterUltraGaugeOpacity(this))
-            presentation.setUltraGaugeNightMode(darkMode)
+            presentation.setGaugeCard(readings)
+            presentation.setGaugeCardGeometry(
+                AirPlayPersistence.loadClusterGaugeCardXPercent(this),
+                AirPlayPersistence.loadClusterGaugeCardYPercent(this),
+                AirPlayPersistence.loadClusterGaugeCardSizePercent(this),
+                AirPlayPersistence.loadClusterGaugeCardOpacity(this),
+            )
+            presentation.setGaugeCardNightMode(darkMode)
         }
     }
 
@@ -5391,32 +5400,8 @@ class CarPlayHostActivity : ComponentActivity() {
             // 该开关关(音频走 CarPlay)→ 发键请 iPhone 关闭蓝牙会话控制,
             // 车机侧再叠加 BluetoothA2dpDisconnect 的机械切断。
             disableBluetooth = !carBluetoothAudio,
-            // ★ v125 B561: CarPlay Ultra 协议扩展（车辆状态协议）。
-            //   默认关 —— 它会让 INFO 多出 vehicleStateProtocolInfo、
-            //   SETUP 多协商一个 feature、并开一条 RCS 数据流。
-            //   实车验证前不默认开。
-            protocolExtension = ultraProtocol(),
         )
     }
-
-    /**
-     * v125: CarPlay Ultra 协议扩展实例；开关关闭时返回 null（行为与之前完全一致）。
-     *
-     * 扩展按会话创建（[B561UltraProtocol.forSession]），所以这里给的是**工厂**：
-     * 每个 CarPlay 会话拿一份独立的 RCS 通道与协商状态。
-     */
-    private fun ultraProtocol(): com.shilapi.xcertplay.airplay.AirPlayProtocolExtension? {
-        if (!AirPlayPersistence.loadCarPlayUltraEnabled(this)) return null
-        val protocol = com.shilapi.xcertplay.airplay.ultra.B561UltraProtocol(
-            sample = { vehicleStatus.currentUltraGauges() },
-            trace = { message -> appendLog(message) },
-        )
-        ultraProtocolInstance = protocol
-        return protocol
-    }
-
-    /** v125: 当前会话的 Ultra 协议实例（用于把车辆数据变化推给它）。 */
-    @Volatile private var ultraProtocolInstance: com.shilapi.xcertplay.airplay.ultra.B561UltraProtocol? = null
 
     /** Car Bluetooth audio: shows whether the iPhone keeps A2DP/HFP with the car now and once CarPlay runs. */
     private fun logCarBluetoothAudio() {
@@ -5905,12 +5890,9 @@ class CarPlayHostActivity : ComponentActivity() {
             vehicleSpeedSource.sample()
             runOnUiThread {
                 pushClusterSpeedometer()
-                // v123: Ultra 仪表盘的数据也来自同一份车辆读数，一起刷。
-                pushClusterUltraGauge()
+                // v123: 仪表卡片的数据也来自同一份车辆读数，一起刷。
+                pushClusterGaugeCard()
             }
-            // ★ v125: 把车辆数据推给 CarPlay Ultra 协议 ——
-            //   iPhone 订阅的 characteristic 靠这个更新。
-            ultraProtocolInstance?.onGaugesChanged(vehicleStatus.currentUltraGauges())
         }
         val locationProvider: Iap2LocationProvider? =
             if (config.locationReportingEnabled) {
