@@ -60,6 +60,19 @@ internal class ClusterGaugeCardView(context: Context) : View(context), ClusterTu
     private var yPercent = ClusterTurnCardOverlay.DEFAULT_Y_PERCENT
     private var sizePercent = ClusterTurnCardOverlay.DEFAULT_SIZE_PERCENT
 
+    // ─────────────────────────────────────────────────────────────
+    // ★ v137: 「车辆信息」卡片内容自定义。
+    //   每个读数独立开关（默认全开）+ 文字大小百分比（默认 100）。
+    // ─────────────────────────────────────────────────────────────
+    private var showTachometer = true
+    private var showPower = true
+    private var showFuel = true
+    private var showRange = true
+    private var showBattery = true
+    private var showOdometer = true
+    private var showTires = true
+    private var textScalePercent = 100
+
     private val glassPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
@@ -135,12 +148,77 @@ internal class ClusterGaugeCardView(context: Context) : View(context), ClusterTu
         val next = gauges?.takeIf { !it.isEmpty }
         if (next == this.gauges) return
         this.gauges = next
-        visibility = if (next == null) View.GONE else View.VISIBLE
+        refreshVisibility()
+        invalidate()
+    }
+
+    /**
+     * ★ v137: 配置「车辆信息」卡片的内容自定义。
+     *
+     * @param showTachometer 是否显示转速表
+     * @param showPower 是否显示功率
+     * @param showFuel 是否显示油量
+     * @param showRange 是否显示续航
+     * @param showBattery 是否显示电量
+     * @param showOdometer 是否显示里程
+     * @param showTires 是否显示胎压
+     * @param textScalePercent 文字大小百分比（60..180，100 = 默认）
+     */
+    fun setContentOptions(
+        showTachometer: Boolean,
+        showPower: Boolean,
+        showFuel: Boolean,
+        showRange: Boolean,
+        showBattery: Boolean,
+        showOdometer: Boolean,
+        showTires: Boolean,
+        textScalePercent: Int,
+    ) {
+        this.showTachometer = showTachometer
+        this.showPower = showPower
+        this.showFuel = showFuel
+        this.showRange = showRange
+        this.showBattery = showBattery
+        this.showOdometer = showOdometer
+        this.showTires = showTires
+        this.textScalePercent = textScalePercent.coerceIn(60, 180)
+        // 开关变化可能影响「是否有内容可画」—— 重新过滤一次。
+        refreshVisibility()
         invalidate()
     }
 
     /** 是否有内容可画；给设置页预览用。 */
-    fun hasContent(): Boolean = gauges != null
+    fun hasContent(): Boolean {
+        val data = gauges ?: return false
+        return visibleData(data) != null
+    }
+
+    /**
+     * 按当前开关过滤数据快照。
+     *
+     * 返回 null 表示开关过滤后没有任何内容可画（整块隐藏）。
+     */
+    private fun visibleData(data: B561GaugeReadings): B561GaugeReadings? {
+        val rpm = if (showTachometer) data.primaryRpm else null
+        val power = if (showPower) data.powerKw else null
+        val fuel = if (showFuel) data.fuelPercent else null
+        val range = if (showRange) data.rangeKm else null
+        val battery = if (showBattery) data.batteryPercent else null
+        val odometer = if (showOdometer) data.odometerKm else null
+        val tires = if (showTires) data.tirePressureBar else null
+        if (rpm == null && power == null && fuel == null && range == null &&
+            battery == null && odometer == null && tires == null
+        ) {
+            return null
+        }
+        return data
+    }
+
+    /** 按当前开关刷新可见性。 */
+    private fun refreshVisibility() {
+        val data = gauges
+        visibility = if (data != null && visibleData(data) != null) View.VISIBLE else View.GONE
+    }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         setMeasuredDimension(
@@ -152,6 +230,8 @@ internal class ClusterGaugeCardView(context: Context) : View(context), ClusterTu
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         val data = gauges ?: return
+        // 开关过滤后没有可画内容 → 不画。
+        val visible = visibleData(data) ?: return
         // ★ v136: 用自己的偏方几何（1.9:1），不是转向卡那种 2.64:1 横幅 ——
         //   左边要放半圆转速表，右边要竖排 4~5 行读数。
         val card = ClusterTurnCardOverlay.gaugeCard(width, height, xPercent, yPercent, sizePercent)
@@ -166,10 +246,12 @@ internal class ClusterGaugeCardView(context: Context) : View(context), ClusterTu
         rect.inset(1f, 1f)
         canvas.drawRoundRect(rect, radius, radius, strokePaint)
 
-        // 转速表（若有）：左半区，一个半圆仪表。
-        val rpm = data.primaryRpm
-        if (rpm != null) {
-            drawTachometer(canvas, card.left.toFloat(), card.top.toFloat(), w * 0.52f, h, rpm, data.gearLabel)
+        // 转速表（若开启且有数据）：左半区，一个半圆仪表。
+        if (showTachometer) {
+            val rpm = visible.primaryRpm
+            if (rpm != null) {
+                drawTachometer(canvas, card.left.toFloat(), card.top.toFloat(), w * 0.52f, h, rpm, visible.gearLabel)
+            }
         }
 
         // 右侧信息栏：功率 / 续航(或油量) / 电量 / 里程 / 胎压。
@@ -177,29 +259,41 @@ internal class ClusterGaugeCardView(context: Context) : View(context), ClusterTu
         var y = card.top + h * 0.20f
         val rowH = h * 0.155f
 
-        data.powerKw?.let {
-            drawRow(canvas, rightX, y, context.getString(R.string.cluster_gauge_power), "${it.roundToInt()} kW")
-            y += rowH
+        if (showPower) {
+            visible.powerKw?.let {
+                drawRow(canvas, rightX, y, context.getString(R.string.cluster_gauge_power), "${it.roundToInt()} kW")
+                y += rowH
+            }
         }
         // 燃油车优先显示油量，纯电车显示续航。
-        data.fuelPercent?.let {
-            drawRow(canvas, rightX, y, context.getString(R.string.cluster_gauge_fuel), "$it %")
-            y += rowH
+        if (showFuel) {
+            visible.fuelPercent?.let {
+                drawRow(canvas, rightX, y, context.getString(R.string.cluster_gauge_fuel), "$it %")
+                y += rowH
+            }
         }
-        data.rangeKm?.let {
-            drawRow(canvas, rightX, y, context.getString(R.string.cluster_gauge_range), "$it km")
-            y += rowH
+        if (showRange) {
+            visible.rangeKm?.let {
+                drawRow(canvas, rightX, y, context.getString(R.string.cluster_gauge_range), "$it km")
+                y += rowH
+            }
         }
-        data.batteryPercent?.let {
-            drawRow(canvas, rightX, y, context.getString(R.string.cluster_gauge_battery), "$it %")
-            y += rowH
+        if (showBattery) {
+            visible.batteryPercent?.let {
+                drawRow(canvas, rightX, y, context.getString(R.string.cluster_gauge_battery), "$it %")
+                y += rowH
+            }
         }
-        data.odometerKm?.let {
-            drawRow(canvas, rightX, y, context.getString(R.string.cluster_gauge_odometer), "${it.roundToInt()} km")
-            y += rowH
+        if (showOdometer) {
+            visible.odometerKm?.let {
+                drawRow(canvas, rightX, y, context.getString(R.string.cluster_gauge_odometer), "${it.roundToInt()} km")
+                y += rowH
+            }
         }
-        data.tirePressureBar?.let { tires ->
-            drawTirePressure(canvas, rightX, y, card.left + w, tires)
+        if (showTires) {
+            visible.tirePressureBar?.let { tires ->
+                drawTirePressure(canvas, rightX, y, card.left + w, tires)
+            }
         }
     }
 
@@ -285,5 +379,5 @@ internal class ClusterGaugeCardView(context: Context) : View(context), ClusterTu
     }
 
     /** 行高基准：按 View 高度推，保证不同仪表分辨率下比例一致。 */
-    private fun hUnit(): Float = height * 0.085f
+    private fun hUnit(): Float = height * 0.085f * (textScalePercent / 100f)
 }

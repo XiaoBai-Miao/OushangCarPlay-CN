@@ -1492,28 +1492,24 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                     AirPlayPersistence.loadClusterMediaYPercent(this),
                     AirPlayPersistence.loadClusterMediaSizePercent(this),
                 ),
-                "junction" to Triple(
-                    AirPlayPersistence.loadClusterJunctionXPercent(this),
-                    AirPlayPersistence.loadClusterJunctionYPercent(this),
-                    AirPlayPersistence.loadClusterJunctionSizePercent(this),
-                ),
-                "lane" to Triple(
-                    AirPlayPersistence.loadClusterLaneXPercent(this),
-                    AirPlayPersistence.loadClusterLaneYPercent(this),
-                    AirPlayPersistence.loadClusterLaneSizePercent(this),
-                ),
                 "call" to Triple(
                     AirPlayPersistence.loadClusterCallXPercent(this),
                     AirPlayPersistence.loadClusterCallYPercent(this),
                     AirPlayPersistence.loadClusterCallSizePercent(this),
                 ),
+                // ★ v136: 自绘仪表卡片 —— 与其它卡共用同一套几何滑块。
+                "gauge" to Triple(
+                    AirPlayPersistence.loadClusterGaugeCardXPercent(this),
+                    AirPlayPersistence.loadClusterGaugeCardYPercent(this),
+                    AirPlayPersistence.loadClusterGaugeCardSizePercent(this),
+                ),
             ),
             opacity = mapOf(
                 "turn" to AirPlayPersistence.loadClusterTurnCardOpacityPercent(this),
                 "media" to AirPlayPersistence.loadClusterMediaOpacityPercent(this),
-                "junction" to AirPlayPersistence.loadClusterJunctionOpacityPercent(this),
-                "lane" to AirPlayPersistence.loadClusterLaneOpacityPercent(this),
                 "call" to AirPlayPersistence.loadClusterCallOpacityPercent(this),
+                // ★ v136: 自绘仪表卡片。
+                "gauge" to AirPlayPersistence.loadClusterGaugeCardOpacity(this),
             ),
             night = lastKnownNight,
         )
@@ -1525,6 +1521,17 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             AirPlayPersistence.loadClusterMediaWidthPercent(this),
             AirPlayPersistence.loadClusterMediaHeightPercent(this),
             AirPlayPersistence.loadClusterMediaOrientation(this),
+        )
+        // ★ v137: 「车辆信息」卡的内容自定义同步到预览。
+        preview.setGaugeContentOptions(
+            AirPlayPersistence.loadClusterGaugeShowTachometer(this),
+            AirPlayPersistence.loadClusterGaugeShowPower(this),
+            AirPlayPersistence.loadClusterGaugeShowFuel(this),
+            AirPlayPersistence.loadClusterGaugeShowRange(this),
+            AirPlayPersistence.loadClusterGaugeShowBattery(this),
+            AirPlayPersistence.loadClusterGaugeShowOdometer(this),
+            AirPlayPersistence.loadClusterGaugeShowTires(this),
+            AirPlayPersistence.loadClusterGaugeTextScalePercent(this),
         )
     }
 
@@ -1552,10 +1559,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         val turnAvailable = CarPlayClusterDisplay.usesCustomTurnCard(
             AirPlayPersistence.loadClusterContent(this))
         val mediaAvailable = AirPlayPersistence.loadClusterMediaCardEnabled(this)
-        val junctionAvailable = AirPlayPersistence.loadClusterJunctionCardEnabled(this)
-        // v118: 车道信息卡片。官方转向卡模式下同样不可用 ——
-        // 那张卡只有自定义内容(clusterContent)时才谈得上摆位。
-        val laneAvailable = AirPlayPersistence.loadClusterLaneCardEnabled(this)
         val callAvailable = AirPlayPersistence.loadClusterCallCardEnabled(this)
         // ★ v136: 自绘仪表卡片。它取代了原来的「CarPlay Ultra 官方仪表」——
         //   现在仪表上的车辆信息全部由我们自绘，所以它是**唯一**能画车辆
@@ -1564,8 +1567,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         val available = buildList {
             if (turnAvailable) add("turn")
             if (mediaAvailable) add("media")
-            if (junctionAvailable) add("junction")
-            if (laneAvailable) add("lane")
             if (callAvailable) add("call")
             if (gaugeAvailable) add("gauge")
         }
@@ -1591,8 +1592,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             // 右侧空一块，看着就是"预览没占满预览区域"。
             card.addView(preview, LinearLayout.LayoutParams(-1, LinearLayout.LayoutParams.WRAP_CONTENT))
             preview.setVisibleCards(turnAvailable, mediaAvailable)
-            preview.setJunctionVisible(junctionAvailable)
-            preview.setLaneVisible(laneAvailable)
             preview.setCallVisible(callAvailable)
             preview.setGaugeVisible(gaugeAvailable)
             preview.setSelectedCard(clusterPreviewCard)
@@ -1613,29 +1612,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                 saveY = { AirPlayPersistence.saveClusterMediaYPercent(this, it) },
                 saveSize = { AirPlayPersistence.saveClusterMediaSizePercent(this, it) },
                 saveOpacity = { AirPlayPersistence.saveClusterMediaOpacityPercent(this, it) },
-            )
-            "junction" -> clusterCardSliders(
-                card,
-                loadX = { AirPlayPersistence.loadClusterJunctionXPercent(this) },
-                loadY = { AirPlayPersistence.loadClusterJunctionYPercent(this) },
-                loadSize = { AirPlayPersistence.loadClusterJunctionSizePercent(this) },
-                loadOpacity = { AirPlayPersistence.loadClusterJunctionOpacityPercent(this) },
-                saveX = { AirPlayPersistence.saveClusterJunctionXPercent(this, it) },
-                saveY = { AirPlayPersistence.saveClusterJunctionYPercent(this, it) },
-                saveSize = { AirPlayPersistence.saveClusterJunctionSizePercent(this, it) },
-                saveOpacity = { AirPlayPersistence.saveClusterJunctionOpacityPercent(this, it) },
-            )
-            // v118: 车道信息卡片 —— 横幅版式,默认压在仪表底边。
-            "lane" -> clusterCardSliders(
-                card,
-                loadX = { AirPlayPersistence.loadClusterLaneXPercent(this) },
-                loadY = { AirPlayPersistence.loadClusterLaneYPercent(this) },
-                loadSize = { AirPlayPersistence.loadClusterLaneSizePercent(this) },
-                loadOpacity = { AirPlayPersistence.loadClusterLaneOpacityPercent(this) },
-                saveX = { AirPlayPersistence.saveClusterLaneXPercent(this, it) },
-                saveY = { AirPlayPersistence.saveClusterLaneYPercent(this, it) },
-                saveSize = { AirPlayPersistence.saveClusterLaneSizePercent(this, it) },
-                saveOpacity = { AirPlayPersistence.saveClusterLaneOpacityPercent(this, it) },
             )
             // ★ v136: 自绘仪表卡片 —— 取代已下线的 CarPlay Ultra 官方仪表。
             //   位置/大小/透明度与其它卡共用同一套滑块与同一套几何。
@@ -1731,8 +1707,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     private fun clusterCardChip(key: String, selected: Boolean): android.widget.Button {
         val title = getString(when (key) {
             "media" -> R.string.cluster_media_card
-            "junction" -> R.string.cluster_junction_card
-            "lane" -> R.string.cluster_lane_card
             "call" -> R.string.cluster_call_card
             // ★ v136: 自绘仪表卡片（取代已下线的 CarPlay Ultra 官方仪表）。
             "gauge" -> R.string.cluster_gauge_card
@@ -2556,9 +2530,8 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             card.addView(label(getString(R.string.settings_navigation_attenuation_description), 14, MUTED).apply {
                 setPadding(0, dp(SETTINGS_BLOCK_GAP_DP), 0, 0)
             })
-            // v100 B561: 仪表媒体卡设置放在「音频」分区 —— 媒体卡本质是播放器
-            // 的一部分,跟着音频走比塞在仪表屏设置里更符合预期。
-            clusterMediaCardControls(card)
+            // ★ v137: 媒体卡设置已迁移到「仪表」分区 —— 它本质是仪表卡片，
+            //   不再属于音频路由。
             // ★ v105 B561: 导航声道是否申请音频焦点。默认关(= 不抢焦点,叠加播放)。
             toggle(card, getString(R.string.navigation_audio_focus),
                 getString(R.string.navigation_audio_focus_description),
@@ -2661,6 +2634,9 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                     render()
                 }
                 clusterSpeedometerControls(card)
+                // ★ v137: 媒体卡设置从「音频」分区迁到「仪表」分区 ——
+                //   它是仪表卡片，设置理应跟着仪表走。
+                clusterMediaCardControls(card)
                 clusterGaugeCardControls(card)
                 toggle(card, getString(R.string.center_map_card),
                     if (clusterDisplay != null) getString(R.string.center_map_card_description)
@@ -2776,23 +2752,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                             AirPlayPersistence.loadClusterTurnCardShowArrival(this)) {
                             AirPlayPersistence.saveClusterTurnCardShowArrival(this, it)
                         }
-                    }
-                    // v100 B561: 路口放大图 —— 与转向卡同源(车道级指引 0x5204),
-                    // 但版式与几何完全独立,可单独开关/摆放。
-                    toggle(card, getString(R.string.cluster_junction_card),
-                        getString(R.string.cluster_junction_card_description),
-                        AirPlayPersistence.loadClusterJunctionCardEnabled(this)) {
-                        AirPlayPersistence.saveClusterJunctionCardEnabled(this, it)
-                        render()
-                    }
-                    // v118 B561: 车道信息卡片 —— 只画 0x5204 车道带的横幅卡。
-                    //   与路口放大图是两张卡:路口图带"岔路+车道"的方块版式且
-                    //   车道解不出时照样画岔路;这张只有车道带,解不出就整块隐藏。
-                    toggle(card, getString(R.string.cluster_lane_card),
-                        getString(R.string.cluster_lane_card_description),
-                        AirPlayPersistence.loadClusterLaneCardEnabled(this)) {
-                        AirPlayPersistence.saveClusterLaneCardEnabled(this, it)
-                        render()
                     }
                     // v108: 路口卡的位置/大小/透明度滑块已整合到下方「统一卡片预览」块。
                     // v108 B561: 统一卡片预览 —— 一行 chip 选卡 + 一个预览框
@@ -4007,7 +3966,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
     // (见「音频路由」分区的媒体卡设置),不走 DiLink 导航广播。
 
     /**
-     * v136: 自绘仪表卡片的开关。
+     * ★ v137: 「车辆信息」卡片设置（原「仪表卡片」）。
      *
      * 与「仪表车速表」是**两件独立的事**：那个只画速度，这个画整套
      * （转速表/功率/续航或油量/电量/里程/胎压）。
@@ -4016,11 +3975,12 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
      *   真 Ultra 协议栈（airplay/ultra/ + airplay/rcs/）在 v136 已整体下线，
      *   现在仪表上的车辆信息**全部由我们自绘**，不依赖 iPhone 端能力。
      *
-     * 缺哪个数据就少画哪个 —— 纯电车没有油量、燃油车没有电量，
-     * 都不画，**绝不编造**。
+     * ★ v137: 增加内容自定义 —— 每个读数独立开关 + 文字大小滑块。
+     *   缺哪个数据就少画哪个 —— 纯电车没有油量、燃油车没有电量，
+     *   都不画，**绝不编造**。用户关掉的读数在仪表上同样隐藏。
      *
      * 位置/大小/透明度在「统一卡片预览」块里调（与其它卡共用同一套滑块），
-     * 所以这里只有一个总开关。
+     * 所以这里只有总开关 + 内容自定义。
      */
     private fun clusterGaugeCardControls(card: LinearLayout) {
         toggle(card, getString(R.string.settings_cluster_gauge_card),
@@ -4028,6 +3988,60 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             AirPlayPersistence.loadClusterGaugeCardEnabled(this)) {
             AirPlayPersistence.saveClusterGaugeCardEnabled(this, it)
             render()
+        }
+        if (AirPlayPersistence.loadClusterGaugeCardEnabled(this)) {
+            card.addView(label(getString(R.string.cluster_gauge_show_section), 16, TEXT, true).apply {
+                setPadding(0, dp(12), 0, dp(4))
+            })
+            // ★ v137: 每个读数开关保存后立即刷新预览 —— 让用户立刻看到
+            //   仪表卡片上的内容变化（与实车一致：关掉的读数不再画）。
+            toggle(card, getString(R.string.cluster_gauge_show_tachometer), "",
+                AirPlayPersistence.loadClusterGaugeShowTachometer(this)) {
+                AirPlayPersistence.saveClusterGaugeShowTachometer(this, it)
+                refreshClusterPreview()
+            }
+            toggle(card, getString(R.string.cluster_gauge_show_power), "",
+                AirPlayPersistence.loadClusterGaugeShowPower(this)) {
+                AirPlayPersistence.saveClusterGaugeShowPower(this, it)
+                refreshClusterPreview()
+            }
+            toggle(card, getString(R.string.cluster_gauge_show_fuel), "",
+                AirPlayPersistence.loadClusterGaugeShowFuel(this)) {
+                AirPlayPersistence.saveClusterGaugeShowFuel(this, it)
+                refreshClusterPreview()
+            }
+            toggle(card, getString(R.string.cluster_gauge_show_range), "",
+                AirPlayPersistence.loadClusterGaugeShowRange(this)) {
+                AirPlayPersistence.saveClusterGaugeShowRange(this, it)
+                refreshClusterPreview()
+            }
+            toggle(card, getString(R.string.cluster_gauge_show_battery), "",
+                AirPlayPersistence.loadClusterGaugeShowBattery(this)) {
+                AirPlayPersistence.saveClusterGaugeShowBattery(this, it)
+                refreshClusterPreview()
+            }
+            toggle(card, getString(R.string.cluster_gauge_show_odometer), "",
+                AirPlayPersistence.loadClusterGaugeShowOdometer(this)) {
+                AirPlayPersistence.saveClusterGaugeShowOdometer(this, it)
+                refreshClusterPreview()
+            }
+            toggle(card, getString(R.string.cluster_gauge_show_tires), "",
+                AirPlayPersistence.loadClusterGaugeShowTires(this)) {
+                AirPlayPersistence.saveClusterGaugeShowTires(this, it)
+                refreshClusterPreview()
+            }
+            card.addView(label(getString(R.string.cluster_gauge_customize_note), 14, MUTED).apply {
+                setPadding(0, dp(4), 0, dp(8))
+            })
+            card.addView(overlaySliderRow(
+                getString(R.string.cluster_gauge_text_scale),
+                com.shilapi.xcertplay.airplay.ClusterTurnCardOverlay.mediaTextScalePercents,
+                AirPlayPersistence.loadClusterGaugeTextScalePercent(this),
+            ) { getString(R.string.cluster_gauge_text_scale_option, it) }
+                .also { row -> row.onSave = { v ->
+                    AirPlayPersistence.saveClusterGaugeTextScalePercent(this, v)
+                    refreshClusterPreview()
+                } })
         }
     }
 

@@ -47,12 +47,6 @@ internal class ClusterMapPresentation(
     /** B561: 通话卡（来电方 / 通话时长）。默认 GONE，见 [setCallCard]。 */
     private var callCardView: ClusterCallCardView? = null
 
-    /** B561: 路口放大图（车道级导航图）。默认 GONE，见 [setJunction]。 */
-    private var junctionCardView: ClusterJunctionCardView? = null
-
-    /** v118 B561: 车道信息卡片（只画车道带）。默认 GONE，见 [setLaneCard]。 */
-    private var laneCardView: ClusterLaneCardView? = null
-
     /** v117: 车速表。默认 GONE，读到 VHAL 车速才显示，见 [setSpeedometerReading]。 */
     private var speedometerView: ClusterSpeedometerView? = null
 
@@ -142,16 +136,6 @@ internal class ClusterMapPresentation(
         //   几何与转向/媒体卡共用同一套 x/y/size（见 [setCardGeometry]）。
         callCardView = ClusterCallCardView(context).apply { visibility = View.GONE }
         root.addView(callCardView, FrameLayout.LayoutParams(-1, -1))
-        // ★ B561 路口放大图（车道级导航图）。iOS 不发成品图，只发 0x5202 的路口
-        //   几何与 0x5204 的车道数据，由这里自己渲染 —— 详见
-        //   [ClusterJunctionCardView] 顶部的说明。挂在三张卡**之上**：
-        //   它就是转向信息的展开态，出现时应该在最上层。
-        junctionCardView = ClusterJunctionCardView(context).apply { visibility = View.GONE }
-        root.addView(junctionCardView, FrameLayout.LayoutParams(-1, -1))
-        // ★ v118 车道信息卡片。挂在路口卡**之下**：同时出现时路口图是
-        //   临近路口的展开态，优先级更高；车道卡是常驻条，被压住也合理。
-        laneCardView = ClusterLaneCardView(context).apply { visibility = View.GONE }
-        root.addView(laneCardView, FrameLayout.LayoutParams(-1, -1))
         // ★ v117 车速表。数据来自 B561 VHAL（与原厂仪表同源），
         //   读不到时整块 GONE —— 报假的 0 速比空白更糟。
         //   挂在最上层：它是驾驶员最需要随时看到的信息。
@@ -324,79 +308,6 @@ internal class ClusterMapPresentation(
     }
 
     /**
-     * B561: 路口放大图的位置/大小/透明度 —— 独立于转向卡。
-     *
-     * 用 [ClusterTurnCardOverlay.junctionCard] 那份更方的几何，所以**不能**
-     * 复用 [setCardGeometry] 的横幅比例。
-     */
-    fun setJunctionGeometry(xPercent: Int, yPercent: Int, sizePercent: Int) {
-        junctionCardView?.setLayout(xPercent, yPercent, sizePercent)
-    }
-
-    fun setJunctionOpacity(percent: Int) {
-        junctionCardView?.setOpacity(percent)
-    }
-
-    /**
-     * 旧入口：只推车道带（没有路口几何）。
-     *
-     * v118 起 [ClusterJunctionCardView] 只吃 [setJunction] 一种数据
-     * （见该类顶部"两半不能互相绑架"的说明），所以这里把车道带包一份
-     * 只有 lanes 的 [com.shilapi.xcertplay.guidance.ClusterJunctionGuidance]
-     * 转进去：`maneuverType = 0` 时 `branches` 为空、不会凭空画岔路，
-     * 卡片表现与旧的"只画车道带"一致。车道不可画时整块隐藏。
-     */
-    fun setJunctionLanes(lanes: com.shilapi.xcertplay.guidance.ClusterLaneGuidance?) {
-        val usable = lanes?.takeIf { it.drawable && it.sane }
-        junctionCardView?.setJunction(
-            usable?.let {
-                com.shilapi.xcertplay.guidance.ClusterJunctionGuidance(
-                    maneuverType = 0,
-                    drivingSide = 0,
-                    distanceMeters = 0,
-                    lanes = it,
-                )
-            },
-        )
-    }
-
-    /**
-     * v118: 推路口放大图数据。
-     *
-     * 与 [setJunctionLanes] 是**两条路**：本方法推的是
-     * [com.shilapi.xcertplay.guidance.ClusterJunctionGuidance]（`0x5202` 路口几何
-     * + 可选车道带），车道带解不出来时路口图照样画 —— 这就是"路口放大图
-     * 画不出来"的修复点。[setJunctionLanes] 是它的车道带专用包装。
-     */
-    fun setJunction(guidance: com.shilapi.xcertplay.guidance.ClusterJunctionGuidance?) {
-        junctionCardView?.setJunction(guidance)
-    }
-
-    /**
-     * v118: 推车道信息卡片数据。null（`0x5204` 解不出来）时整块隐藏。
-     *
-     * ★ 不用 maneuver 类型编一组车道充数 —— 那是路口卡的权限
-     *   （见 [ClusterLaneCardView] 顶部说明）。猜错车道比不画危险得多。
-     */
-    fun setLaneCard(lanes: com.shilapi.xcertplay.guidance.ClusterLaneGuidance?) {
-        laneCardView?.setLanes(lanes)
-    }
-
-    /** v118: 车道信息卡片的位置/大小/透明度 —— 独立于其它卡。 */
-    fun setLaneCardGeometry(xPercent: Int, yPercent: Int, sizePercent: Int) {
-        laneCardView?.setLayout(xPercent, yPercent, sizePercent)
-    }
-
-    fun setLaneCardOpacity(percent: Int) {
-        laneCardView?.setOpacity(percent)
-    }
-
-    /** v118: 车道信息卡片的深浅色。 */
-    fun setLaneCardNightMode(night: Boolean) {
-        laneCardView?.setNightMode(night)
-    }
-
-    /**
      * v117: 推 VHAL 车速读数。null（读不到）时整块隐藏。
      *
      * 走 VHAL 而不是抓 logcat —— 数据与原厂仪表同源，单位明确是 km/h。
@@ -432,6 +343,34 @@ internal class ClusterMapPresentation(
         gaugeCardView?.setOpacity(opacityPercent)
     }
 
+    /**
+     * ★ v137: 「车辆信息」卡片的内容自定义 —— 显示开关 + 文字大小。
+     *
+     * 与 [setGaugeCard] 分开：这些选项来自设置页持久化键，随设置变化
+     * 实时下发，与数据推送相互独立。
+     */
+    fun setGaugeCardContentOptions(
+        showTachometer: Boolean,
+        showPower: Boolean,
+        showFuel: Boolean,
+        showRange: Boolean,
+        showBattery: Boolean,
+        showOdometer: Boolean,
+        showTires: Boolean,
+        textScalePercent: Int,
+    ) {
+        gaugeCardView?.setContentOptions(
+            showTachometer,
+            showPower,
+            showFuel,
+            showRange,
+            showBattery,
+            showOdometer,
+            showTires,
+            textScalePercent,
+        )
+    }
+
     /** v136: 仪表卡片的深浅色。 */
     fun setGaugeCardNightMode(night: Boolean) {
         gaugeCardView?.setNightMode(night)
@@ -447,7 +386,6 @@ internal class ClusterMapPresentation(
         turnCardView?.setNightMode(night)
         mediaCardView?.setNightMode(night)
         callCardView?.setNightMode(night)
-        junctionCardView?.setNightMode(night)
     }
 
     companion object {

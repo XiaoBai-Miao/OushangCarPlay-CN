@@ -512,29 +512,6 @@ class CarPlayHostActivity : ComponentActivity() {
             applyClusterTurnOverlay()
         }
     }
-    /** v100 B561: 车道级指引(0x5204)→ 路口放大图。 */
-    private var clusterLaneGuidance: com.shilapi.xcertplay.guidance.ClusterLaneGuidance? = null
-    private val clusterLaneListener: (com.shilapi.xcertplay.guidance.ClusterLaneGuidance?) -> Unit = { lanes ->
-        runOnUiThread {
-            clusterLaneGuidance = lanes
-            applyClusterTurnOverlay()
-        }
-    }
-
-    /**
-     * v118 B561: 路口放大图（0x5202 路口几何 + 可选 0x5204 车道带）。
-     *
-     * 与 [clusterLaneListener] 是两条独立通道 —— 改之前路口卡只吃后者，
-     * 于是 `0x5204` 解不出来时，`0x5202` 已经解出来的路口几何也一起被隐藏，
-     * 表现就是"路口放大图画不出来"。
-     */
-    private var clusterJunctionGuidance: com.shilapi.xcertplay.guidance.ClusterJunctionGuidance? = null
-    private val clusterJunctionListener: (com.shilapi.xcertplay.guidance.ClusterJunctionGuidance?) -> Unit = { junction ->
-        runOnUiThread {
-            clusterJunctionGuidance = junction
-            applyClusterTurnOverlay()
-        }
-    }
     /** v100 B561: 仪表媒体卡数据(来自 glance 快照)。 */
     private var clusterMediaTitle: String? = null
     private var clusterMediaArtist: String? = null
@@ -1229,8 +1206,6 @@ class CarPlayHostActivity : ComponentActivity() {
         ensureClusterPresentation()
         AirPlayPersistence.overlaySettingsListener = { runOnUiThread { applyClusterTurnOverlay() } }
         ClusterGuidanceFeed.setTurnOverlayListener(clusterTurnOverlayListener)
-        ClusterGuidanceFeed.setLaneGuidanceListener(clusterLaneListener)
-        ClusterGuidanceFeed.setJunctionListener(clusterJunctionListener)
         mainHandler.removeCallbacks(refreshTurnOverlay)
         mainHandler.post(refreshTurnOverlay)
         subscribeClusterMedia()
@@ -1540,31 +1515,6 @@ class CarPlayHostActivity : ComponentActivity() {
                 AirPlayPersistence.loadClusterMediaHeightPercent(this),
                 AirPlayPersistence.loadClusterMediaOrientation(this),
             )
-            // 路口放大图(车道级导航图),由 iOS 0x5204/0x5202 几何渲染而成。
-            // ★ v118: 走 setJunction（0x5202 路口几何 + 可选车道带）。
-            //   车道带解不出来时路口图照样画 —— 这正是"路口放大图画不出来"的修复。
-            //   （旧入口 setJunctionLanes 现为车道带专用包装，无调用方保留。）
-            presentation.setJunction(
-                if (AirPlayPersistence.loadClusterJunctionCardEnabled(this)) clusterJunctionGuidance else null,
-            )
-            presentation.setJunctionGeometry(
-                AirPlayPersistence.loadClusterJunctionXPercent(this),
-                AirPlayPersistence.loadClusterJunctionYPercent(this),
-                AirPlayPersistence.loadClusterJunctionSizePercent(this),
-            )
-            presentation.setJunctionOpacity(AirPlayPersistence.loadClusterJunctionOpacityPercent(this))
-            // ★ v118 车道信息卡片：只画 0x5204 车道带，横幅版式。
-            //   解不出 0x5204 时整块隐藏 —— 不用 maneuver 编车道充数。
-            presentation.setLaneCard(
-                if (AirPlayPersistence.loadClusterLaneCardEnabled(this)) clusterLaneGuidance else null,
-            )
-            presentation.setLaneCardGeometry(
-                AirPlayPersistence.loadClusterLaneXPercent(this),
-                AirPlayPersistence.loadClusterLaneYPercent(this),
-                AirPlayPersistence.loadClusterLaneSizePercent(this),
-            )
-            presentation.setLaneCardOpacity(AirPlayPersistence.loadClusterLaneOpacityPercent(this))
-            presentation.setLaneCardNightMode(effectiveNight)
             // ★ v117 车速表。数据来自 B561 VHAL（与原厂仪表同源），
             //   开关关闭或读不到车速时整块隐藏。
             presentation.setSpeedometerLayout(
@@ -1650,6 +1600,17 @@ class CarPlayHostActivity : ComponentActivity() {
                 AirPlayPersistence.loadClusterGaugeCardOpacity(this),
             )
             presentation.setGaugeCardNightMode(darkMode)
+            // ★ v137: 内容自定义（显示开关 + 文字大小）随几何一起下发。
+            presentation.setGaugeCardContentOptions(
+                AirPlayPersistence.loadClusterGaugeShowTachometer(this),
+                AirPlayPersistence.loadClusterGaugeShowPower(this),
+                AirPlayPersistence.loadClusterGaugeShowFuel(this),
+                AirPlayPersistence.loadClusterGaugeShowRange(this),
+                AirPlayPersistence.loadClusterGaugeShowBattery(this),
+                AirPlayPersistence.loadClusterGaugeShowOdometer(this),
+                AirPlayPersistence.loadClusterGaugeShowTires(this),
+                AirPlayPersistence.loadClusterGaugeTextScalePercent(this),
+            )
         }
     }
 
@@ -2133,10 +2094,6 @@ class CarPlayHostActivity : ComponentActivity() {
         mainHandler.removeCallbacks(refreshTurnOverlay)
         AirPlayPersistence.overlaySettingsListener = null
         ClusterGuidanceFeed.setTurnOverlayListener(null)
-        ClusterGuidanceFeed.setLaneGuidanceListener(null)
-        ClusterGuidanceFeed.setJunctionListener(null)
-        clusterLaneGuidance = null
-        clusterJunctionGuidance = null
         CarPlayGlance.listener = null
         CarPlayMediaKeys.artworkObserver = null
         getSystemService(android.hardware.display.DisplayManager::class.java)

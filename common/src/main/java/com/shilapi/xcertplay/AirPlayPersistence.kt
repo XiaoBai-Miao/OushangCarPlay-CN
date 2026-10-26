@@ -945,6 +945,99 @@ object AirPlayPersistence {
         overlaySettingsListener?.invoke()
     }
 
+    // ─────────────────────────────────────────────────────────────
+    // ★ v137: 「车辆信息」卡片的内容自定义。
+    //   显示内容开关（默认全开）+ 文字大小百分比（默认 100）。
+    // ─────────────────────────────────────────────────────────────
+
+    /** 车辆信息卡：是否显示转速表。默认 true。 */
+    fun loadClusterGaugeShowTachometer(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getBoolean("cluster_gauge_show_tachometer", true)
+
+    fun saveClusterGaugeShowTachometer(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putBoolean("cluster_gauge_show_tachometer", enabled).apply()
+        overlaySettingsListener?.invoke()
+    }
+
+    /** 车辆信息卡：是否显示功率。默认 true。 */
+    fun loadClusterGaugeShowPower(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getBoolean("cluster_gauge_show_power", true)
+
+    fun saveClusterGaugeShowPower(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putBoolean("cluster_gauge_show_power", enabled).apply()
+        overlaySettingsListener?.invoke()
+    }
+
+    /** 车辆信息卡：是否显示油量。默认 true。 */
+    fun loadClusterGaugeShowFuel(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getBoolean("cluster_gauge_show_fuel", true)
+
+    fun saveClusterGaugeShowFuel(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putBoolean("cluster_gauge_show_fuel", enabled).apply()
+        overlaySettingsListener?.invoke()
+    }
+
+    /** 车辆信息卡：是否显示续航。默认 true。 */
+    fun loadClusterGaugeShowRange(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getBoolean("cluster_gauge_show_range", true)
+
+    fun saveClusterGaugeShowRange(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putBoolean("cluster_gauge_show_range", enabled).apply()
+        overlaySettingsListener?.invoke()
+    }
+
+    /** 车辆信息卡：是否显示电量。默认 true。 */
+    fun loadClusterGaugeShowBattery(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getBoolean("cluster_gauge_show_battery", true)
+
+    fun saveClusterGaugeShowBattery(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putBoolean("cluster_gauge_show_battery", enabled).apply()
+        overlaySettingsListener?.invoke()
+    }
+
+    /** 车辆信息卡：是否显示里程。默认 true。 */
+    fun loadClusterGaugeShowOdometer(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getBoolean("cluster_gauge_show_odometer", true)
+
+    fun saveClusterGaugeShowOdometer(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putBoolean("cluster_gauge_show_odometer", enabled).apply()
+        overlaySettingsListener?.invoke()
+    }
+
+    /** 车辆信息卡：是否显示胎压。默认 true。 */
+    fun loadClusterGaugeShowTires(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getBoolean("cluster_gauge_show_tires", true)
+
+    fun saveClusterGaugeShowTires(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putBoolean("cluster_gauge_show_tires", enabled).apply()
+        overlaySettingsListener?.invoke()
+    }
+
+    /** 车辆信息卡：文字大小百分比（只改字号，不动整卡）。默认 100。 */
+    fun loadClusterGaugeTextScalePercent(context: Context): Int =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getInt("cluster_gauge_text_scale", 100)
+
+    fun saveClusterGaugeTextScalePercent(context: Context, percent: Int) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putInt("cluster_gauge_text_scale", percent.coerceIn(60, 180)).apply()
+        overlaySettingsListener?.invoke()
+    }
+
     fun loadClusterSpeedometerX(context: Context): Int =
         ClusterSpeedometerOverlay.snap(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .getInt("cluster_speedometer_x", ClusterSpeedometerOverlay.DEFAULT_X_PERCENT), ClusterSpeedometerOverlay.xPercents)
@@ -1883,117 +1976,6 @@ object AirPlayPersistence {
     fun saveClusterCallOpacityPercent(context: Context, percent: Int) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putInt("cluster_call_card_opacity_percent", percent.coerceIn(20, 100)).apply()
-        overlaySettingsListener?.invoke()
-    }
-
-    /** 路口放大图开关。默认**开**。 */
-    fun loadClusterJunctionCardEnabled(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getBoolean("cluster_junction_card_enabled", true)
-
-    fun saveClusterJunctionCardEnabled(context: Context, enabled: Boolean) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-            .putBoolean("cluster_junction_card_enabled", enabled).apply()
-        overlaySettingsListener?.invoke()
-    }
-
-    fun loadClusterJunctionXPercent(context: Context): Int =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getInt("cluster_junction_card_x_percent", 24)
-
-    fun saveClusterJunctionXPercent(context: Context, percent: Int) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-            .putInt("cluster_junction_card_x_percent", percent).apply()
-        overlaySettingsListener?.invoke()
-    }
-
-    fun loadClusterJunctionYPercent(context: Context): Int =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getInt("cluster_junction_card_y_percent", 30)
-
-    fun saveClusterJunctionYPercent(context: Context, percent: Int) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-            .putInt("cluster_junction_card_y_percent", percent).apply()
-        overlaySettingsListener?.invoke()
-    }
-
-    fun loadClusterJunctionSizePercent(context: Context): Int =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getInt("cluster_junction_card_size_percent", ClusterTurnCardOverlay.DEFAULT_SIZE_PERCENT)
-
-    fun saveClusterJunctionSizePercent(context: Context, percent: Int) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-            .putInt("cluster_junction_card_size_percent", percent).apply()
-        overlaySettingsListener?.invoke()
-    }
-
-    fun loadClusterJunctionOpacityPercent(context: Context): Int =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getInt("cluster_junction_card_opacity_percent", ClusterTurnCardOverlay.DEFAULT_OPACITY_PERCENT)
-
-    fun saveClusterJunctionOpacityPercent(context: Context, percent: Int) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-            .putInt("cluster_junction_card_opacity_percent", percent.coerceIn(20, 100)).apply()
-        overlaySettingsListener?.invoke()
-    }
-
-    // ─────────────────────────────────────────────────────────────
-    // v118: 车道信息卡片（只画 0x5204 车道带，横幅版式）
-    //
-    // 与路口放大图是两张卡：路口图带"路口岔路 + 车道带"的方块版式，
-    // 车道卡片只有车道带、走横幅比例，可以压在仪表底边当常驻条。
-    // 默认**开** —— 与路口卡一致；解不出 0x5204 时它自己会整块隐藏，
-    // 开着不会画出任何假数据。
-    // ─────────────────────────────────────────────────────────────
-
-    /** 车道信息卡片开关。默认开。 */
-    fun loadClusterLaneCardEnabled(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getBoolean("cluster_lane_card_enabled", true)
-
-    fun saveClusterLaneCardEnabled(context: Context, enabled: Boolean) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-            .putBoolean("cluster_lane_card_enabled", enabled).apply()
-        overlaySettingsListener?.invoke()
-    }
-
-    fun loadClusterLaneXPercent(context: Context): Int =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getInt("cluster_lane_card_x_percent", 30)
-
-    fun saveClusterLaneXPercent(context: Context, percent: Int) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-            .putInt("cluster_lane_card_x_percent", percent).apply()
-        overlaySettingsListener?.invoke()
-    }
-
-    fun loadClusterLaneYPercent(context: Context): Int =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getInt("cluster_lane_card_y_percent", 78)
-
-    fun saveClusterLaneYPercent(context: Context, percent: Int) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-            .putInt("cluster_lane_card_y_percent", percent).apply()
-        overlaySettingsListener?.invoke()
-    }
-
-    fun loadClusterLaneSizePercent(context: Context): Int =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getInt("cluster_lane_card_size_percent", ClusterTurnCardOverlay.DEFAULT_SIZE_PERCENT)
-
-    fun saveClusterLaneSizePercent(context: Context, percent: Int) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-            .putInt("cluster_lane_card_size_percent", percent).apply()
-        overlaySettingsListener?.invoke()
-    }
-
-    fun loadClusterLaneOpacityPercent(context: Context): Int =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getInt("cluster_lane_card_opacity_percent", ClusterTurnCardOverlay.DEFAULT_OPACITY_PERCENT)
-
-    fun saveClusterLaneOpacityPercent(context: Context, percent: Int) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-            .putInt("cluster_lane_card_opacity_percent", percent.coerceIn(20, 100)).apply()
         overlaySettingsListener?.invoke()
     }
 

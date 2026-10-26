@@ -90,9 +90,6 @@ object ClusterTurnCardOverlay {
         return CardRect(left, top, width, height)
     }
 
-    /** B561: 路口放大图的高宽比（高 : 宽）。 */
-    private const val JUNCTION_ASPECT = 0.78f
-
     /**
      * ★ v136: 自绘仪表卡片的高宽比（宽 : 高 = 1.9）。
      *
@@ -165,40 +162,6 @@ object ClusterTurnCardOverlay {
                     .coerceAtMost((window.height * 0.62f).toInt())
             }
         }
-        val x = snap(xPercent, xPercents)
-        val y = snap(yPercent, yPercents)
-        val left = (panelWidth * x / 100 - width / 2).coerceIn(0, panelWidth - width)
-        val top = (panelHeight * y / 100 - height / 2).coerceIn(0, panelHeight - height)
-        return CardRect(left, top, width, height)
-    }
-
-    /**
-     * B561: **路口放大图**（车道级导航图）的几何。
-     *
-     * ## 与 [card] 的区别：更方的版式
-     *
-     * 转向卡是 2.64:1 的横幅 —— 只放得下一个箭头 + 距离 + 路名。
-     * 路口放大图要同时装下**上半的路口岔路**与**下半的车道带**，
-     * 横幅比例根本放不下，所以给一份更方的高版（高 : 宽 = 0.78）。
-     *
-     * 高度另受 `window.height` 的 62% 约束 —— 仪表屏上下有车辆数据叠层，
-     * 不能让它盖满。
-     */
-    fun junctionCard(
-        panelWidth: Int,
-        panelHeight: Int,
-        xPercent: Int,
-        yPercent: Int,
-        sizePercent: Int,
-    ): CardRect {
-        require(panelWidth > 0 && panelHeight > 0)
-        val window = visibleWindow(panelWidth, panelHeight)
-        val size = snap(sizePercent, sizePercents)
-        // ★ v69: 基数同样是屏幕高度（见 card() 的说明）。
-        val width = (panelHeight * size / 100).coerceAtLeast(180).coerceAtMost(window.width)
-        val height = (width * JUNCTION_ASPECT).toInt()
-            .coerceAtLeast(140)
-            .coerceAtMost((window.height * 0.62f).toInt())
         val x = snap(xPercent, xPercents)
         val y = snap(yPercent, yPercents)
         val left = (panelWidth * x / 100 - width / 2).coerceIn(0, panelWidth - width)

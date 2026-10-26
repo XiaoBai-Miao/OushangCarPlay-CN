@@ -9,7 +9,7 @@ import kotlin.math.abs
  *
  * 改之前，仪表上那张"路口放大图"只有**一个**数据入口：
  * [ClusterGuidanceFeed] 发布 [ClusterLaneGuidance]（来自 `0x5204`），
- * [ClusterJunctionCardView] 收到 null 就整块 `GONE`。
+ * 路口渲染器收到 null 就整块隐藏。
  *
  * 于是出现一个纯粹的人为故障：`0x5202` 的 `0x09/0x0A/0x0B`
  * （路口类型 / 各岔路方位角 / 出口偏角）**一直解析得好好的**，

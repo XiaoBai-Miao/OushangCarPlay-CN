@@ -14,7 +14,7 @@ import com.shilapi.xcertplay.airplay.ClusterTurnCardOverlay
  * 三种仪表卡片共用的对外动作。
  *
  * 抽这个接口不是为了优雅，而是为了能一次性把「位置 / 大小 / 透明度 / 昼夜」
- * 下发给三张卡 —— 它们没有共同父类，`listOf(turnCard, mediaCard, junctionCard)`
+ * 下发给各张卡 —— 它们没有共同父类，`listOf(turnCard, mediaCard, callCard)`
  * 会被推成 `List<View>`，而这些方法不在 `View` 上，编译不过。
  */
 internal interface ClusterTurnCardOverlayHost {
@@ -55,12 +55,6 @@ internal class ClusterCardPreview(context: Context) : View(context) {
     /** 要预览哪几张卡。未连接的设置页里媒体卡通常没数据，用占位内容示意版式。 */
     private var showTurnCard = true
     private var showMediaCard = true
-
-    /** B561: 路口放大图。默认不画（与实车一致：没车道数据就不显示）。 */
-    private var showJunctionCard = false
-
-    /** v118 B561: 车道信息卡片。默认不画（与实车一致：没 0x5204 就不显示）。 */
-    private var showLaneCard = false
 
     /** v110 B561: 通话卡。默认不画（与实车一致：没来电就不显示）。 */
     private var showCallCard = false
@@ -109,8 +103,6 @@ internal class ClusterCardPreview(context: Context) : View(context) {
 
     private val turnCard = ClusterTurnCardView(context)
     private val mediaCard = ClusterMediaCardView(context)
-    private val junctionCard = ClusterJunctionCardView(context)
-    private val laneCard = ClusterLaneCardView(context)
     private val callCard = ClusterCallCardView(context)
     /** ★ v136: 自绘仪表卡片。 */
     private val gaugeCard = ClusterGaugeCardView(context)
@@ -120,12 +112,6 @@ internal class ClusterCardPreview(context: Context) : View(context) {
         // 给一点固定的示意内容，用户才能看出卡片里会放什么。
         turnCard.setGuidance(sampleGuidance())
         mediaCard.setMedia("示例歌曲", "示例歌手", "示例专辑", true)
-        // B561: 路口放大图给一组示意车道（3 车道、中间那条推荐），
-        //   这样设置页里能看出它长什么样、以及该摆在哪。
-        junctionCard.setJunction(sampleJunction())
-        // v118: 车道信息卡片用同一组示意车道（它只画其中的车道带），
-        //   版式是横幅，默认压在底边 —— 预览里能看出两者的区别。
-        laneCard.setLanes(sampleLanes())
         // v110: 通话卡给一通"来电中"的示意 —— 暖色竖条 + 两行文字。
         callCard.setCall(
             com.shilapi.xcertplay.media.CarPlayCallCard(
@@ -173,7 +159,6 @@ internal class ClusterCardPreview(context: Context) : View(context) {
         }
         place(turnCard, "turn")
         place(mediaCard, "media")
-        place(junctionCard, "junction")
         place(callCard, "call")
         // ★ v136: 仪表卡片共用同一套几何（横幅卡规则）。
         place(gaugeCard, "gauge")
@@ -190,31 +175,9 @@ internal class ClusterCardPreview(context: Context) : View(context) {
         invalidate()
     }
 
-    /**
-     * B561: 路口放大图是否在预览里显示。
-     *
-     * 与 [setVisibleCards] 分开 —— 它已经有三个位置参数了，再加第四个
-     * 只会让调用处出现一堆 `true, true, false, ???`。
-     */
-    fun setJunctionVisible(visible: Boolean) {
-        showJunctionCard = visible
-        invalidate()
-    }
-
     /** v110 B561: 通话卡是否在预览里显示。 */
     fun setCallVisible(visible: Boolean) {
         showCallCard = visible
-        invalidate()
-    }
-
-    /**
-     * v118 B561: 车道信息卡片是否在预览里显示。
-     *
-     * 与 [setJunctionVisible] 分开的理由同它：一个是方块版式（带岔路），
-     * 一个是横幅版式（只有车道带），在预览里是两张不同的卡。
-     */
-    fun setLaneVisible(visible: Boolean) {
-        showLaneCard = visible
         invalidate()
     }
 
@@ -270,6 +233,35 @@ internal class ClusterCardPreview(context: Context) : View(context) {
         mediaHeightPercent = heightPercent
         mediaOrientation = orientation
         (mediaCard as? ClusterMediaCardView)?.setMediaShape(widthPercent, heightPercent, orientation)
+        invalidate()
+    }
+
+    /**
+     * ★ v137: 把「车辆信息」卡的内容自定义同步到预览里的那张卡。
+     *
+     * 与 [update] 分开是因为这些选项**只属于车辆信息卡**，而几何/透明度是
+     * 所有卡共有的 —— 走同一个 update 就得把一堆布尔也塞进 Map 里传。
+     */
+    fun setGaugeContentOptions(
+        showTachometer: Boolean,
+        showPower: Boolean,
+        showFuel: Boolean,
+        showRange: Boolean,
+        showBattery: Boolean,
+        showOdometer: Boolean,
+        showTires: Boolean,
+        textScalePercent: Int,
+    ) {
+        gaugeCard.setContentOptions(
+            showTachometer,
+            showPower,
+            showFuel,
+            showRange,
+            showBattery,
+            showOdometer,
+            showTires,
+            textScalePercent,
+        )
         invalidate()
     }
 
@@ -330,8 +322,6 @@ internal class ClusterCardPreview(context: Context) : View(context) {
         canvas.scale(scale, scale)
         drawCard(canvas, turnCard, showTurnCard, "turn")
         drawCard(canvas, mediaCard, showMediaCard, "media")
-        drawCard(canvas, junctionCard, showJunctionCard, "junction")
-        drawCard(canvas, laneCard, showLaneCard, "lane")
         drawCard(canvas, callCard, showCallCard, "call")
         // ★ v136: 自绘仪表卡片。
         drawCard(canvas, gaugeCard, showGaugeCard, "gauge")
@@ -347,8 +337,8 @@ internal class ClusterCardPreview(context: Context) : View(context) {
         // 没有数据的卡片不画 —— 与实车"宁缺勿画"一致：
         // 预览里画个空壳会让用户以为仪表上也会出现空卡。
         if (card is ClusterTurnCardView && !card.hasContent()) return
-        if (card is ClusterJunctionCardView && !card.hasContent()) return
-        if (card is ClusterLaneCardView && !card.hasContent()) return
+        // ★ v137: 车辆信息卡同样按开关过滤 —— 所有读数都被关掉时预览里不画空卡。
+        if (card is ClusterGaugeCardView && !card.hasContent()) return
         // 面板尺寸，不是 View 像素尺寸 —— 见 onDraw 里的说明。
         card.measure(
             MeasureSpec.makeMeasureSpec(panelWidth, MeasureSpec.EXACTLY),
@@ -398,7 +388,6 @@ internal class ClusterCardPreview(context: Context) : View(context) {
                         panelWidth, panelHeight, x, y, size, size, mediaOrientation,
                     )
                 }
-            "junction" -> ClusterTurnCardOverlay.junctionCard(panelWidth, panelHeight, x, y, size)
             // ★ v136: 仪表卡片用自己的偏方几何（1.9:1）。
             "gauge" -> ClusterTurnCardOverlay.gaugeCard(panelWidth, panelHeight, x, y, size)
             // 转向卡与通话卡共用同一套矩形规则（见各自 onDraw）。
@@ -420,40 +409,6 @@ internal class ClusterCardPreview(context: Context) : View(context) {
         roundaboutExit = 0,
         distanceMeters = 320,
         road = "示例道路",
-    )
-
-    /**
-     * B561: 预览用的示意车道数据。
-     *
-     * 3 条车道、左右各左转/直行、中间直行且被推荐 —— 这是最常见的
-     * "前方路口保持直行"场景，一眼就能看出推荐车道高亮是否对。
-     */
-    private fun sampleLanes() = com.shilapi.xcertplay.guidance.ClusterLaneGuidance(
-        eventIndex = 1,
-        laneCount = 3,
-        angles = listOf(listOf(-90), listOf(0), listOf(90)),
-        positions = listOf(0, 1, 2),
-        primaryLane = 1,
-        showing = true,
-    )
-
-    /**
-     * 路口放大图的示意数据：一个右转路口 + 上面那组示意车道。
-     *
-     * `junctionAngles` 给两条岔路（0° 主路 / +90° 右转匝道），
-     * 这样预览里能看到"推荐岔路加粗"的效果 —— 只给车道的话
-     * 上半那片是空的，用户会以为路口卡坏了。
-     */
-    private fun sampleJunction() = com.shilapi.xcertplay.guidance.ClusterJunctionGuidance(
-        // Apple maneuver 类型 2 = 右转（ManeuverCodes 里 RIGHT 的原始值）。
-        // ManeuverCodes 是 shared 模块 internal，这里直接用字面量。
-        maneuverType = 2,
-        drivingSide = 0,
-        distanceMeters = 180,
-        junctionType = 0,
-        junctionAngles = listOf(0, 90),
-        junctionExitAngle = null,
-        lanes = sampleLanes(),
     )
 
     private companion object {
