@@ -1586,24 +1586,76 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         }
         card.addView(chipRow)
 
-        ensureClusterPreview(card)?.let { preview ->
+        // ★ v139+: 宽屏（车机 1920×910 等）把「滑块」放左、「预览」放右，
+        //   两者同屏可见，不再需要滚动才能边看预览边调位置。
+        //   窄屏（手机竖屏/小窗）保持原来的垂直堆叠，避免挤压。
+        val widthDp = (resources.displayMetrics.widthPixels / resources.displayMetrics.density).toInt()
+        val useSplit = widthDp >= PREVIEW_SPLIT_MIN_WIDTH_DP
+
+        if (useSplit) {
+            val split = row().apply { gravity = Gravity.TOP }
+            // 左列：位置/大小/透明度滑块 + 重置。
+            val leftColumn = column().apply {
+                layoutParams = LinearLayout.LayoutParams(0, -2, PREVIEW_SPLIT_SLIDER_WEIGHT)
+            }
+            // 右列：预览框（8:3 比例）+ 说明。
+            val rightColumn = column().apply {
+                layoutParams = LinearLayout.LayoutParams(0, -2, PREVIEW_SPLIT_PREVIEW_WEIGHT)
+            }
+            split.addView(leftColumn)
+            split.addView(space(0), LinearLayout.LayoutParams(dp(PREVIEW_SPLIT_GAP_DP), 1))
+            split.addView(rightColumn)
+            card.addView(split)
+
+            // 左列填充滑块（选中卡那套持久化键）。
+            addClusterCardSliders(leftColumn)
+            // 右列填充预览。
+            addClusterCardPreview(rightColumn)
+        } else {
+            // 窄屏：垂直堆叠（chip → 预览 → note → 滑块）。
+            addClusterCardPreview(card)
+            addClusterCardSliders(card)
+        }
+    }
+
+    /**
+     * ★ v139+: 把「统一卡片预览」的预览框 + 说明挂到 [parent]。
+     *
+     * 宽屏时 [parent] 是右列（左右分栏），窄屏时是整卡（垂直堆叠）。
+     * `ClusterCardPreview` 始终铺满父容器内区宽度，高度按 1920×720（8:3）自推，
+     * 所以两种布局下预览与实车几何都逐像素一致。
+     */
+    private fun addClusterCardPreview(parent: LinearLayout) {
+        ensureClusterPreview(parent)?.let { preview ->
             // v111: 高度改WRAP_CONTENT —— 预览自己按 1920:720 推高度。
             // 之前固定 dp(240) 高，宽度被 8:3 卡在 1248px，比卡片（1344px）窄，
             // 右侧空一块，看着就是"预览没占满预览区域"。
-            card.addView(preview, LinearLayout.LayoutParams(-1, LinearLayout.LayoutParams.WRAP_CONTENT))
+            parent.addView(preview, LinearLayout.LayoutParams(-1, LinearLayout.LayoutParams.WRAP_CONTENT))
+            val turnAvailable = CarPlayClusterDisplay.usesCustomTurnCard(
+                AirPlayPersistence.loadClusterContent(this))
+            val mediaAvailable = AirPlayPersistence.loadClusterMediaCardEnabled(this)
+            val callAvailable = AirPlayPersistence.loadClusterCallCardEnabled(this)
+            val gaugeAvailable = AirPlayPersistence.loadClusterGaugeCardEnabled(this)
             preview.setVisibleCards(turnAvailable, mediaAvailable)
             preview.setCallVisible(callAvailable)
             preview.setGaugeVisible(gaugeAvailable)
             preview.setSelectedCard(clusterPreviewCard)
         }
-        card.addView(label(getString(R.string.card_preview_note), 14, MUTED).apply {
+        parent.addView(label(getString(R.string.card_preview_note), 14, MUTED).apply {
             setPadding(0, dp(8), 0, 0)
         })
+    }
 
-        // 位置滑块：选中卡读自己那套持久化键；保存后立刻刷新预览（拖滑块即见）。
+    /**
+     * ★ v139+: 把选中卡的位置/大小/透明度滑块 + 重置挂到 [parent]。
+     *
+     * 宽屏时 [parent] 是左列（左右分栏），窄屏时是整卡（垂直堆叠）。
+     * 读写的持久化键与选中卡一一对应，保存后立刻刷新预览（拖滑块即见）。
+     */
+    private fun addClusterCardSliders(parent: LinearLayout) {
         when (clusterPreviewCard) {
             "media" -> clusterCardSliders(
-                card,
+                parent,
                 loadX = { AirPlayPersistence.loadClusterMediaXPercent(this) },
                 loadY = { AirPlayPersistence.loadClusterMediaYPercent(this) },
                 loadSize = { AirPlayPersistence.loadClusterMediaSizePercent(this) },
@@ -1616,7 +1668,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             // ★ v136: 自绘仪表卡片 —— 取代已下线的 CarPlay Ultra 官方仪表。
             //   位置/大小/透明度与其它卡共用同一套滑块与同一套几何。
             "gauge" -> clusterCardSliders(
-                card,
+                parent,
                 loadX = { AirPlayPersistence.loadClusterGaugeCardXPercent(this) },
                 loadY = { AirPlayPersistence.loadClusterGaugeCardYPercent(this) },
                 loadSize = { AirPlayPersistence.loadClusterGaugeCardSizePercent(this) },
@@ -1627,7 +1679,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                 saveOpacity = { AirPlayPersistence.saveClusterGaugeCardOpacity(this, it) },
             )
             "call" -> clusterCardSliders(
-                card,
+                parent,
                 loadX = { AirPlayPersistence.loadClusterCallXPercent(this) },
                 loadY = { AirPlayPersistence.loadClusterCallYPercent(this) },
                 loadSize = { AirPlayPersistence.loadClusterCallSizePercent(this) },
@@ -1638,7 +1690,7 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                 saveOpacity = { AirPlayPersistence.saveClusterCallOpacityPercent(this, it) },
             )
             else -> clusterCardSliders(
-                card,
+                parent,
                 loadX = { AirPlayPersistence.loadClusterTurnCardOverlayXPercent(this) },
                 loadY = { AirPlayPersistence.loadClusterTurnCardOverlayYPercent(this) },
                 loadSize = { AirPlayPersistence.loadClusterTurnCardOverlaySizePercent(this) },
@@ -6165,6 +6217,13 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         private const val SETTINGS_BUTTON_GAP_DP = 10
         private const val SETTINGS_DIALOG_PADDING_DP = 24
         private const val SETTINGS_DIALOG_GAP_DP = 12
+        // ★ v139+: 统一卡片预览的左右分栏阈值与权重。
+        //   车机宽屏（如 1920×910）下「滑块在左、预览在右」同屏显示；
+        //   低于该宽度（手机竖屏/小窗）保持垂直堆叠，避免挤压。
+        private const val PREVIEW_SPLIT_MIN_WIDTH_DP = 1000
+        private const val PREVIEW_SPLIT_SLIDER_WEIGHT = 0.45f
+        private const val PREVIEW_SPLIT_PREVIEW_WEIGHT = 0.55f
+        private const val PREVIEW_SPLIT_GAP_DP = 16
         private const val UPDATE_PROGRESS_BAR_HEIGHT_DP = 4
         private const val UPDATE_PROGRESS_BAR_INSET_DP = 16
         private const val UPDATE_PROGRESS_BAR_BOTTOM_DP = 7

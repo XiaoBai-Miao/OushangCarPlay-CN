@@ -7,7 +7,11 @@ import android.graphics.Color
 import android.os.Looper
 import android.view.View
 import android.view.ViewGroup
+import android.widget.LinearLayout
+import android.widget.SeekBar
 import com.shilapi.xcertplay.airplay.ClusterTurnCardOverlay
+import java.nio.file.Files
+import java.nio.file.Paths
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -50,6 +54,61 @@ class ClusterCardPreviewLayoutTest {
     /** 车机常见的低密度大屏：卡片内区远宽于旧代码 240dp 高 × 8:3 = 640dp 的上限。 */
     @Test fun previewFillsTheCardOnALowDensityWideHeadUnit() {
         assertFillsCard(qualifiers = "zh-rCN-w1920dp-h720dp-mdpi")
+    }
+
+    /**
+     * v139+: 宽屏（车机 1920×910 等）下，统一卡片预览块必须左右分栏 ——
+     * **滑块在左、预览在右**，两者同屏可见，不需要滚动才能边看预览边调位置。
+     *
+     * 结构断言：
+     * - 预览的直接父容器是「右列」（垂直 LinearLayout）；
+     * - 右列的父容器是「split」（水平 LinearLayout）；
+     * - split 中右列在左列右侧（index 更大）；
+     * - 左列里能找到 SeekBar（位置/大小滑块）。
+     */
+    @Test fun previewSitsRightOfSlidersOnWideHeadUnitScreens() {
+        val screen = openClusterSettings("zh-rCN-w1400dp-h800dp-xhdpi")
+        val preview = descendants(screen.window.decorView).filterIsInstance<ClusterCardPreview>().single()
+        val rightColumn = preview.parent as ViewGroup
+        val split = rightColumn.parent as ViewGroup
+        assertTrue(
+            "宽屏下预览应位于左右分栏的右列，实际父容器=${split.javaClass.simpleName}",
+            split is LinearLayout && split.orientation == LinearLayout.HORIZONTAL,
+        )
+        val rightIndex = split.indexOfChild(rightColumn)
+        assertTrue("预览应在滑块右侧（右列 index=$rightIndex）", rightIndex > 0)
+        val leftColumn = split.getChildAt(0) as ViewGroup
+        val hasSeekBar = descendants(leftColumn).filterIsInstance<SeekBar>().any()
+        assertTrue("左列应包含位置/大小滑块（SeekBar）", hasSeekBar)
+    }
+
+    /**
+     * v139+: 宽屏（1920×910，mdpi）下，左右分栏后的「滑块+预览」整块高度
+     * 必须不超过可视滚动区高度 —— 这是用户诉求的本质：**同屏可见，无需滚动**。
+     */
+    @Test
+    fun previewAndSlidersFitInTheVisibleViewportOnWideScreens() {
+        val screen = openClusterSettings("zh-rCN-w1920dp-h910dp-mdpi")
+        val preview = descendants(screen.window.decorView).filterIsInstance<ClusterCardPreview>().single()
+        val rightColumn = preview.parent as ViewGroup
+        val split = rightColumn.parent as ViewGroup
+        // 找到承载预览块的 ScrollView（categoryScroll）—— 它的高度就是可视滚动区。
+        var scroll: ViewGroup? = null
+        var ancestor: ViewGroup? = split.parent as? ViewGroup
+        while (ancestor != null) {
+            if (ancestor is android.widget.ScrollView) {
+                scroll = ancestor
+                break
+            }
+            ancestor = ancestor.parent as? ViewGroup
+        }
+        assertTrue("预览块应位于 ScrollView 内", scroll != null)
+        val viewport = scroll!!.height - scroll.paddingTop - scroll.paddingBottom
+        val detail = "split=${split.width}x${split.height} scrollViewport=$viewport"
+        assertTrue(
+            "滑块+预览整块高度应不超过可视滚动区（$detail）",
+            split.height <= viewport,
+        )
     }
 
     private fun assertFillsCard(qualifiers: String) {
