@@ -3089,7 +3089,7 @@ class CarPlayHostActivity : ComponentActivity() {
             FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 (resources.displayMetrics.heightPixels * 94) / 100,
-                Gravity.CENTER,
+                Gravity.LEFT or Gravity.CENTER_VERTICAL,
             ).apply {
                 leftMargin = dp(OVERLAY_SIDE_MARGIN_DP)
                 rightMargin = dp(OVERLAY_SIDE_MARGIN_DP)

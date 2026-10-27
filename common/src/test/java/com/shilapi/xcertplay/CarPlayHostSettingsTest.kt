@@ -98,7 +98,7 @@ class CarPlayHostSettingsTest {
         assertEquals(0, field("gestureFingerCount"))
     }
 
-    @Test fun menuStaysCenteredAndUsesAvailableWidthAcrossWindowSizes() {
+    @Test fun menuStaysLeftAlignedAndUsesAvailableWidthAcrossWindowSizes() {
         invoke("openSettingsMenu")
         val overlay = menu() as ViewGroup
         val panel = overlay.getChildAt(0)
@@ -113,7 +113,14 @@ class CarPlayHostSettingsTest {
             }
             val expected = (minOf(880, widthDp - 48) * density + 0.5f).toInt()
             assertEquals("width=$widthDp", expected, panel.width)
-            assertTrue("width=$widthDp", kotlin.math.abs(panel.left - (width - panel.right)) <= 1)
+            // The sheet is pinned to the screen's left edge (the driver's side on LTR head units),
+            // with only the overlay margin between it and the edge. On narrow screens it still fills
+            // the available width (right edge flush with the right margin); on wide screens the
+            // unused space stays on the right, so the panel is visibly left-aligned.
+            val leftMargin = (24 * density + 0.5f).toInt()
+            val rightMargin = (24 * density + 0.5f).toInt()
+            assertTrue("width=$widthDp", kotlin.math.abs(panel.left - leftMargin) <= 1)
+            assertTrue("width=$widthDp", panel.right <= width - rightMargin)
             assertTrue("The floating sheet needs space above it", panel.top > 0)
             assertTrue("The floating sheet needs space below it", panel.bottom < height)
             val title = views(panel).filterIsInstance<TextView>()
