@@ -1492,6 +1492,11 @@ class CarPlayHostActivity : ComponentActivity() {
             presentation.setTurnCardOverlay(xPercent, yPercent, sizePercent)
             presentation.setTurnCardOpacity(effectiveOpacity)
             presentation.setTurnCardNightMode(effectiveNight)
+            // ★ v139: 恢复上游车道箭头条/到达信息条开关下发。
+            presentation.setTurnCardExtras(
+                overlayShowLanes,
+                overlayShowArrival,
+            )
             presentation.setTurnCardGuidance(if (showTurn) clusterTurnGuidance else null)
             presentation.setCardGeometry(turnGeometry, mediaGeometry, callGeometry)
             presentation.setCardOpacity(
@@ -3725,6 +3730,14 @@ class CarPlayHostActivity : ComponentActivity() {
         ).also { locationReportingSwitch = it.switch }.rowView
         val infoRows = listOf(
             locationRow,
+            settingsSwitchRow(
+                label = getString(R.string.turn_card_show_lanes),
+                checked = overlayShowLanes,
+                description = getString(R.string.turn_card_show_lanes_description),
+            ) { checked ->
+                overlayShowLanes = checked
+                applyClusterTurnOverlay()
+            },
             settingsSwitchRow(
                 label = getString(R.string.turn_card_show_arrival),
                 checked = overlayShowArrival,

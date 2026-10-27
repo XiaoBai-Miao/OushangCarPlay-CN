@@ -2747,6 +2747,12 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                         }
                         // v108: 水平/垂直/大小/透明度/重置位置已移入统一卡片预览块。
                         card.addView(label(getString(R.string.turn_card_overlay_note), 14, MUTED))
+                        // ★ v139: 恢复上游车道箭头条开关。
+                        toggle(card, getString(R.string.turn_card_show_lanes),
+                            getString(R.string.turn_card_show_lanes_description),
+                            AirPlayPersistence.loadClusterTurnCardShowLanes(this)) {
+                            AirPlayPersistence.saveClusterTurnCardShowLanes(this, it)
+                        }
                         toggle(card, getString(R.string.turn_card_show_arrival),
                             getString(R.string.turn_card_show_arrival_description),
                             AirPlayPersistence.loadClusterTurnCardShowArrival(this)) {

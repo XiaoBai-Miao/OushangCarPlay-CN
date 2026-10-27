@@ -254,46 +254,50 @@ internal class ClusterGaugeCardView(context: Context) : View(context), ClusterTu
             }
         }
 
-        // 右侧信息栏：功率 / 续航(或油量) / 电量 / 里程 / 胎压。
+        // 右侧信息栏：功率 / 油量 / 续航 / 电量 / 里程 / 胎压。
+        // ★ v139: 改为**动态行高 + 垂直居中**，修复文字放大后行与行重叠。
+        //   旧版固定 rowH = h*0.155，但每行实际需要 label+value ≈ 2.15 * hUnit
+        //   （hUnit = h*0.085*scale/100），scale=100 时就需要 0.183h > 0.155h，
+        //   scale=180 时更是 0.329h —— 必然溢出重叠。
+        //   现在先数出实际可见的行数，行高 = 可用高度 / 行数，文字随行高联动，
+        //   无论几行、文字多大都均匀分布、互不重叠（与上游车道条「内容自适应」同思路）。
         val rightX = card.left + w * 0.54f
-        var y = card.top + h * 0.20f
-        val rowH = h * 0.155f
+        val rightWidth = card.left + w - rightX
 
-        if (showPower) {
-            visible.powerKw?.let {
-                drawRow(canvas, rightX, y, context.getString(R.string.cluster_gauge_power), "${it.roundToInt()} kW")
-                y += rowH
+        // 统计可见的纵向行（胎压是横排，单独占底部一块，不参与均分行高）。
+        val rows = mutableListOf<Pair<String, String>>()
+        if (showPower) visible.powerKw?.let { rows += context.getString(R.string.cluster_gauge_power) to "${it.roundToInt()} kW" }
+        if (showFuel) visible.fuelPercent?.let { rows += context.getString(R.string.cluster_gauge_fuel) to "$it %" }
+        if (showRange) visible.rangeKm?.let { rows += context.getString(R.string.cluster_gauge_range) to "$it km" }
+        if (showBattery) visible.batteryPercent?.let { rows += context.getString(R.string.cluster_gauge_battery) to "$it %" }
+        if (showOdometer) visible.odometerKm?.let { rows += context.getString(R.string.cluster_gauge_odometer) to "${it.roundToInt()} km" }
+
+        val tires = if (showTires) visible.tirePressureBar else null
+        val hasTires = tires != null && tires.isNotEmpty()
+
+        // 上下各留 5% 边距，行内容在行内垂直居中。
+        val contentTop = card.top + h * 0.06f
+        val contentBottom = card.top + h - h * 0.06f
+        val availableH = (contentBottom - contentTop).coerceAtLeast(1f)
+
+        val rowCount = rows.size
+        if (rowCount > 0) {
+            // 胎压横排时给底部预留一块（约一行半的高度），其余高度均分给纵向行。
+            val rowsArea = if (hasTires) availableH * 0.72f else availableH
+            // 行高随用户文字大小缩放（scale 越大行越高），但不超过可用高度的均分值，
+            // 保证任何行数、任何文字大小都不溢出重叠。
+            val desiredRowH = h * 0.155f * (textScalePercent / 100f)
+            val rowH = min(desiredRowH, rowsArea / rowCount).coerceAtLeast(h * 0.08f)
+            val startY = contentTop + (rowsArea - rowH * rowCount) / 2f + rowH * 0.62f
+            rows.forEachIndexed { index, (label, value) ->
+                drawRow(canvas, rightX, startY + index * rowH, rowH, label, value)
             }
         }
-        // 燃油车优先显示油量，纯电车显示续航。
-        if (showFuel) {
-            visible.fuelPercent?.let {
-                drawRow(canvas, rightX, y, context.getString(R.string.cluster_gauge_fuel), "$it %")
-                y += rowH
-            }
-        }
-        if (showRange) {
-            visible.rangeKm?.let {
-                drawRow(canvas, rightX, y, context.getString(R.string.cluster_gauge_range), "$it km")
-                y += rowH
-            }
-        }
-        if (showBattery) {
-            visible.batteryPercent?.let {
-                drawRow(canvas, rightX, y, context.getString(R.string.cluster_gauge_battery), "$it %")
-                y += rowH
-            }
-        }
-        if (showOdometer) {
-            visible.odometerKm?.let {
-                drawRow(canvas, rightX, y, context.getString(R.string.cluster_gauge_odometer), "${it.roundToInt()} km")
-                y += rowH
-            }
-        }
-        if (showTires) {
-            visible.tirePressureBar?.let { tires ->
-                drawTirePressure(canvas, rightX, y, card.left + w, tires)
-            }
+
+        // 胎压：横排四个小方块，放在右侧区域底部。
+        if (hasTires) {
+            val tireY = if (rowCount > 0) contentBottom - h * 0.20f else contentTop + availableH * 0.5f
+            drawTirePressure(canvas, rightX, tireY, rightWidth, tires)
         }
     }
 
@@ -346,12 +350,18 @@ internal class ClusterGaugeCardView(context: Context) : View(context), ClusterTu
         }
     }
 
-    /** 右侧一行「标签 + 数值」。 */
-    private fun drawRow(canvas: Canvas, x: Float, y: Float, label: String, value: String) {
-        labelPaint.textSize = hUnit()
-        canvas.drawText(label, x, y, labelPaint)
-        valuePaint.textSize = hUnit() * 1.15f
-        canvas.drawText(value, x, y + hUnit() * 1.05f, valuePaint)
+    /**
+     * 右侧一行「标签 + 数值」。
+     *
+     * @param rowH 本行分配到的行高；文字大小随行高联动，
+     *   保证 label + value 两行文字始终落在行高内、不与下一行重叠。
+     */
+    private fun drawRow(canvas: Canvas, x: Float, y: Float, rowH: Float, label: String, value: String) {
+        val unit = rowUnit(rowH)
+        labelPaint.textSize = unit
+        canvas.drawText(label, x, y - unit * 0.1f, labelPaint)
+        valuePaint.textSize = unit * 1.15f
+        canvas.drawText(value, x, y + unit * 1.05f, valuePaint)
     }
 
     /** 四轮胎压：横排四个小方块，各自标 bar。 */
@@ -359,7 +369,7 @@ internal class ClusterGaugeCardView(context: Context) : View(context), ClusterTu
         canvas: Canvas,
         x: Float,
         y: Float,
-        right: Float,
+        width: Float,
         tires: FloatArray,
     ) {
         val names = arrayOf(
@@ -368,15 +378,26 @@ internal class ClusterGaugeCardView(context: Context) : View(context), ClusterTu
             context.getString(R.string.cluster_gauge_tire_rl),
             context.getString(R.string.cluster_gauge_tire_rr),
         )
-        labelPaint.textSize = hUnit() * 0.86f
-        valuePaint.textSize = hUnit() * 0.95f
-        val cell = (right - x) / 4f
+        // 胎压文字以卡片高度为基准（与行高解耦，横排不受行数影响）。
+        val unit = hUnit()
+        labelPaint.textSize = unit * 0.86f
+        valuePaint.textSize = unit * 0.95f
+        val cell = width / 4f
         for (i in tires.indices) {
             val cx = x + cell * (i + 0.5f)
             canvas.drawText(names[i], cx, y, labelPaint)
-            canvas.drawText(String.format("%.2f", tires[i]), cx, y + hUnit() * 0.95f, valuePaint)
+            canvas.drawText(String.format("%.2f", tires[i]), cx, y + unit * 0.95f, valuePaint)
         }
     }
+
+    /**
+     * 纵向行内文字基准：按实际行高的 42% 缩放。
+     *
+     * 用户文字大小百分比已经体现在 [onDraw] 的行高计算里（scale 越大行越高），
+     * 这里不再乘 scale —— 否则文字会超出按行高分配的空间、重新重叠。
+     * label(1×) + value(1.15×) ≈ 2.15 × 0.42 = 0.90 × rowH，始终落在行高内。
+     */
+    private fun rowUnit(rowH: Float): Float = rowH * 0.42f
 
     /** 行高基准：按 View 高度推，保证不同仪表分辨率下比例一致。 */
     private fun hUnit(): Float = height * 0.085f * (textScalePercent / 100f)

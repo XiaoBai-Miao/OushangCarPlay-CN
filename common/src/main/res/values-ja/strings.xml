@@ -498,6 +498,8 @@
     <string name="turn_card_overlay_large">大</string>
     <string name="reset_turn_card_overlay">カスタム案内カードの位置をリセット</string>
     <string name="turn_card_overlay_note">DiPlayが地図上に案内カードを描画します。位置は2%ずつ変更できます。iOS純正の案内カードだけを移動することはできません。再接続せずに変更が反映されます。</string>
+    <string name="turn_card_show_lanes">車線矢印</string>
+    <string name="turn_card_show_lanes_description">Appleが送信したときに、カスタム案内カードの下に現在の車線矢印を描画します。すぐに反映されます。</string>
     <string name="turn_card_now">現在</string>
     <string name="turn_card_distance_m">%1$d m</string>
     <string name="turn_card_distance_km">%1$.1f km</string>

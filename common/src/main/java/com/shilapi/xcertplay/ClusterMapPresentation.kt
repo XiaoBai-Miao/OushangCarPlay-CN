@@ -229,6 +229,12 @@ internal class ClusterMapPresentation(
         turnCardView?.setOpacity(percent)
     }
 
+    /** ★ v139: 恢复上游车道箭头条/到达信息条开关下发（v100 重建时丢失）。 */
+    fun setTurnCardExtras(showLanes: Boolean, showArrival: Boolean) {
+        turnCardView?.setShowLanes(showLanes)
+        turnCardView?.setShowArrival(showArrival)
+    }
+
     fun setTurnCardGuidance(guidance: ClusterTurnGuidance?) {
         turnCardView?.setGuidance(guidance)
     }

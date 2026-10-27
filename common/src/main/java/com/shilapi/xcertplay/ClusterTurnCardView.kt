@@ -31,6 +31,10 @@ internal class ClusterTurnCardView(context: Context) : View(context), ClusterTur
     private var xPercent = ClusterTurnCardOverlay.DEFAULT_X_PERCENT
     private var yPercent = ClusterTurnCardOverlay.DEFAULT_Y_PERCENT
     private var sizePercent = ClusterTurnCardOverlay.DEFAULT_SIZE_PERCENT
+    /** ★ v139: 恢复上游 DiPlay-CN 车道箭头条 —— 转向卡下方画当前车道箭头。 */
+    private var showLanes = true
+    /** ★ v139: 恢复上游到达信息条开关 —— 转向卡下方的到达/耗时/距离条。 */
+    private var showArrival = true
 
     private val accent = Color.rgb(10, 132, 255)
     /** Card opacity as percent; 100 keeps the historical fully-opaque look available. */
@@ -114,6 +118,24 @@ internal class ClusterTurnCardView(context: Context) : View(context), ClusterTur
         }
     }
 
+    /**
+     * ★ v139: 恢复上游车道箭头条开关。
+     *
+     * 关闭后转向卡下方不再绘制车道箭头条（到达信息条不受影响）。
+     */
+    fun setShowLanes(enabled: Boolean) {
+        if (enabled == showLanes) return
+        showLanes = enabled
+        invalidate()
+    }
+
+    /** ★ v139: 恢复上游到达信息条开关。关闭后转向卡下方不再绘制到达/耗时/距离条。 */
+    fun setShowArrival(enabled: Boolean) {
+        if (enabled == showArrival) return
+        showArrival = enabled
+        invalidate()
+    }
+
     fun setGuidance(next: ClusterTurnGuidance?) {
         if (guidance == next) {
             visibility = if (next == null) GONE else VISIBLE
@@ -172,7 +194,72 @@ internal class ClusterTurnCardView(context: Context) : View(context), ClusterTur
                 textLeft, card.top + h * 0.72f, roadPaint,
             )
         }
-        drawInfoStrip(canvas, next, card.left, (card.top + h).toInt(), w.toInt(), h.toInt())
+        var below = (card.top + h).toInt()
+        below = drawLaneStrip(canvas, next, card.left, below, w.toInt(), h.toInt())
+        drawInfoStrip(canvas, next, card.left, below, w.toInt(), h.toInt())
+    }
+
+    /**
+     * ★ v139: 车道箭头条 —— 从上游 DiPlay-CN v0.2.16-cn.3 恢复。
+     *
+     * 在转向卡主体下方、到达信息条上方，画一条车道箭头悬浮条：
+     * 每条车道一个等宽格子，箭头居中；推荐车道高亮，其余弱化。
+     * 通过 [belowTop] 链式传递 y 坐标，与转向卡/到达条垂直堆叠、互不重叠。
+     */
+    private fun drawLaneStrip(canvas: Canvas, next: ClusterTurnGuidance, left: Int, belowTop: Int, width: Int, cardHeight: Int): Int {
+        if (!showLanes || next.lanes.isEmpty()) return belowTop
+        val count = next.lanes.size.coerceAtMost(8)
+        val h = (cardHeight * 0.38f).coerceAtLeast(28f)
+        val gap = cardHeight * 0.05f
+        val top = (belowTop + gap).coerceAtMost(height - h)
+        val stripWidth = width
+        val stripLeft = left.toFloat()
+        rect.set(stripLeft, top, stripLeft + stripWidth, top + h)
+        canvas.drawRoundRect(rect, h / 2f, h / 2f, glassPaint)
+        canvas.drawRoundRect(rect, h / 2f, h / 2f, strokePaint)
+        val cell = stripWidth / count.toFloat()
+        val arrowH = h * 0.55f
+        val highlight = next.laneHighlight
+        for (index in 0 until count) {
+            val cx = stripLeft + cell * index + cell / 2f
+            val cy = top + h * 0.52f
+            val on = highlight < 0 || index == highlight
+            drawLaneArrow(canvas, cx, cy, arrowH, next.lanes[index], on)
+        }
+        return (top + h).toInt()
+    }
+
+    private fun drawLaneArrow(canvas: Canvas, cx: Float, cy: Float, size: Float, kind: Int, on: Boolean) {
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            // 推荐车道：accent 蓝（深浅色卡片上都醒目）；
+            // 非推荐车道：描边色低透明度（自动适配昼夜卡片）。
+            color = if (on) accent else Color.argb(
+                Color.alpha(strokePaint.color) / 2,
+                Color.red(strokePaint.color), Color.green(strokePaint.color), Color.blue(strokePaint.color),
+            )
+            style = Paint.Style.STROKE
+            strokeWidth = size * 0.16f
+            strokeCap = Paint.Cap.ROUND
+            strokeJoin = Paint.Join.ROUND
+        }
+        val half = size / 2f
+        when (kind) {
+            2 -> {
+                canvas.drawLine(cx + half * 0.35f, cy, cx - half * 0.25f, cy, paint)
+                canvas.drawLine(cx - half * 0.25f, cy, cx - half * 0.05f, cy - half * 0.35f, paint)
+                canvas.drawLine(cx - half * 0.25f, cy, cx - half * 0.05f, cy + half * 0.35f, paint)
+            }
+            3 -> {
+                canvas.drawLine(cx - half * 0.35f, cy, cx + half * 0.25f, cy, paint)
+                canvas.drawLine(cx + half * 0.25f, cy, cx + half * 0.05f, cy - half * 0.35f, paint)
+                canvas.drawLine(cx + half * 0.25f, cy, cx + half * 0.05f, cy + half * 0.35f, paint)
+            }
+            else -> {
+                canvas.drawLine(cx, cy + half * 0.4f, cx, cy - half * 0.35f, paint)
+                canvas.drawLine(cx, cy - half * 0.35f, cx - half * 0.28f, cy - half * 0.05f, paint)
+                canvas.drawLine(cx, cy - half * 0.35f, cx + half * 0.28f, cy - half * 0.05f, paint)
+            }
+        }
     }
 
     /** The arrival/duration/distance pill that hangs under the card, like the stock nav bar. */
@@ -207,6 +294,7 @@ internal class ClusterTurnCardView(context: Context) : View(context), ClusterTur
     private fun dp(value: Float): Float = value * resources.displayMetrics.density
 
     private fun infoParts(next: ClusterTurnGuidance): List<String> {
+        if (!showArrival) return emptyList()
         val parts = mutableListOf<String>()
         next.arrivalEpochSeconds?.takeIf { it > 0 }?.let { epoch ->
             val time = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(epoch * 1000L))
