@@ -4,7 +4,7 @@
 
 ## 語系與用語
 
-主要應用程式繁體中文資源位於 `common/src/main/res/values-zh-rTW/` 及 `shared/src/main/res/values-zh-rTW/`，分散於多個 XML，不只 `strings.xml`。選用的 Home 與地圖範例資源位於 `samples/home/src/main/res/values-zh-rTW/` 及 `samples/maphost/src/main/res/values-zh-rTW/`，依系統語言顯示。主要應用程式語言代碼維持 `zh-TW`，網站使用 `zh-Hant`。語言選單維持 **繁體中文**，網站註明臺灣用語。
+主要應用程式繁體中文資源位於 `common/src/main/res/values-zh-rTW/` 及 `shared/src/main/res/values-zh-rTW/`，分散於多個 XML，不只 `strings.xml`。主要應用程式語言代碼維持 `zh-TW`，網站使用 `zh-Hant`。語言選單維持 **繁體中文**，網站註明臺灣用語。
 
 | English | 繁體中文 |
 | --- | --- |
@@ -26,7 +26,7 @@
 4. 檢查首次設定、主畫面、所有設定分類、連線錯誤與手機備份頁。手機備份文字另位於 `common/src/main/assets/settings-backup.html`。
 5. 窄視窗、大字體及高密度螢幕下確認標題、設定列與對話框沒有截斷；若修改設定版面，依 `AGENTS.md` 提供 compact/full 大字體截圖，列對齊修改另加阿拉伯文截圖。
 
-`TraditionalChineseTranslationsTest` 檢查 common/shared 與兩個範例的完整可翻譯 string 資源鍵、重複名稱與格式參數。`SettingsTranslationsTest` 檢查各語系的 `settings_*`。`AppLocaleTest` 已涵蓋新舊 Android、臺灣／香港／澳門及 `Hant` 選擇。`AdaptiveSettingsUiTest` 也檢查繁體中文在窄視窗、完整設定頁、高密度及 1.3 倍字體下是否省略文字；Home 的返回操作測試同時驗證繁體中文編輯及應用程式清單操作。這些檢查不能取代人工校訂與實車測試。
+`TraditionalChineseTranslationsTest` 檢查 common/shared 的完整可翻譯 string 資源鍵、重複名稱與格式參數。`SettingsTranslationsTest` 檢查各語系的 `settings_*`。`AppLocaleTest` 已涵蓋新舊 Android、臺灣／香港／澳門及 `Hant` 選擇。`AdaptiveSettingsUiTest` 也檢查繁體中文在窄視窗、完整設定頁、高密度及 1.3 倍字體下是否省略文字。這些檢查不能取代人工校訂與實車測試。
 
 ## 文件與網站同步
 

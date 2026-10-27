@@ -465,18 +465,11 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         interfaceOverride = next
         return false
     }
-    private fun openOverlayPermission() {
-        val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName"))
-        if (runCatching { startActivity(intent) }.isFailure) {
-            android.widget.Toast.makeText(this, R.string.center_map_no_permission_screen, android.widget.Toast.LENGTH_LONG).show()
-        }
-    }
 
     override fun onStart() {
         super.onStart()
         // Results from the image picker and crop screens arrive before onResume.
         enforceInterfaceSize()
-        CenterMapOverlay.onDiPlayScreenShown()
     }
 
     override fun onStop() {
@@ -484,7 +477,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
         clusterSafeAreaDialog?.dismiss()
         startupHotspotCancelled = true
         super.onStop()
-        if (!isFinishing && !isChangingConfigurations) CenterMapOverlay.scheduleShow()
     }
 
     override fun onResume() {
@@ -2690,39 +2682,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                 //   它是仪表卡片，设置理应跟着仪表走。
                 clusterMediaCardControls(card)
                 clusterGaugeCardControls(card)
-                toggle(card, getString(R.string.center_map_card),
-                    if (clusterDisplay != null) getString(R.string.center_map_card_description)
-                    else getString(R.string.center_map_card_virtual_description),
-                    AirPlayPersistence.loadCenterMapOverlay(this)) {
-                    AirPlayPersistence.saveCenterMapOverlay(this, it)
-                    if (it && !CenterMapOverlay.permitted(this)) openOverlayPermission()
-                    render()
-                }
-                if (AirPlayPersistence.loadCenterMapOverlay(this)) {
-                    toggle(card, getString(R.string.center_map_follows_dashboard), getString(R.string.center_map_follows_dashboard_description),
-                        AirPlayPersistence.loadCenterMapFollowsDashboard(this)) {
-                        AirPlayPersistence.saveCenterMapFollowsDashboard(this, it)
-                    }
-                    toggle(card, getString(R.string.center_map_auto_hide), getString(R.string.center_map_auto_hide_description),
-                        AirPlayPersistence.loadCenterMapAutoHide(this)) {
-                        AirPlayPersistence.saveCenterMapAutoHide(this, it)
-                    }
-                }
-                toggle(card, getString(R.string.launcher_map_sharing), getString(R.string.launcher_map_sharing_description),
-                    AirPlayPersistence.loadLauncherMapSharing(this)) {
-                    AirPlayPersistence.saveLauncherMapSharing(this, it)
-                }
-                if (AirPlayPersistence.loadCenterMapOverlay(this)) {
-                    val overlay = CenterMapOverlay.permitted(this)
-                    card.addView(label(if (overlay) getString(R.string.center_map_overlay_allowed)
-                        else getString(R.string.center_map_overlay_missing, packageName), 14, if (overlay) MUTED else WARNING))
-                    val usage = HomeScreenMonitor.hasAccess(this)
-                    card.addView(label(if (usage) getString(R.string.center_map_auto_hide_active)
-                        else getString(R.string.center_map_auto_hide_needed), 14, if (usage) MUTED else WARNING))
-                    if (!usage) {
-                        card.addView(button(getString(R.string.btn_auto_apply_permissions), false) { autoApplyPermissions() }, matchButton(8, 54))
-                    }
-                }
                 // v100 B561: 恒真 —— 这层原先是 `if (clusterDisplay != null || adbCluster)`,
                 // 害得「转向卡 / 路口卡 / 三卡预览」在还没选到屏时整块不显示;而选屏控件
                 // 也在这一层里,用户被卡在「看不到卡、也选不了屏」的死结。
@@ -4319,16 +4278,11 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
             if (!UsbAutoConfirmService.openSettings(this)) toast(getString(R.string.wheel_keys_no_settings))
         }, matchButton(0, 56))
 
-        val overlayOn = CenterMapOverlay.permitted(this)
-        body.addView(button(if (overlayOn) getString(R.string.center_map_overlay_allowed) else getString(R.string.btn_open_overlay_setting), false) {
-            openOverlayPermission()
-        }, matchButton(10, 56))
-
         UsbPermissionSetup.snapshot(this).forEach { (permission, granted) ->
             val title = getString(when (permission) {
                 UsbPermissionSetup.Permission.ACCESSIBILITY -> R.string.usb_auto_confirm_title
-                UsbPermissionSetup.Permission.USAGE -> R.string.center_map_auto_hide
-                UsbPermissionSetup.Permission.OVERLAY -> R.string.btn_open_overlay_setting
+                UsbPermissionSetup.Permission.USAGE -> R.string.permission_usage_access_title
+                UsbPermissionSetup.Permission.OVERLAY -> R.string.permission_overlay_title
             })
             body.addView(label("$title: ${getString(if (granted) R.string.permission_enabled_ready else R.string.permission_not_enabled)}", 14, if (granted) MUTED else WARNING))
         }

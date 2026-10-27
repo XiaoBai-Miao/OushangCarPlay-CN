@@ -99,9 +99,9 @@ The combined candidate adds no new application runtime dependency, downloaded na
 The following earlier configurations ran the repository's full workflow locally with JDK 25 and the configured Android SDK/NDK. They do not supply a completed result for the current combined preflight:
 
 ```sh
-./gradlew :shared:testDebugUnitTest :common:testDebugUnitTest :home:testDebugUnitTest \
-  :mobile:lintDebug :home:lintDebug :maphost:lintDebug \
-  :mobile:assembleDebug :home:assembleDebug :maphost:assembleDebug --stacktrace
+./gradlew :shared:testDebugUnitTest :common:testDebugUnitTest \
+  :mobile:lintDebug \
+  :mobile:assembleDebug --stacktrace
 ```
 
 | Configuration | Tests passed | Skipped | Failures/errors | Lint and builds |

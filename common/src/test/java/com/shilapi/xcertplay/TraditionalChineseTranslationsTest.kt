@@ -10,7 +10,7 @@ class TraditionalChineseTranslationsTest {
     private val argument = Regex("%(?:%|n|(?:\\d+\\$)?[-#+0,(<]*\\d*(?:\\.\\d+)?(?:[tT][a-zA-Z]|[bBhHsScCdoxXeEfgGaA]))")
 
     @Test fun everyUserFacingStringHasATraditionalChineseTranslationWithMatchingArguments() {
-        for (module in listOf(File("."), File("../shared"), File("../samples/home"), File("../samples/maphost"))) {
+        for (module in listOf(File("."), File("../shared"))) {
             val english = load(File(module, "src/main/res/values"))
             val traditional = load(File(module, "src/main/res/values-zh-rTW"))
             assertEquals("$module: Traditional Chinese resource keys", english.keys, traditional.keys)

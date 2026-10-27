@@ -111,7 +111,7 @@ the car's own hotspot settings remain available for manual setup.
 
 For startup after boot, also enable Open after the car starts. When both options
 are selected, the switch being enabled also requests missing SYSTEM_ALERT_WINDOW
-for boot launch. This does not enable a floating map or turn on the boot option
+for boot launch. This does not turn on the boot option
 automatically. The head unit may also require its own auto-start permission.
 Connect when DiPlay opens remains a separate choice: the app can start the hotspot
 without connecting to an iPhone.

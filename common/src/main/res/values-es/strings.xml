@@ -35,6 +35,8 @@
     <string name="hotspot_details_saved">Datos guardados · Comprueba que el punto de acceso del coche esté activado antes de conectarte.</string>
     <string name="permission_enabled_ready">Permiso activado · listo para usar</string>
     <string name="permission_not_enabled">El permiso aún no está activado</string>
+    <string name="permission_usage_access_title">Acceso a datos de uso</string>
+    <string name="permission_overlay_title">Mostrar sobre otras aplicaciones</string>
     <string name="clipboard_usage_access">Acceso al uso de DiPlay</string>
     <string name="report_clip_label">Informe de diagnóstico</string>
     <string name="share_diagnostic_report">Compartir informe de diagnóstico</string>
@@ -511,17 +513,6 @@
     <string name="widget_distance_km">%1$d km</string>
     <string name="widget_minutes">%1$d min</string>
     <string name="widget_hours_minutes">%1$d h %2$02d min</string>
-    <string name="center_map_card">Mapa del panel de instrumentos en la pantalla central</string>
-    <string name="center_map_card_description">Mientras DiPlay está en segundo plano, el mapa del panel de instrumentos también aparece como una tarjeta en la pantalla de inicio: el inicio de BYD, el inicio con mapa o tu launcher predeterminado. Toca la tarjeta para abrir CarPlay, arrástrala para moverla y pellízcala para cambiar su tamaño. El panel de instrumentos conserva su mapa. Requiere permiso para mostrarse sobre otras aplicaciones.</string>
-    <string name="center_map_follows_dashboard">Mantener el mapa de inicio sincronizado con el cuadro</string>
-    <string name="center_map_follows_dashboard_description">Activado: la tarjeta de inicio refleja el mapa del cuadro. Desactivado: la tarjeta se oculta y el mapa solo aparece en el cuadro.</string>
-    <string name="center_map_overlay_allowed">Mostrar sobre otras aplicaciones: permitido</string>
-    <string name="center_map_overlay_missing">Mostrar sobre otras aplicaciones: no permitido. Permítelo en los ajustes de la aplicación o por ADB: adb shell appops set %1$s SYSTEM_ALERT_WINDOW allow</string>
-    <string name="center_map_usage_allowed">Acceso a datos de uso: permitido, la tarjeta solo aparece en la pantalla de inicio</string>
-    <string name="center_map_usage_missing">Acceso a datos de uso: no permitido, así que la tarjeta aparece sobre todas las aplicaciones. Por ADB: adb shell appops set %1$s GET_USAGE_STATS allow</string>
-    <string name="center_map_no_permission_screen">Esta unidad principal no tiene pantalla de ajustes para este permiso. Permítelo por ADB.</string>
-    <string name="launcher_map_sharing">Compartir el mapa en vivo con otros launchers</string>
-    <string name="launcher_map_sharing_description">Los launchers compatibles con DiPlay pueden mostrar el mapa en vivo del panel de instrumentos en su propia pantalla de inicio. Desactivado por defecto, porque entonces cualquier aplicación de la unidad principal podría pedir el mapa. Consulta docs/LAUNCHER_INTEGRATION.md.</string>
     <string name="turn_card_overlay_size">Tamaño de la tarjeta personalizada</string>
     <string name="turn_card_overlay_opacity">Opacidad de la tarjeta personalizada</string>
     <string name="turn_card_overlay_opacity_option">%1$d %%</string>

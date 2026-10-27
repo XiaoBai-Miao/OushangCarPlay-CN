@@ -57,8 +57,6 @@ How it works: the iPhone lists the cluster content it offers in its `/info` requ
 
 Limits: the cluster window belongs to the CarPlay screen, so it stops while that screen is closed and the session runs in the background. Other map apps and other firmware are untested.
 
-The optional centre-screen map card mirrors that same dashboard stream. **Keep the home-screen map in sync with the dashboard** (on by default) shows the card. Turn it off to hide the home-screen card so only the instrument cluster shows the dashboard map. This does not change what CarPlay draws on the main screen.
-
 ### DiLink 5.1 theme profile
 
 The exact Android 13 firmware `BYD-AUTO/IVI/IVI:13/TP1A.220624.014/eng.build20260722.221155:user/release-keys` has a separate profile for its measured 1920×720 cluster. Other firmware retains the original PR display selection, renderer and settings.

@@ -15,7 +15,7 @@
     <!-- Optional: diagnostic reports in the visible Downloads/DiPlay folder on Android 9.
          Android 10+ needs no permission for this, so it is never requested there. -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
-    <!-- Optional: the dashboard map as a card over the home screen. -->
+    <!-- Optional, user-authorized overlay access (auto-start on boot uses it to watch the car launcher). -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <!-- Optional, owner-enabled Usage Access for the verified DiLink 5.1 cluster profile. -->
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:ignore="ProtectedPermissions" />
@@ -28,7 +28,6 @@
          (证书 c8a2e9bc…92ab8),所以能静态拿到,不需要运行时权限弹窗。
          VHAL 那一路仍保留为兜底,拿不到也不影响主流程。 -->
     <uses-permission android:name="android.permission.READ_LOGS" tools:ignore="ProtectedPermissions" />
-    <!-- The centre card also follows whichever launcher is the default home. -->
     <queries>
         <package android:name="com.byd.carsettings" />
         <!-- 仪表投屏通道广播接口的目标包;targetSdk 30+ 下不声明就查不到它是否安装。 -->
@@ -142,16 +141,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/navigation_widget_info" />
         </receiver>
-
-        <!-- The live dashboard map for launchers that embed it (docs/LAUNCHER_INTEGRATION.md). -->
-        <service
-            android:name="com.shilapi.xcertplay.MapEmbedService"
-            android:exported="true"
-            tools:ignore="ExportedService">
-            <intent-filter>
-                <action android:name="com.shihab.diplay.action.EMBED_MAP" />
-            </intent-filter>
-        </service>
 
         <!-- Optional: steering-wheel keys for the dashboard map zoom (docs/BYD_NAVIGATION.md). -->
         <service

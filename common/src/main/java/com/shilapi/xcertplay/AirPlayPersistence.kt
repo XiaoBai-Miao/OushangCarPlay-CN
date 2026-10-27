@@ -90,9 +90,6 @@ object AirPlayPersistence {
      * 关掉等于退回"自己 Presentation 挂副屏"的老路,那正是通道被占时出不去的原因。
      */
     private const val KEY_SUPERUNI_FLYSCREEN = "superuni_flyscreen_enabled"
-    private const val KEY_CENTER_MAP_OVERLAY = "center_map_overlay"
-    private const val KEY_CENTER_MAP_AUTO_HIDE = "center_map_auto_hide"
-    private const val KEY_LAUNCHER_MAP_SHARING = "launcher_map_sharing"
     private const val KEY_CLUSTER_MAP_SCALE = "cluster_map_scale_percent"
     private const val KEY_CLUSTER_CONTENT = "cluster_content"
     private const val KEY_CLUSTER_MARKER_X = "cluster_marker_horizontal_step"
@@ -105,7 +102,6 @@ object AirPlayPersistence {
     private const val KEY_CLUSTER_TURN_CARD_OVERLAY_SIZE = "cluster_turn_card_overlay_size"
     private const val KEY_CLUSTER_TURN_CARD_OVERLAY_X = "cluster_turn_card_overlay_x_percent"
     private const val KEY_CLUSTER_TURN_CARD_OVERLAY_Y = "cluster_turn_card_overlay_y_percent"
-    private const val KEY_CENTER_MAP_FOLLOWS_DASHBOARD = "center_map_follows_dashboard"
     private const val KEY_SETTINGS_GESTURE_FINGERS = "settings_gesture_fingers"
     private const val KEY_WIDTH_PHYSICAL_MM = "display_width_physical_mm"
     private const val KEY_PHYSICAL_SIZE_BASIS = "display_physical_size_basis"
@@ -830,26 +826,6 @@ object AirPlayPersistence {
             .edit().putBoolean(KEY_SUPERUNI_FLYSCREEN, enabled).apply()
     }
 
-    /** The dashboard map as a card on the centre screen while DiPlay is in the background. */
-    fun loadCenterMapOverlay(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_CENTER_MAP_OVERLAY, false)
-
-    /** Automatically hide the floating card when non-launcher apps are in the foreground. */
-    fun loadCenterMapAutoHide(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_CENTER_MAP_AUTO_HIDE, true)
-
-    fun saveCenterMapAutoHide(context: Context, enabled: Boolean) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_CENTER_MAP_AUTO_HIDE, enabled).apply()
-    }
-
-    /** Other launchers may show the live dashboard map in their own screen (MapEmbedService). */
-    fun loadLauncherMapSharing(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_LAUNCHER_MAP_SHARING, false)
-
-    fun saveLauncherMapSharing(context: Context, enabled: Boolean) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_LAUNCHER_MAP_SHARING, enabled).apply()
-    }
-
     fun loadClusterSpeedometerEnabled(context: Context): Boolean =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("cluster_speedometer_enabled", false)
     fun saveClusterSpeedometerEnabled(context: Context, enabled: Boolean) {
@@ -1074,21 +1050,6 @@ object AirPlayPersistence {
             .putInt("cluster_speedometer_opacity", ClusterSpeedometerOverlay.snap(value, ClusterSpeedometerOverlay.opacityPercents)).apply()
     }
 
-    /** Observe consent changes for already attached launcher maps; call the returned function to unregister. */
-    internal fun observeLauncherMapSharing(context: Context, changed: (Boolean) -> Unit): () -> Unit {
-        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-            if (key == KEY_LAUNCHER_MAP_SHARING) changed(loadLauncherMapSharing(context))
-        }
-        prefs.registerOnSharedPreferenceChangeListener(listener)
-        return { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
-    }
-
-    fun saveCenterMapOverlay(context: Context, enabled: Boolean) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_CENTER_MAP_OVERLAY, enabled).apply()
-    }
-
-    /** Whether to renegotiate resolution when entering/exiting freeform floating windows or launcher PiP. */
     fun loadAdaptPipResolution(context: Context): Boolean =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_ADAPT_PIP_RESOLUTION, false)
 
@@ -1139,15 +1100,6 @@ object AirPlayPersistence {
     fun saveSettingsGestureFingers(context: Context, fingers: Int) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putInt(KEY_SETTINGS_GESTURE_FINGERS, if (fingers == 0) 0 else fingers.coerceIn(2, 4)).apply()
-    }
-
-    fun loadCenterMapFollowsDashboard(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getBoolean(KEY_CENTER_MAP_FOLLOWS_DASHBOARD, true)
-
-    fun saveCenterMapFollowsDashboard(context: Context, enabled: Boolean) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-            .putBoolean(KEY_CENTER_MAP_FOLLOWS_DASHBOARD, enabled).apply()
     }
 
     fun loadClusterTurnCardOverlaySizePercent(context: Context): Int {

@@ -17,7 +17,7 @@ object SettingsBackupCodec {
      * (`pairing.<id>`), lockdown records, the authentication target and the car's hotspot name and
      * passphrase. An imported file must never set those: a pairing key from someone else's file would make
      * DiPlay trust their device. So a key travels only once it is listed here; car-specific values (the
-     * detected screen size, the car's hotspot) and consents (sharing the map with other apps) stay out too.
+     * detected screen size, the car's hotspot) stay out too.
      */
     private val AIRPLAY_KEYS = setOf(
         "display_scale_tenths", "ui_scale_percent", "hevc_enabled", "hevc_software_decoder",
@@ -28,8 +28,7 @@ object SettingsBackupCodec {
         "ambient_lux_threshold", "display_fps", "media_buffer_ms", "main_buffered_audio",
         "speech_without_8_16_khz", "car_bluetooth_audio", "call_echo_cancellation", "call_voice_filter",
         "smooth_video", "direct_video_output", "low_latency_decoder", "mtk_decoder_tuning", "fps_counter",
-        "adb_cluster_activity_enabled", "center_map_overlay", "center_map_auto_hide",
-        "center_map_follows_dashboard", "settings_gesture_fingers", "display_width_physical_mm",
+        "adb_cluster_activity_enabled", "settings_gesture_fingers", "display_width_physical_mm",
         "display_physical_size_basis", "right_hand_drive", "hide_top_bar", "hide_bottom_bar",
         "harman_fullscreen", "safe_area_draw_outside", "main_display_disable_safe_area",
         "adapt_pip_resolution", "auto_start_on_boot", "bt_suspend_during_carplay", "hide_byd_call_popup",

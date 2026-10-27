@@ -22,7 +22,6 @@ class VirtualClusterDisplayTest {
     }
 
     @After fun tearDown() {
-        MapMirrors.streamAspect = MapMirrors.PHYSICAL_STREAM_ASPECT
         for (name in listOf("teardownExecutor", "airPlayCommandExecutor")) {
             val executor = activity.javaClass.getDeclaredField(name).apply { isAccessible = true }
                 .get(activity) as ExecutorService
@@ -32,13 +31,12 @@ class VirtualClusterDisplayTest {
 
     @Test fun virtualStreamRemainsOptIn() { assertNull(config()) }
 
-    @Test fun absentPhysicalClusterNegotiates16By9AndSetsMirrorAspect() {
+    @Test fun absentPhysicalClusterNegotiates16By9() {
         AirPlayPersistence.saveClusterMapEnabled(activity, true)
-        MapMirrors.streamAspect = MapMirrors.PHYSICAL_STREAM_ASPECT
         val display = config()!!
         assertEquals(1280, display.widthPixels)
         assertEquals(720, display.heightPixels)
-        assertEquals(16.0 / 9, MapMirrors.streamAspect, 0.00001)
+        assertEquals(16.0 / 9, display.widthPixels.toDouble() / display.heightPixels, 0.00001)
         assertEquals(display.safeArea!!.left, display.safeArea!!.right)
     }
 

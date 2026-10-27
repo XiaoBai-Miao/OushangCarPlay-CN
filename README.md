@@ -60,7 +60,7 @@ If a problem remains, reproduce it on **0.2.19-cn.1**, then use **Settings → D
 - [Install and connect](docs/INSTALL.md)
 - [Compatibility and troubleshooting](docs/COMPATIBILITY.md)
 - [Privacy and diagnostic reports](docs/PRIVACY.md)
-- [Build from source](docs/BUILD.md) — select `mobile` for the main DiPlay app; `maphost` is a map sample.
+- [Build from source](docs/BUILD.md) — select `mobile` for the main DiPlay app.
 - [Validation](docs/VALIDATION.md)
 - [Release notes](CHANGELOG.md)
 - [CN optimization log](docs/CN_OPTIMIZATIONS.md)

@@ -1,3 +1,7 @@
+# Unreleased
+
+- Remove the optional centre-screen dashboard-map overlay (`CenterMapOverlay`) and the launcher map-sharing feature (`MapEmbedService` / `MapMirrors`). The `samples/maphost` and `samples/home` sample modules, `docs/LAUNCHER_INTEGRATION.md`, their CI tasks, and all related settings and strings are removed. The instrument-cluster dashboard map itself is unchanged.
+
 # DiPlay 0.2.19 — 2026-10-12
 
 - Start wired CarPlay several seconds sooner by not waiting 2 s on each refused USB network write, ask for CarPlay mode first on iOS 26, grant USB access through approved ADB on Android 7.1–9 head units without a USB permission page, and let Auto-confirm USB permission find the system dialog (#644, #689).

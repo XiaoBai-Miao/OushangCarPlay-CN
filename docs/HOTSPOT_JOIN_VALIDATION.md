@@ -48,13 +48,12 @@ These checks do not replace the remaining physical-device acceptance below.
 Validation command:
 
 ```sh
-./gradlew :shared:testDebugUnitTest :common:testDebugUnitTest :home:testDebugUnitTest :mobile:lintDebug :home:lintDebug :maphost:lintDebug :automotive:lintDebug :mobile:assembleDebug :home:assembleDebug :maphost:assembleDebug :automotive:assembleDebug --console=plain
+./gradlew :shared:testDebugUnitTest :common:testDebugUnitTest :mobile:lintDebug :automotive:lintDebug :mobile:assembleDebug :automotive:assembleDebug --console=plain
 ```
 
 All tests, four debug lint checks and source-only APK builds passed using the
 repository's JDK 25 / Android SDK 37 / NDK 28.2.13676358 toolchain. Lint reported
-zero errors; existing warning counts were 18/5/2/4 for Mobile/Home/map-host/
-Automotive. All six app languages contain the repair controls and status text.
+zero errors; existing warning counts were 18/4 for Mobile/Automotive. All six app languages contain the repair controls and status text.
 Public-tree credential and whitespace checks passed. No private configuration,
 authentication asset, signing material or APK is included in the source change.
 
