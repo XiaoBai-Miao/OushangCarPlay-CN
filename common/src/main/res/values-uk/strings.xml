@@ -443,8 +443,6 @@
     <string name="turn_card_horizontal">Картка маневру · горизонтально</string>
     <string name="turn_card_vertical">Картка маневру · вертикально</string>
     <string name="reset_turn_card_to_centre">Повернути картку маневру до центру</string>
-    <string name="dashboard_map_only_in_small_and_full_navi">Карта на приборці лише в малому й повноекранному режимах навігації</string>
-    <string name="dashboard_map_only_in_small_and_full_navi_description">DiPlay визначає режим навігації, вибраний на кермі. У режимах «Вимкнено» та «Вмикати під час навігації» приборка показує лише стрілки, тому iPhone не надсилає карту. У малому й повноекранному режимах навігації iPhone надсилає карту через одну-дві секунди після перемикання. Потрібен ADB через мережу на головному пристрої.</string>
     <string name="check_adb_access">Перевірити доступ ADB</string>
     <string name="adb_checking">Перевірка доступу ADB…</string>
     <string name="adb_checking_may_ask">Перевірка доступу ADB… Якщо автомобіль запитає, дозвольте DiPlay та позначте «Завжди дозволяти».</string>
@@ -703,8 +701,6 @@
     <string name="boot_start_repair_desc">Деякі прошивки блокують сторонні приймачі завантаження. Ця дія через власний ADB автомобіля виводить DiPlay з фонових обмежень, щоб широкомовлення завантаження доходило. Один раз; повторіть після оновлення прошивки.</string>
     <string name="boot_start_repair_result">Ремонт автозапуску:%1$s</string>
     <string name="boot_start_repair_running">Застосовуються винятки автозапуску…</string>
-    <string name="bt_suspend_delay">Затримка паузи Bluetooth</string>
-    <string name="bt_suspend_delay_option">%1$d с після підключення</string>
     <string name="bt_suspend_during_carplay">Призупинити Bluetooth авто під час CarPlay · потрібен ADB</string>
     <string name="bt_suspend_during_carplay_description">Телефон тримає hands-free звʼязок з авто, тому вхідний дзвінок звучить і в телефоні авто, і в CarPlay. Після ввімкнення: Bluetooth авто призупиняється через ADB на час сеансу CarPlay — дзвінки йдуть лише в CarPlay; поки Bluetooth вимкнено, дзвінки CarPlay йдуть через динамік і мікрофон авто. Вмикається назад після сеансу і перед наступним бездротовим зʼєднанням. Пара не змінюється. Застосується з наступного підключення.</string>
     <string name="check_for_updates">Перевірити оновлення</string>

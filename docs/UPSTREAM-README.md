@@ -12,7 +12,8 @@
   `/dev/i2c-N` devices, and Remote MFI authentication (see the API below).
 - Wired and wireless CarPlay connections.
 - CarPlay Ultra triggering (the protocol stack is untested/incomplete, but it
-  can trigger the CarPlay Ultra prompt on an iPhone).
+  can trigger the CarPlay Ultra prompt on an iPhone). *（注：真 CarPlay Ultra 协议栈已在
+  本项目的 v136 整体下线，当前版本不包含该功能。）*
 - Voice, navigation, and music multi-channel audio output mapped to the
   corresponding Android channels.
 - Dynamic Activity resizing with automatic re-handshaking to the new

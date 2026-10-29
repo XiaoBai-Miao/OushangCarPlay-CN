@@ -1,5 +1,10 @@
 # Cluster music card (experimental)
 
+> **Historical record.** This document describes an experimental dashboard music card
+> whose settings path has changed in later versions (the cluster media card controls moved
+> to the cluster-map settings in v137). The launcher/floating-map references below were
+> removed in v142. It is kept as a historical design note.
+
 Based on v0.2.18; branch `feature/cluster-music-card`.
 
 Enable the cluster map, then open Settings → Advanced → the dashboard map card →

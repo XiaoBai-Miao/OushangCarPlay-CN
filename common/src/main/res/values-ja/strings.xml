@@ -518,8 +518,6 @@
     <string name="cluster_small_window_access_missing">自動モードではADBを優先します。ADBを許可していない場合は、メーターの小画面状態を取得できるよう使用状況へのアクセスを許可してください。</string>
     <string name="cluster_small_window_grant_access">使用状況へのアクセスを許可</string>
     <string name="cluster_small_window_adb_ok">ADBナビモード：%1$s · 自動モードはステアリングの小画面／全画面ナビ設定に従います。</string>
-    <string name="dashboard_map_only_in_small_and_full_navi">小画面・全画面ナビのときだけメーター地図を表示</string>
-    <string name="dashboard_map_only_in_small_and_full_navi_description">DiPlayがステアリングスイッチで選択したナビモードを読み取ります。「オフ」と「ナビでオンにする」ではメーターに案内矢印だけを表示し、iPhoneは地図映像を送信しません。「小画面ナビ」と「全画面ナビ」では地図を送信し、切り替え後1～2秒で表示が変わります。車載端末のネットワークADBが必要です。</string>
     <string name="check_adb_access">ADBへのアクセスを確認</string>
     <string name="adb_checking">ADBへのアクセスを確認しています…</string>
     <string name="adb_checking_may_ask">ADBアクセスを確認中です。車に確認画面が出たらDiPlayを許可し、「常に許可」にチェックしてください。</string>
@@ -859,8 +857,6 @@
     <string name="settings_gesture_disabled">オフ</string>
     <string name="settings_gesture_disabled_hint">下スワイプのショートカットは無効です。</string>
     <string name="settings_gesture_disabled_action">クイックメニュー · スワイプ無効（タップして変更）</string>
-    <string name="bt_suspend_delay">Bluetoothの一時停止までの時間</string>
-    <string name="bt_suspend_delay_option">接続後%1$d秒</string>
     <string name="bt_suspend_during_carplay">CarPlay中は車のBluetoothを一時停止 · ADBが必要</string>
     <string name="bt_suspend_during_carplay_description">iPhoneのハンズフリー接続が残っていると、着信が車のBluetooth電話とCarPlayの両方で鳴る場合があります。CarPlay中はADB経由で車のBluetoothを一時停止し、CarPlayだけで着信させます。停止中のCarPlay通話はiPhoneのBluetooth音声経路ではなく、車内のスピーカーとマイクを使います。BluetoothはCarPlay終了時と次のワイヤレス接続の前に再びオンになります。ペアリング情報は変更しません。次回の接続から反映されます。</string>
     <string name="cluster_small_window_card_theme">小画面の案内カードテーマ</string>

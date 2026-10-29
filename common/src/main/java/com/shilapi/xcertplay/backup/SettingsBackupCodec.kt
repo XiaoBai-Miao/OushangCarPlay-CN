@@ -32,7 +32,7 @@ object SettingsBackupCodec {
         "display_physical_size_basis", "right_hand_drive", "hide_top_bar", "hide_bottom_bar",
         "harman_fullscreen", "safe_area_draw_outside", "main_display_disable_safe_area",
         "adapt_pip_resolution", "auto_start_on_boot", "bt_suspend_during_carplay", "hide_byd_call_popup",
-        "bt_suspend_delay_seconds", "location_reporting_enabled", "external_controller", "usb_charging_current",
+        "location_reporting_enabled", "external_controller", "usb_charging_current",
     )
 
     /** Families of layout settings with many keys and nothing sensitive in them. */
@@ -43,7 +43,6 @@ object SettingsBackupCodec {
         "default_connection_mode",
         "settings_force_full_layout",
         "app_appearance_button",
-        "byd_vehicle_advanced",
         "picture_controls",
         "settings_gesture_fingers",
     )

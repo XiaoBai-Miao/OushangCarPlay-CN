@@ -35,10 +35,11 @@ class ClusterTurnCardPersistenceTest {
     }
 
     @Test fun legacyMarkerStepsMigrateAroundTheSlidersCentre() {
+        val prefs = context.getSharedPreferences("xcertplay_airplay", 0)
         assertEquals(50, AirPlayPersistence.loadClusterMarkerXPercent(context))
         assertEquals(45, AirPlayPersistence.loadClusterMarkerYPercent(context))
-        AirPlayPersistence.saveClusterMarkerHorizontalStep(context, 1)
-        AirPlayPersistence.saveClusterMarkerVerticalStep(context, -2)
+        prefs.edit().putInt("cluster_marker_horizontal_step", 1).apply()
+        prefs.edit().putInt("cluster_marker_vertical_step", -2).apply()
         assertEquals(60, AirPlayPersistence.loadClusterMarkerXPercent(context))
         assertEquals(25, AirPlayPersistence.loadClusterMarkerYPercent(context))
         AirPlayPersistence.saveClusterMarkerXPercent(context, 37)

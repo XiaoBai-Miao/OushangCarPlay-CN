@@ -2897,11 +2897,6 @@ class DiPlayActivity : ComponentActivity(), AppAppearanceOwner {
                             card.addView(label(getString(R.string.cluster_small_window_hint), 14, MUTED).apply { setPadding(0, dp(10), 0, 0) })
                         }
                     }
-                    toggle(card, getString(R.string.dashboard_map_only_in_small_and_full_navi),
-                        getString(R.string.dashboard_map_only_in_small_and_full_navi_description),
-                        false) {
-                        if (it) markReconnectNeeded()
-                    }
             }
         }
         // v100 B561: 「BYD 导航」(HUD 箭头 / FCE 集群 / 仪表歌曲投射)整块已随

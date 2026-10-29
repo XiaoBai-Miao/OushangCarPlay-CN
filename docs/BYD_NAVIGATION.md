@@ -1,5 +1,9 @@
 # BYD navigation displays and vehicle data
 
+> **注：BYD 导航集成已移除。** 本文描述的 BYD 导航广播/HUD/FCE 集群输出在 v100 基于
+> DiPlay-CN 0.2.19 重做时已随 BYD 集成整体删除；当前 B561 版本的仪表内容走自绘卡片
+> （地图/转向卡/媒体卡/车辆信息卡），不经过本文所述的广播路径。本文仅作历史参考。
+
 Phone navigation arrows, next-turn distance and street names can appear on supported BYD displays. Ordinary operation requires no ADB, root, laptop or helper process. The map app must provide structured navigation metadata; compatibility is not guaranteed for every map app or version.
 
 ## Validated windshield path

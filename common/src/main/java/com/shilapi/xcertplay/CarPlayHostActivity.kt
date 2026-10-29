@@ -587,7 +587,6 @@ class CarPlayHostActivity : ComponentActivity() {
     private var overlayConnectOnBluetooth = false
     private var overlayShowLanes = true
     private var overlayShowArrival = true
-    private var overlayClusterMapOnlyNavi = false
     private var overlayLauncherReturnsToCarPlay = true
     private var overlayBtSuspend = false
     private var overlaySmoothVideo = false
@@ -921,7 +920,6 @@ class CarPlayHostActivity : ComponentActivity() {
         overlayConnectOnBluetooth = DiPlayPreferences.connectOnPhoneBluetooth(this)
         overlayShowLanes = AirPlayPersistence.loadClusterTurnCardShowLanes(this)
         overlayShowArrival = AirPlayPersistence.loadClusterTurnCardShowArrival(this)
-        overlayClusterMapOnlyNavi = false
         overlayLauncherReturnsToCarPlay = AirPlayPersistence.loadLauncherReturnsToCarPlay(this)
         overlayBtSuspend = AirPlayPersistence.loadBtSuspendDuringCarplay(this)
         overlaySmoothVideo = AirPlayPersistence.loadSmoothVideo(this)
@@ -3671,13 +3669,8 @@ class CarPlayHostActivity : ComponentActivity() {
                 applyClusterTurnOverlay()
             },
         )
-        val mapRow = settingsSwitchRow(
-            label = getString(R.string.dashboard_map_only_in_small_and_full_navi),
-            checked = overlayClusterMapOnlyNavi,
-            description = getString(R.string.dashboard_map_only_in_small_and_full_navi_description),
-        ) { checked -> overlayClusterMapOnlyNavi = checked }
         return listOf(
-            overlayCard(getString(R.string.settings_navigation), null, listOfNotNull(clusterRow, accessWarning, mapRow)),
+            overlayCard(getString(R.string.settings_navigation), null, listOfNotNull(clusterRow, accessWarning)),
             overlayCard(null, null, infoRows),
         )
     }

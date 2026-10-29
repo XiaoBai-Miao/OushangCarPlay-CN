@@ -468,8 +468,6 @@
     <string name="turn_card_distance_m">%1$d 米</string>
     <string name="turn_card_distance_km">%1$.1f 公里</string>
     <string name="turn_card_exit">出口 %1$d</string>
-    <string name="dashboard_map_only_in_small_and_full_navi">仅在小屏或全屏导航时显示仪表盘地图</string>
-    <string name="dashboard_map_only_in_small_and_full_navi_description">DiPlay 读取你在方向盘菜单中选择的导航模式。在“关闭”和“导航时开启”模式下仪表盘只显示箭头，因此 iPhone 不发送地图；在小屏导航和全屏导航模式下会发送，切换后一两秒内生效。需要在车机上开启网络 ADB。</string>
     <string name="check_adb_access">检查 ADB 访问</string>
     <string name="adb_checking">正在检查 ADB 访问…</string>
     <string name="adb_checking_may_ask">正在检查 ADB 访问…如果车机询问，请允许 DiPlay 并勾选“始终允许”。</string>
@@ -780,8 +778,6 @@
     <string name="boot_start_repair_desc">部分固件会拦截第三方应用的开机广播。此操作通过车机自身的 ADB 通道，把 DiPlay 加入后台运行白名单，让开机广播能送达。执行一次即可；车机固件升级后如失效可重新执行。</string>
     <string name="boot_start_repair_result">开机自启修复结果：%1$s</string>
     <string name="boot_start_repair_running">正在应用开机自启白名单…</string>
-    <string name="bt_suspend_delay">蓝牙暂停延时</string>
-    <string name="bt_suspend_delay_option">连接 %1$d 秒后</string>
     <string name="bt_suspend_during_carplay">CarPlay 期间暂停车机蓝牙 · 需要 ADB</string>
     <string name="bt_suspend_during_carplay_description">手机与车机保持免提连接时，来电会同时弹出车机蓝牙电话和 CarPlay 电话。开启后：CarPlay 连接期间通过 ADB 暂停车机蓝牙，来电只在 CarPlay 响应；蓝牙关闭期间，CarPlay 通话改走中控喇叭和车机麦克风，不再走电话免提。CarPlay 结束或下次无线连接握手前会自动恢复蓝牙。配对不受影响。更改在下次连接时生效。</string>
     <string name="check_for_updates">检查更新</string>

@@ -431,8 +431,6 @@
     <string name="turn_card_horizontal">Карточка поворота · по горизонтали</string>
     <string name="turn_card_vertical">Карточка поворота · по вертикали</string>
     <string name="reset_turn_card_to_centre">Вернуть карточку поворота в центр</string>
-    <string name="dashboard_map_only_in_small_and_full_navi">Карта на приборной панели только в малой и полноэкранной навигации</string>
-    <string name="dashboard_map_only_in_small_and_full_navi_description">DiPlay считывает режим навигации, выбранный кнопками на руле. В режимах «Выкл.» и «Включать при навигации» приборная панель показывает только стрелки, поэтому iPhone не передаёт карту; в режимах малого и полного экрана навигации передаёт — через секунду-две после переключения. Нужен ADB по сети на головном устройстве.</string>
     <string name="check_adb_access">Проверить доступ ADB</string>
     <string name="adb_checking">Проверка доступа ADB…</string>
     <string name="adb_checking_may_ask">Проверка доступа ADB… Если машина спросит, разрешите DiPlay и отметьте «Всегда разрешать».</string>
@@ -691,8 +689,6 @@
     <string name="boot_start_repair_desc">Некоторые прошивки блокируют сторонние приёмники загрузки. Эта операция через собственный ADB автомобиля исключает DiPlay из фоновых ограничений, чтобы широковещание загрузки доходило. Один раз; повторите после обновления прошивки.</string>
     <string name="boot_start_repair_result">Ремонт автозапуска:%1$s</string>
     <string name="boot_start_repair_running">Применяются исключения автозапуска…</string>
-    <string name="bt_suspend_delay">Задержка паузы Bluetooth</string>
-    <string name="bt_suspend_delay_option">%1$d с после подключения</string>
     <string name="bt_suspend_during_carplay">Приостановить Bluetooth автомобиля при CarPlay · нужен ADB</string>
     <string name="bt_suspend_during_carplay_description">Телефон держит hands-free связь с автомобилем, поэтому входящий звонок звонит и в телефоне автомобиля, и в CarPlay. При включении: Bluetooth автомобиля приостанавливается через ADB на время сеанса CarPlay — звонки идут только в CarPlay; пока Bluetooth выключен, звонки CarPlay идут через динамик и микрофон автомобиля. Включается обратно после сеанса и перед следующим беспроводным соединением. Сопряжение не затрагивается. Применится при следующем подключении.</string>
     <string name="check_for_updates">Проверить обновления</string>

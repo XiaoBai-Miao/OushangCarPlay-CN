@@ -46,7 +46,8 @@ class ClusterSmallWindowPersistenceTest {
     }
 
     @Test fun markerPercentsRoundTripIndependentlyOfTheFullScreenMarker() {
-        AirPlayPersistence.saveClusterMarkerHorizontalStep(context, -2)
+        val prefs = context.getSharedPreferences("xcertplay_airplay", 0)
+        prefs.edit().putInt("cluster_marker_horizontal_step", -2).apply()
         AirPlayPersistence.saveClusterSmallWindowMode(context, 1)
         AirPlayPersistence.saveClusterSmallWindowMarkerXPercent(context, 95)
         AirPlayPersistence.saveClusterSmallWindowMarkerYPercent(context, 20)
@@ -54,7 +55,8 @@ class ClusterSmallWindowPersistenceTest {
         assertTrue(AirPlayPersistence.loadClusterSmallWindowMarker(context))
         assertEquals(95, AirPlayPersistence.loadClusterSmallWindowMarkerXPercent(context))
         assertEquals(20, AirPlayPersistence.loadClusterSmallWindowMarkerYPercent(context))
-        assertEquals(-2, AirPlayPersistence.loadClusterMarkerHorizontalStep(context))
+        // The legacy full-screen step value still migrates onto the percent grid.
+        assertEquals(30, AirPlayPersistence.loadClusterMarkerXPercent(context))
     }
 
     @Test fun markerSnapsOntoTheOnePercentGrid() {

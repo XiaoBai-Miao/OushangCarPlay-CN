@@ -1,5 +1,10 @@
 # DiPlay 0.2.12 — 4 October 2026
 
+> **Historical record — features removed in v142.** The floating dashboard-map card
+> (`CenterMapOverlay`), the launcher map-sharing service (`MapEmbedService` / `MapMirrors`)
+> and the virtual map-card launcher use were removed in v142. This document is kept as a
+> historical release note and does not describe the current app.
+
 Public preview for compatible BYD Android 9 and newer head units. This release brings together the contributions reviewed since 0.2.11: more connection choices, dashboard and wheel controls, display settings, diagnostic export, and corrections to session ownership and recovery. Download and installation help are available on the [official website](https://shihabal3amri.github.io/DiPlay/).
 
 ## Fixes and review corrections

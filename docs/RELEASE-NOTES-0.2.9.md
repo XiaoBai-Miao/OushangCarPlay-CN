@@ -1,5 +1,11 @@
 # DiPlay 0.2.9 — 2 October 2026
 
+> **Historical record — features removed in v142.** The launcher map-sharing service
+> (`MapEmbedService` / `MapMirrors`), the floating dashboard-map card (`CenterMapOverlay`),
+> the `samples/maphost` and `samples/home` sample modules, and the dashboard music card were
+> removed in v142. This document is kept as a historical release note and does not describe
+> the current app.
+
 Public preview for compatible BYD Android head units. This release includes the contributions from @lpcheng1208 and @romanchukg-cloud, the review corrections, and the floating-map fixes from vehicle testing.
 
 ## Release highlights

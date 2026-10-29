@@ -506,8 +506,6 @@
     <string name="turn_card_distance_m">%1$d m</string>
     <string name="turn_card_distance_km">%1$.1f km</string>
     <string name="turn_card_exit">Exit %1$d</string>
-    <string name="dashboard_map_only_in_small_and_full_navi">Dashboard map only in Small and Full navi</string>
-    <string name="dashboard_map_only_in_small_and_full_navi_description">DiPlay reads the navi mode you pick on the steering wheel. In Off and Turn on by navi the dashboard shows arrows only, so the iPhone does not send the map; in Small and Full screen navi it does, within a second or two of the switch. Needs ADB over network on the head unit.</string>
     <string name="check_adb_access">Check ADB access</string>
     <string name="adb_checking">Checking ADB access…</string>
     <string name="adb_checking_may_ask">Checking ADB access… If the car asks, allow DiPlay and tick “Always allow”.</string>
@@ -797,8 +795,6 @@
     <string name="boot_start_repair_desc">Some firmwares block third-party boot receivers. This asks the head unit, over its own ADB link, to exempt DiPlay from background limits so the boot broadcast can reach it. One-time; re-run after a firmware update.</string>
     <string name="boot_start_repair_result">Boot auto-start repair:%1$s</string>
     <string name="boot_start_repair_running">Applying boot auto-start exemptions…</string>
-    <string name="bt_suspend_delay">Bluetooth pause delay</string>
-    <string name="bt_suspend_delay_option">%1$d s after connecting</string>
     <string name="bt_suspend_during_carplay">Pause car Bluetooth during CarPlay · needs ADB</string>
     <string name="bt_suspend_during_carplay_description">The phone keeps its hands-free link to the car, so a call rings on both the car Bluetooth phone and CarPlay. While CarPlay runs, pause the car Bluetooth over ADB so calls ring on CarPlay only; with Bluetooth off, CarPlay calls play on the cabin speaker and microphone instead of the phone SCO. Bluetooth turns back on when CarPlay ends and before the next wireless handshake. Pairing is never touched. Changes apply on the next connection.</string>
     <string name="check_for_updates">Check for updates</string>

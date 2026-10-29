@@ -431,8 +431,6 @@
     <string name="turn_card_horizontal">بطاقة الانعطاف · أفقيًا</string>
     <string name="turn_card_vertical">بطاقة الانعطاف · عموديًا</string>
     <string name="reset_turn_card_to_centre">إعادة بطاقة الانعطاف إلى الوسط</string>
-    <string name="dashboard_map_only_in_small_and_full_navi">خريطة لوحة العدادات فقط في عرض الملاحة المصغّر والكامل</string>
-    <string name="dashboard_map_only_in_small_and_full_navi_description">يقرأ DiPlay وضع الملاحة الذي تختاره من أزرار المقود. في وضعي «إيقاف» و«التشغيل عند الملاحة» تعرض لوحة العدادات الأسهم فقط، لذا لا يرسل iPhone الخريطة؛ أما في عرض الملاحة المصغّر والكامل فيرسلها خلال ثانية أو ثانيتين من التبديل. يتطلب ADB عبر الشبكة على وحدة القيادة.</string>
     <string name="check_adb_access">التحقق من الوصول عبر ADB</string>
     <string name="adb_checking">جارٍ التحقق من الوصول عبر ADB…</string>
     <string name="adb_checking_may_ask">جارٍ التحقق من الوصول عبر ADB… إذا طلبت السيارة، فاسمح لـ DiPlay وحدّد «السماح دائمًا».</string>
@@ -691,8 +689,6 @@
     <string name="boot_start_repair_desc">بعض البرامج الثابتة تحجب مستقبلات الإقلاع التابعة لجهات خارجية. يطلب هذا من وحدة الرأس عبر رابط ADB الخاص بها إعفاء DiPlay من حدود الخلفية حتى يصل بث الإقلاع. مرة واحدة؛ أعد التشغيل بعد تحديث البرنامج الثابت.</string>
     <string name="boot_start_repair_result">إصلاح بدء التشغيل التلقائي:%1$s</string>
     <string name="boot_start_repair_running">جارٍ تطبيق إعفاءات بدء التشغيل التلقائي…</string>
-    <string name="bt_suspend_delay">تأخير إيقاف البلوتوث</string>
-    <string name="bt_suspend_delay_option">%1$d ث بعد الاتصال</string>
     <string name="bt_suspend_during_carplay">إيقاف بلوتوث السيارة أثناء CarPlay · يتطلب ADB</string>
     <string name="bt_suspend_during_carplay_description">يبقى الهاتف متصلًا بنظام التحدث الحر في السيارة، فرنين المكالمة يظهر على هاتف السيارة وعلى CarPlay معًا. عند التشغيل: يُوقف بلوتوث السيارة مؤقتًا عبر ADB طوال جلسة CarPlay فترد المكالمات على CarPlay فقط؛ ومع إيقاف البلوتوث تخرج مكالمات CarPlay من سماعة السيارة وميكروفونها. يُعاد تشغيله عند انتهاء الجلسة وقبل مصافحة الاتصال اللاسلكي التالية. لا يتأثر الاقتران. يسري التغيير عند الاتصال التالي.</string>
     <string name="check_for_updates">التحقق من التحديثات</string>

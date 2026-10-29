@@ -1,5 +1,9 @@
 # 繁體中文支援驗證紀錄
 
+> **歷史紀錄 — v142 已移除的功能。** 文中提到的 `samples/home`、`samples/maphost` 模組、
+> 啟動器地圖共享（`MapEmbedService` / `MapMirrors`）與浮動儀表板地圖卡（`CenterMapOverlay`）
+> 已在 v142 移除。本文僅作為歷史驗證紀錄保留，不描述目前應用程式的行為。
+
 [繁體中文首頁](../README.zh-TW.md) · [完整建置指令](BUILD.zh-TW.md#完整檢查)
 
 日期：2026-10-12。分支：`codex/traditional-chinese-support`。驗證環境：Windows、專案 Gradle wrapper 9.5.0、JDK 25 工具鏈及 Android SDK 37.0。
