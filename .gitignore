@@ -13,3 +13,6 @@ local.properties
 local-auth/
 *.pk8
 *.p7b
+
+# Kotlin 构建会话缓存
+.kotlin/
