@@ -502,7 +502,6 @@
     <string name="auto_grant_confirm_msg">ADBアクセスの許可がまだ確認できません。車に「USBデバッグを許可しますか？」と表示されたら承認してください。\n\n「常に許可」にチェックし、再試行してください。</string>
     <string name="btn_open_accessibility_setting">システムのユーザー補助設定を開く</string>
     <string name="manual_grant_cmd_hint">またはパソコンから次のADBコマンドを実行してください。</string>
-    <string name="adb_cluster_activity_label">メーター地図</string>
     <string name="adb_cluster_activity_mode">DiLink 4のメーター映像をADBで起動（実験的機能）</string>
     <string name="adb_cluster_activity_description">内部ADBで検証済みのメーターディスプレイに地図を直接起動します。ADBを許可してiPhoneを再接続してください。</string>
     <string name="open_diplay_settings_hint">CarPlay画面で%1$d本指で下にスワイプするとクイックメニューを開けます。</string>

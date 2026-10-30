@@ -98,19 +98,6 @@
         </activity>
 
         <activity
-            android:name="com.shilapi.xcertplay.AdbClusterActivity"
-            android:label="@string/adb_cluster_activity_label"
-            android:icon="@drawable/ic_dp_navigation"
-            android:taskAffinity="${applicationId}.cluster"
-            android:excludeFromRecents="true"
-            android:resizeableActivity="true"
-            android:allowEmbedded="true"
-            android:exported="true"
-            android:configChanges="density|keyboardHidden|orientation|screenLayout|screenSize|smallestScreenSize|uiMode"
-            android:theme="@style/Theme.AdbCluster">
-        </activity>
-
-        <activity
             android:name="com.shilapi.xcertplay.CarPlayVideoActivity"
             android:configChanges="density|keyboardHidden|orientation|screenLayout|screenSize|smallestScreenSize|uiMode"
             android:exported="false"

@@ -495,7 +495,6 @@
     <string name="auto_grant_confirm_msg">ADB authorization has not been confirmed. If the car shows an \"Allow USB debugging?\" prompt, approve it.\n\nPlease check \"Always allow\" and tap OK, then tap this button again to complete setup!</string>
     <string name="btn_open_accessibility_setting">Open System Accessibility Settings</string>
     <string name="manual_grant_cmd_hint">Or run this ADB command from your computer:</string>
-    <string name="adb_cluster_activity_label">Cluster Map</string>
     <string name="adb_cluster_activity_mode">DiLink 4 cluster video via ADB (experimental)</string>
     <string name="adb_cluster_activity_description">Launch the map directly on the verified cluster display through internal ADB. Authorize ADB, then reconnect the iPhone.</string>
     <string name="open_diplay_settings_hint">In CarPlay, swipe down with %1$d fingers to open the quick menu.</string>

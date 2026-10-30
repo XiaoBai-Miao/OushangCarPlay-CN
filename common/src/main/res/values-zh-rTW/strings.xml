@@ -446,7 +446,6 @@
     <string name="widget_minutes">%1$d 分鐘</string>
     <string name="widget_hours_minutes">%1$d 小時 %2$02d 分鐘</string>
     <string name="shows_the_iphone_s_cluster_map_virtual_stream_description">向 iPhone 申請獨立的 CarPlay 儀表地圖串流（Stream 111），供無物理液晶儀表屏的車機投屏儀表板地圖使用。</string>
-    <string name="adb_cluster_activity_label">儀表地圖</string>
     <string name="adb_cluster_activity_mode">DiLink 4 儀表影片（ADB，實驗性）</string>
     <string name="adb_cluster_activity_description">透過內建ADB直接在已驗證儀表副螢幕啟動地圖。請先授權ADB，再重新連線iPhone。</string>
     <string name="open_diplay_settings_hint">在 CarPlay 中用 %1$d 指向下滑動，以開啟快捷選單。</string>

@@ -688,7 +688,6 @@
     <string name="auto_grant_confirm_msg">لم يتم تأكيد تفويض ADB. إذا عرضت السيارة طلب «السماح بتصحيح أخطاء USB؟»، فوافق عليه.\n\nحدّد «السماح دائمًا» واضغط على «موافق»، ثم اضغط على هذا الزر مجددًا لإكمال الإعداد!</string>
     <string name="btn_open_accessibility_setting">فتح إعدادات تسهيل الاستخدام في النظام</string>
     <string name="manual_grant_cmd_hint">أو نفّذ أمر ADB هذا من جهاز الكمبيوتر:</string>
-    <string name="adb_cluster_activity_label">خريطة شاشة العدادات</string>
     <string name="adb_cluster_activity_mode">فيديو شاشة عدادات DiLink 4 عبر ADB (تجريبي)</string>
     <string name="adb_cluster_activity_description">تشغيل الخريطة مباشرةً على شاشة العدادات التي تم التحقق منها عبر ADB الداخلي. فوّض ADB، ثم أعد توصيل iPhone.</string>
     <string name="cluster_safe_area_edit">المنطقة الآمنة لشاشة العدادات · تعديل الإطار</string>
